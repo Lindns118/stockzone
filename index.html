@@ -2272,10 +2272,11 @@ function calcProductChange() {
   const cfg = (S.palettes && pid && S.palettes[pid]) || null;
   document.getElementById('calc-etages').value = cfg ? cfg.etages : 1;
   document.getElementById('calc-profondeur').value = cfg ? cfg.profondeur : 1;
-  // Update unit label
-  const unit = found ? found.p.unit : 'unités';
-  document.getElementById('calc-unit-lbl').textContent = unit + '/palette';
-  document.getElementById('calc-units-lbl2').textContent = unit.charAt(0).toUpperCase() + unit.slice(1);
+  // Unit label: always show the base physical unit, not "palettes"
+  const rawUnit = found ? found.p.unit : 'unités';
+  const physUnit = rawUnit === 'palettes' ? 'unités' : rawUnit;
+  document.getElementById('calc-unit-lbl').textContent = physUnit + '/palette';
+  document.getElementById('calc-units-lbl2').textContent = physUnit.charAt(0).toUpperCase() + physUnit.slice(1);
   calcUpdate();
 }
 
@@ -2316,11 +2317,12 @@ function calcShowResult(palettes, units) {
   const ppp = calcParPalette();
   const pid = document.getElementById('calc-product').value;
   const found = pid ? findProduct(pid) : null;
-  const unit = found ? found.p.unit : 'unités';
+  const rawUnit = found ? found.p.unit : 'unités';
+  const unit = rawUnit === 'palettes' ? 'unités' : rawUnit;
   const palStr = Number.isInteger(palettes) ? palettes : palettes.toFixed(2);
   const res = document.getElementById('calc-result');
   res.style.display = 'block';
-  res.textContent = `${palStr} palette${palettes>1?'s':''} × ${ppp} ${unit} = ${units} ${unit}`;
+  res.textContent = `${palStr} palette${palettes>1?'s':''} × ${ppp} ${unit}/palette = ${units} ${unit}`;
 }
 
 function calcSavePalette() {
