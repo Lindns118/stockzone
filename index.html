@@ -403,6 +403,7 @@ table.conso-tbl tfoot td.num{font-weight:700}
     <button class="act-btn act-liv" onclick="showModal('livraison')">🚚 Livraison</button>
     <button class="act-btn act-pret" onclick="showModal('pret')">🔄 Prêt</button>
     <button class="act-btn" id="attr-zone-btn" style="display:none;background:#7c3aed;color:#fff" onclick="switchZone('attributions')">👕 Attributions</button>
+    <button class="act-btn" style="background:#0f766e;color:#fff" onclick="openCalcModal()">🧮 Calc</button>
     <button class="act-btn act-exp" onclick="showModal('export')">⬇ Export</button>
   </div>
 
@@ -536,6 +537,69 @@ table.conso-tbl tfoot td.num{font-weight:700}
   </div>
   <div id="person-modal-body"></div>
   <button class="attr-print-btn" style="width:100%;justify-content:center;margin-top:12px" onclick="printPersonFiche()">🖨️ Imprimer la fiche</button>
+</div>
+</div>
+
+
+<!-- CALCULATRICE PALETTE -->
+<div id="modal-calc" class="modal-overlay hidden" onclick="overlayClose(event,'modal-calc')">
+<div class="modal-sheet">
+  <div class="mh-row">
+    <div class="mh-icon" style="background:#ccfbf1">🧮</div>
+    <div><div class="m-title">Calculatrice stock</div><div class="m-sub">Palettes ↔ Unités</div></div>
+    <button class="m-close" onclick="hideModal('modal-calc')">✕</button>
+  </div>
+
+  <!-- Product selector -->
+  <div class="fg">
+    <label class="fl">Produit</label>
+    <select id="calc-product" class="fi" onchange="calcProductChange()">
+      <option value="">-- Sélectionner --</option>
+    </select>
+  </div>
+
+  <!-- Palette config -->
+  <div class="calc-palette-cfg" id="calc-pal-cfg">
+    <div class="calc-section-title">📦 Définition d'une palette</div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+      <div style="flex:1">
+        <label class="fl" style="font-size:11px">Étages</label>
+        <input type="number" id="calc-etages" class="fi fi-sm" min="1" value="1" oninput="calcUpdate()">
+      </div>
+      <div style="font-size:20px;color:var(--text2);padding-top:16px">×</div>
+      <div style="flex:1">
+        <label class="fl" style="font-size:11px">Profondeur</label>
+        <input type="number" id="calc-profondeur" class="fi fi-sm" min="1" value="1" oninput="calcUpdate()">
+      </div>
+      <div style="font-size:20px;color:var(--text2);padding-top:16px">=</div>
+      <div style="flex:1;text-align:center;padding-top:14px">
+        <div style="font-size:22px;font-weight:700;color:var(--blue)" id="calc-par-palette">1</div>
+        <div style="font-size:10px;color:var(--text2)" id="calc-unit-lbl">unités/palette</div>
+      </div>
+    </div>
+    <button class="btn-secondary" style="width:100%;margin-bottom:14px;font-size:12px" onclick="calcSavePalette()">💾 Mémoriser pour ce produit</button>
+  </div>
+
+  <!-- Conversion -->
+  <div class="calc-section-title">🔄 Conversion</div>
+  <div style="display:flex;gap:8px;margin-bottom:6px">
+    <div style="flex:1">
+      <label class="fl" style="font-size:11px">Palettes</label>
+      <input type="number" id="calc-nb-palettes" class="fi fi-sm" min="0" step="0.5" placeholder="ex: 2.5" oninput="calcFromPalettes()">
+    </div>
+    <div style="font-size:20px;color:var(--text2);padding-top:16px">↔</div>
+    <div style="flex:1">
+      <label class="fl" style="font-size:11px" id="calc-units-lbl2">Unités</label>
+      <input type="number" id="calc-nb-units" class="fi fi-sm" min="0" placeholder="ex: 200" oninput="calcFromUnits()">
+    </div>
+  </div>
+  <div id="calc-result" style="text-align:center;padding:10px;background:var(--blue-light);border-radius:10px;font-size:13px;color:var(--blue);font-weight:600;margin-bottom:14px;display:none"></div>
+
+  <!-- Actions -->
+  <div style="display:flex;gap:8px">
+    <button class="btn-primary" style="flex:1" onclick="calcApplyInventaire()">📋 → Inventaire</button>
+    <button class="btn-secondary" style="flex:1" onclick="calcApplyLivraison()">🚚 → Livraison</button>
+  </div>
 </div>
 </div>
 
@@ -786,6 +850,7 @@ const DEF = {
   },
   prets: [],
   attributions: [],
+  palettes: {},
   units: [...DEFAULT_UNITS]
 };
 
@@ -815,6 +880,7 @@ function migrateData(data) {
   }
   if (!data.prets) data.prets = [];
   if (!data.attributions) data.attributions = [];
+  if (!data.palettes) data.palettes = {};
   if (!data.units) data.units = [...DEFAULT_UNITS];
   // Migrate vetements products: add sizes if missing
   if (data.zones && data.zones.vetements) {
@@ -1781,26 +1847,37 @@ function importJSON(e) {
   const file=e.target.files[0];
   if(!file) return;
   const r=new FileReader();
-  r.onload=ev=>{
+  r.onload=async ev=>{
     try{
       const raw = ev.target.result;
-      // Size guard: max 5MB
       if(raw.length > 5 * 1024 * 1024) throw new Error('Fichier trop volumineux');
       const data = JSON.parse(raw);
-      // Structure validation
       if(!data || typeof data !== 'object') throw new Error('Format invalide');
-      if(!data.zones || typeof data.zones !== 'object') throw new Error('Format invalide');
-      // Sanitize each zone and product
+
+      // Support both raw export {zones,...} and wrapped {data:{zones,...}}
+      const src = (data.data && data.data.zones) ? data.data : data;
+      if(!src.zones || typeof src.zones !== 'object') throw new Error('Format invalide');
+
       const allowedZoneKeys = /^[a-zA-Z0-9_-]{1,50}$/;
-      for(const [k,z] of Object.entries(data.zones)){
-        if(!allowedZoneKeys.test(k)) throw new Error('Clé de zone invalide');
-        if(!z.name || !z.products || !Array.isArray(z.products)) throw new Error('Zone invalide');
-        // Sanitize product fields
-        z.products = z.products.filter(p =>
+
+      // Ask user: merge or replace?
+      const doMerge = await confirm2(
+        'Mode d\'import',
+        'Comment voulez-vous importer ces données ?<br><br>' +
+        '<strong>Fusionner</strong> : ajoute les nouveaux produits sans supprimer l\'existant.<br>' +
+        '<strong>Remplacer</strong> : efface tout et repart des nouvelles données.',
+        'Fusionner'
+      );
+
+      for(const [k,z] of Object.entries(src.zones)){
+        if(!allowedZoneKeys.test(k)) continue;
+        if(!z.name || !z.products || !Array.isArray(z.products)) continue;
+
+        // Sanitize incoming products
+        const incoming = z.products.filter(p =>
           p && typeof p === 'object' &&
           typeof p.name === 'string' && p.name.length <= 100 &&
-          typeof p.qty === 'number' && isFinite(p.qty) &&
-          typeof p.unit === 'string' && p.unit.length <= 30
+          typeof p.qty === 'number' && isFinite(p.qty)
         ).map(p => ({
           id: p.id || uid(),
           name: p.name.slice(0,100),
@@ -1808,27 +1885,86 @@ function importJSON(e) {
           qty: Math.max(0, parseFloat(p.qty)||0),
           unit: (p.unit||'pièces').slice(0,30),
           seuil: Math.max(0, parseInt(p.seuil)||0),
+          sized: p.sized || false,
+          sizes: p.sizes || undefined,
           history: Array.isArray(p.history) ? p.history.filter(h =>
             h && typeof h === 'object' &&
-            ['inventaire','inventaire_base','livraison'].includes(h.type) &&
+            ['inventaire','inventaire_base','livraison','attribution'].includes(h.type) &&
             typeof h.qty === 'number' && isFinite(h.qty)
           ).map(h => ({
             id: h.id || uid(),
             type: h.type,
             date: typeof h.date === 'string' ? h.date.slice(0,10) : today(),
-            qty: Math.max(0, parseFloat(h.qty)||0),
+            qty: parseFloat(h.qty)||0,
             ...(h.fournisseur ? {fournisseur: String(h.fournisseur).slice(0,100)} : {}),
             ...(h.notes ? {notes: String(h.notes).slice(0,500)} : {})
           })) : []
         }));
+
+        if(doMerge) {
+          // MERGE: add zone if missing, then add/update products
+          if(!S.zones[k]) {
+            S.zones[k] = {name: z.name.slice(0,50), icon: z.icon||'📦', color: z.color||k, products: []};
+          }
+          let added = 0, updated = 0;
+          incoming.forEach(newP => {
+            // Match by name (case insensitive)
+            const existing = S.zones[k].products.find(p => p.name.toLowerCase() === newP.name.toLowerCase());
+            if(existing) {
+              // Add new history entries that don't already exist (by date+type)
+              newP.history.forEach(h => {
+                const alreadyExists = existing.history.some(eh => eh.date === h.date && eh.type === h.type);
+                if(!alreadyExists) existing.history.push(h);
+              });
+              recalcQty(existing);
+              updated++;
+            } else {
+              S.zones[k].products.push(newP);
+              added++;
+            }
+          });
+          toast(`✅ Zone ${z.name} : ${added} ajouté(s), ${updated} mis à jour`, 'success');
+        } else {
+          // REPLACE zone products entirely
+          S.zones[k] = {
+            name: z.name.slice(0,50),
+            icon: z.icon || S.zones[k]?.icon || '📦',
+            color: z.color || k,
+            products: incoming
+          };
+        }
       }
-      data.prets = Array.isArray(data.prets) ? data.prets.slice(0,1000) : [];
-      data.units = Array.isArray(data.units) ? data.units.filter(u=>typeof u==='string'&&u.length<=30).slice(0,50) : [...DEFAULT_UNITS];
-      S = data;
-      save(); switchZone('entrepot');
+
+      // Merge units
+      if(Array.isArray(src.units)) {
+        src.units.forEach(u => {
+          if(typeof u==='string' && u.length<=30 && !S.units.includes(u)) S.units.push(u);
+        });
+      }
+      // Merge prets
+      if(Array.isArray(src.prets)) {
+        src.prets.forEach(pr => {
+          if(!S.prets.find(p=>p.id===pr.id)) S.prets.push(pr);
+        });
+      }
+      // Merge attributions
+      if(Array.isArray(src.attributions)) {
+        if(!S.attributions) S.attributions = [];
+        src.attributions.forEach(a => {
+          if(!S.attributions.find(x=>x.id===a.id)) S.attributions.push(a);
+        });
+      }
+      // Merge palettes config
+      if(src.palettes && typeof src.palettes === 'object') {
+        if(!S.palettes) S.palettes = {};
+        Object.assign(S.palettes, src.palettes);
+      }
+
+      save();
+      switchZone('entrepot');
       hideModal('modal-export');
-      toast('✅ Données importées','success');
-    }catch(e){ toast('⚠ Fichier invalide : '+e.message,'error'); }
+      if(!doMerge) toast('✅ Données remplacées avec succès', 'success');
+    }catch(err){ toast('⚠ Erreur import : '+err.message,'error'); }
   };
   r.readAsText(file);
   e.target.value='';
@@ -1972,6 +2108,13 @@ table.inv-tbl input.sz-inp:focus{border-color:var(--blue);background:#fff}
 .attr-cart-item{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--gray2);font-size:13px}
 .attr-cart-item:last-child{border:none}
 
+
+/* ===== CALCULATRICE ===== */
+.calc-section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);margin-bottom:8px}
+.calc-palette-cfg{background:var(--gray);border-radius:12px;padding:12px;margin-bottom:14px}
+.btn-secondary{padding:11px;border:1.5px solid var(--blue);border-radius:11px;background:#fff;color:var(--blue);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;transition:all .18s;text-align:center}
+.btn-secondary:active{background:var(--blue-light)}
+
 .cmp-summary{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;padding:12px 14px;background:var(--blue-light);border-radius:11px}
 .cmp-sum-item{display:flex;flex-direction:column}
 .cmp-sum-num{font-size:20px;font-weight:700;color:var(--blue)}
@@ -1989,6 +2132,124 @@ table.inv-tbl input.sz-inp:focus{border-color:var(--blue);background:#fff}
   </body></html>`;
 }
 
+
+
+// ===== CALCULATRICE PALETTE =====
+function openCalcModal() {
+  // Fill product list from current zone
+  const zd = S.zones[currentZone] || {products:[]};
+  const sel = document.getElementById('calc-product');
+  sel.innerHTML = '<option value="">-- Sélectionner --</option>' +
+    zd.products.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  document.getElementById('calc-nb-palettes').value = '';
+  document.getElementById('calc-nb-units').value = '';
+  document.getElementById('calc-result').style.display = 'none';
+  calcProductChange();
+  showModal('calc');
+}
+
+function calcProductChange() {
+  const pid = document.getElementById('calc-product').value;
+  const found = pid ? findProduct(pid) : null;
+  // Load saved palette config for this product
+  const cfg = (S.palettes && pid && S.palettes[pid]) || null;
+  document.getElementById('calc-etages').value = cfg ? cfg.etages : 1;
+  document.getElementById('calc-profondeur').value = cfg ? cfg.profondeur : 1;
+  // Update unit label
+  const unit = found ? found.p.unit : 'unités';
+  document.getElementById('calc-unit-lbl').textContent = unit + '/palette';
+  document.getElementById('calc-units-lbl2').textContent = unit.charAt(0).toUpperCase() + unit.slice(1);
+  calcUpdate();
+}
+
+function calcUpdate() {
+  const etages = Math.max(1, parseInt(document.getElementById('calc-etages').value)||1);
+  const prof = Math.max(1, parseInt(document.getElementById('calc-profondeur').value)||1);
+  const total = etages * prof;
+  document.getElementById('calc-par-palette').textContent = total;
+  // Re-run conversions
+  if(document.getElementById('calc-nb-palettes').value) calcFromPalettes();
+  else if(document.getElementById('calc-nb-units').value) calcFromUnits();
+}
+
+function calcParPalette() {
+  const etages = Math.max(1, parseInt(document.getElementById('calc-etages').value)||1);
+  const prof = Math.max(1, parseInt(document.getElementById('calc-profondeur').value)||1);
+  return etages * prof;
+}
+
+function calcFromPalettes() {
+  const palettes = parseFloat(document.getElementById('calc-nb-palettes').value);
+  if(isNaN(palettes) || palettes < 0) return;
+  const units = Math.round(palettes * calcParPalette());
+  document.getElementById('calc-nb-units').value = units;
+  calcShowResult(palettes, units);
+}
+
+function calcFromUnits() {
+  const units = parseFloat(document.getElementById('calc-nb-units').value);
+  if(isNaN(units) || units < 0) return;
+  const ppp = calcParPalette();
+  const palettes = units / ppp;
+  document.getElementById('calc-nb-palettes').value = Math.round(palettes * 100) / 100;
+  calcShowResult(palettes, units);
+}
+
+function calcShowResult(palettes, units) {
+  const ppp = calcParPalette();
+  const pid = document.getElementById('calc-product').value;
+  const found = pid ? findProduct(pid) : null;
+  const unit = found ? found.p.unit : 'unités';
+  const palStr = Number.isInteger(palettes) ? palettes : palettes.toFixed(2);
+  const res = document.getElementById('calc-result');
+  res.style.display = 'block';
+  res.textContent = `${palStr} palette${palettes>1?'s':''} × ${ppp} ${unit} = ${units} ${unit}`;
+}
+
+function calcSavePalette() {
+  const pid = document.getElementById('calc-product').value;
+  if(!pid) { toast('Sélectionnez un produit', 'error'); return; }
+  const etages = Math.max(1, parseInt(document.getElementById('calc-etages').value)||1);
+  const prof = Math.max(1, parseInt(document.getElementById('calc-profondeur').value)||1);
+  if(!S.palettes) S.palettes = {};
+  S.palettes[pid] = {etages, profondeur: prof};
+  save();
+  toast('✅ Configuration palette mémorisée', 'success');
+}
+
+function calcGetQty() {
+  const units = parseInt(document.getElementById('calc-nb-units').value);
+  if(isNaN(units) || units <= 0) { toast('Entrez une quantité', 'error'); return null; }
+  return units;
+}
+
+function calcApplyInventaire() {
+  const qty = calcGetQty(); if(!qty) return;
+  const pid = document.getElementById('calc-product').value;
+  if(!pid) { toast('Sélectionnez un produit', 'error'); return; }
+  const found = findProduct(pid);
+  if(!found) return;
+  found.p.history.push({id:uid(), type:'inventaire', date:today(), qty});
+  recalcQty(found.p);
+  save();
+  hideModal('modal-calc');
+  toast(`✅ Inventaire enregistré : ${qty} ${found.p.unit}`, 'success');
+  renderProducts();
+}
+
+function calcApplyLivraison() {
+  const qty = calcGetQty(); if(!qty) return;
+  const pid = document.getElementById('calc-product').value;
+  if(!pid) { toast('Sélectionnez un produit', 'error'); return; }
+  const found = findProduct(pid);
+  if(!found) return;
+  found.p.history.push({id:uid(), type:'livraison', date:today(), qty});
+  recalcQty(found.p);
+  save();
+  hideModal('modal-calc');
+  toast(`✅ Livraison enregistrée : ${qty} ${found.p.unit}`, 'success');
+  renderProducts();
+}
 
 // ===== ATTRIBUTIONS VETEMENTS =====
 // Cart: {productId: {size: qty}}
