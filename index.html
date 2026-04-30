@@ -356,6 +356,10 @@ body{font-family:'DM Sans',sans-serif;background:#eef0f7;color:var(--text);min-h
 table.conso-tbl{width:100%;border-collapse:collapse;font-size:12px;background:#fff}
 table.conso-tbl thead tr{background:var(--blue);color:#fff}
 table.conso-tbl th{padding:10px 12px;text-align:left;font-weight:600;white-space:nowrap;font-size:11px;letter-spacing:.3px}
+table.conso-tbl th:first-child,table.conso-tbl td:first-child{position:sticky;left:0;z-index:2;background:inherit}
+table.conso-tbl thead th:first-child{background:var(--blue);z-index:3}
+table.conso-tbl tbody tr:hover td:first-child{background:#f9fafb}
+table.conso-tbl tfoot td:first-child{background:var(--gray)}
 table.conso-tbl th.num{text-align:right}
 table.conso-tbl td{padding:9px 12px;border-bottom:1px solid var(--gray2);vertical-align:middle}
 table.conso-tbl td.num{text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
@@ -854,6 +858,12 @@ const DEF = {
   units: [...DEFAULT_UNITS]
 };
 
+
+// Round to max 2 decimal places, remove trailing zeros
+function r2(v) {
+  if(v === null || v === undefined || v === 0) return 0;
+  return Math.round(v * 100) / 100;
+}
 function uid() {
   if(typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID().replace(/-/g,'');
@@ -2010,6 +2020,10 @@ function genHTMLReport(prods) {
 table.conso-tbl{width:100%;border-collapse:collapse;font-size:12px;background:#fff}
 table.conso-tbl thead tr{background:var(--blue);color:#fff}
 table.conso-tbl th{padding:10px 10px;text-align:left;font-weight:600;white-space:nowrap;font-size:11px;letter-spacing:.3px}
+table.conso-tbl th:first-child,table.conso-tbl td:first-child{position:sticky;left:0;z-index:2;background:inherit}
+table.conso-tbl thead th:first-child{background:var(--blue);z-index:3}
+table.conso-tbl tbody tr:hover td:first-child{background:#f9fafb}
+table.conso-tbl tfoot td:first-child{background:var(--gray)}
 table.conso-tbl th.num{text-align:right}
 table.conso-tbl td{padding:9px 10px;border-bottom:1px solid var(--gray2);vertical-align:middle}
 table.conso-tbl td.num{text-align:right;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -2589,7 +2603,7 @@ function renderConsoTable(){
 
   const tbody=rows.map(r=>{
     const cells=periods.map(pk=>{
-      const v=r.grouped[pk]||0;
+      const v=r2(r.grouped[pk]||0);
       if(!v) return `<td class="num zero">—</td>`;
       const pct=v/maxV;
       const cls=pct>0.65?'hi':pct>0.35?'med':'';
@@ -2600,14 +2614,14 @@ function renderConsoTable(){
       <td><div class="prod-cell"><span class="prod-cell-name">${esc(r.name)}</span><span class="prod-cell-cat">${esc(r.cat)} · ${esc(r.unit)}</span></div></td>
       <td style="font-size:12px;color:var(--text2)">${esc(r.zone)}</td>
       ${cells}
-      <td class="num"><span class="sum-badge">${r.total}</span></td>
+      <td class="num"><span class="sum-badge">${r2(r.total)}</span></td>
     </tr>`;
   }).join('');
 
   const tfoot=`<tfoot><tr>
     <td colspan="2" style="font-size:12px">Totaux période</td>
-    ${periods.map(pk=>`<td class="num">${pkTotals[pk]||0}</td>`).join('')}
-    <td class="num">${grandTotal}</td>
+    ${periods.map(pk=>`<td class="num">${r2(pkTotals[pk]||0)}</td>`).join('')}
+    <td class="num">${r2(grandTotal)}</td>
   </tr></tfoot>`;
 
   wrap.innerHTML=`<div class="tbl-wrap"><table class="conso-tbl">${thead}<tbody>${tbody}</tbody>${tfoot}</table></div>
