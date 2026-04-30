@@ -417,6 +417,7 @@ table.conso-tbl tfoot td.num{font-weight:700}
       <input type="text" id="search-input" maxlength="100" placeholder="Rechercher un produit..." oninput="renderProducts()" autocomplete="off" autocorrect="off" spellcheck="false">
     </div>
     <div class="sort-bar">
+      <button class="sort-btn" onclick="setSort('ordre',this)">🔢 Ordre</button>
       <button class="sort-btn active" onclick="setSort('az',this)">A–Z</button>
       <button class="sort-btn" onclick="setSort('desc',this)">Stock ↓</button>
       <button class="sort-btn" onclick="setSort('asc',this)">Stock ↑</button>
@@ -495,7 +496,9 @@ table.conso-tbl tfoot td.num{font-weight:700}
       <label class="fl">Nom du produit</label>
       <input type="text" id="ps-name" class="fi" maxlength="100" style="margin-bottom:11px" autocomplete="off">
       <label class="fl">Catégorie</label>
-      <input type="text" id="ps-cat" class="fi" maxlength="60" style="margin-bottom:18px" autocomplete="off">
+      <input type="text" id="ps-cat" class="fi" maxlength="60" style="margin-bottom:11px" autocomplete="off">
+      <label class="fl">Numéro d'ordre <span style="font-size:11px;color:var(--text2);font-weight:400">(décale les autres automatiquement)</span></label>
+      <input type="number" id="ps-ordre" class="fi fi-sm" placeholder="ex: 3" min="1" style="margin-bottom:18px">
       <button class="btn-primary" onclick="saveParams()">💾 Sauvegarder</button>
       <button class="btn-danger" style="margin-top:9px" onclick="confirmDeleteProduct()">🗑 Supprimer ce produit</button>
     </div>
@@ -897,6 +900,18 @@ function migrateData(data) {
   if (!data.attributions) data.attributions = [];
   if (!data.palettes) data.palettes = {};
   if (!data.units) data.units = [...DEFAULT_UNITS];
+  // Assign default ordre to entrepot products if missing
+  const DEFAULT_ORDRE = ['Shuttles','Planche 3m','Planche 2m','Beams 3m','Beams 2m',
+    'Plastique 6/6','Shrink 125','Corde','Palette','Shrink 50',
+    'Tape','Sel','Absorbant','Sangle','Climatube','Culligan','Shrink machine'];
+  if (data.zones && data.zones.entrepot) {
+    data.zones.entrepot.products.forEach(p => {
+      if (p.ordre == null) {
+        const idx = DEFAULT_ORDRE.findIndex(n => n.toLowerCase() === p.name.toLowerCase());
+        if (idx >= 0) p.ordre = idx + 1;
+      }
+    });
+  }
   // Migrate vetements products: add sizes if missing
   if (data.zones && data.zones.vetements) {
     data.zones.vetements.products.forEach(p => {
@@ -1359,6 +1374,11 @@ function cardSave(pid) {
 
 function sortedProds(arr) {
   return [...arr].sort((a,b)=>{
+    if(currentSort==='ordre'){
+      const ao = a.ordre != null ? a.ordre : 9999;
+      const bo = b.ordre != null ? b.ordre : 9999;
+      return ao - bo || a.name.localeCompare(b.name,'fr');
+    }
     if(currentSort==='az') return a.name.localeCompare(b.name,'fr');
     if(currentSort==='desc') return b.qty-a.qty;
     if(currentSort==='asc') return a.qty-b.qty;
@@ -1401,6 +1421,7 @@ function openDetail(id) {
   document.getElementById('ps-unit').innerHTML = unitOptions(found.p.unit);
   document.getElementById('ps-name').value = found.p.name;
   document.getElementById('ps-cat').value = found.p.category;
+  document.getElementById('ps-ordre').value = found.p.ordre != null ? found.p.ordre : '';
   showModal('detail');
 }
 
@@ -1587,6 +1608,31 @@ function saveParams() {
   const newCat = document.getElementById('ps-cat').value.trim();
   if (newName) currentProduct.name = newName;
   if (newCat) currentProduct.category = newCat;
+
+  // Handle ordre with shift
+  const ordreVal = document.getElementById('ps-ordre').value;
+  if (ordreVal !== '') {
+    const newOrdre = parseInt(ordreVal);
+    if (!isNaN(newOrdre) && newOrdre >= 1) {
+      const zd = S.zones[currentZone];
+      if (zd) {
+        const oldOrdre = currentProduct.ordre;
+        // Shift other products: if slot taken, push them up by 1
+        zd.products.forEach(p => {
+          if (p.id === currentProduct.id) return;
+          if (p.ordre == null) return;
+          // If moving to a slot already taken, shift >= newOrdre up by 1
+          if (p.ordre >= newOrdre && (oldOrdre == null || p.ordre < oldOrdre)) {
+            p.ordre++;
+          } else if (oldOrdre != null && p.ordre > oldOrdre && p.ordre <= newOrdre) {
+            p.ordre--;
+          }
+        });
+      }
+      currentProduct.ordre = newOrdre;
+    }
+  }
+
   save();
   switchZone(currentZone);
   hideModal('modal-detail');
@@ -1666,7 +1712,7 @@ function drawBarChart(ctx, W, H, data) {
       ctx.fillStyle=g;
       ctx.beginPath();ctx.roundRect(x,y,bw,h,5);ctx.fill();
       ctx.fillStyle='#111';ctx.font='10px DM Sans';ctx.textAlign='center';
-      ctx.fillText(d.val,x+bw/2,y-3);
+      ctx.fillText(r2(d.val),x+bw/2,y-3);
     }
     ctx.fillStyle='#9ca3af';ctx.font='9px DM Sans';ctx.textAlign='center';
     ctx.fillText(d.label,x+bw/2,chartH+16);
