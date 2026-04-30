@@ -829,20 +829,6 @@ table.conso-tbl tfoot td.num{font-weight:700}
 const SK = 'stockzone_v2';
 const DEFAULT_UNITS = ['pièces','kg','rouleaux','ramettes','paires','litres','boîtes','mètres','sachets','cartons'];
 const SIZES = ['S','M','L','XL','2XL','3XL'];
-const COLOR_MAP = {
-  'Rouge':'#ef4444','Red':'#ef4444','Rouge foncé':'#991b1b',
-  'Bleu':'#3b82f6','Blue':'#3b82f6','Bleu ciel':'#38bdf8','Bleu foncé':'#1e3a8a',
-  'Vert':'#22c55e','Green':'#22c55e','Jaune-vert':'#84cc16',
-  'Jaune':'#eab308','Yellow':'#eab308','Orange':'#f97316',
-  'Blanc':'#e5e7eb','White':'#f9fafb','Noir':'#1f2937','Black':'#1f2937',
-  'Rose':'#ec4899','Violet':'#8b5cf6','Gris':'#6b7280',
-  'Multi':'linear-gradient(135deg,#ef4444,#eab308,#22c55e,#3b82f6)',
-  'A4':'#6366f1','A5':'#8b5cf6'
-};
-function colorStyle(c) {
-  const s = COLOR_MAP[c] || COLOR_MAP[c.charAt(0).toUpperCase()+c.slice(1).toLowerCase()] || '#9ca3af';
-  return s.includes('gradient') ? `background:${s}` : `background:${s}`;
-}
 
 const DEF = {
   zones: {
@@ -1340,31 +1326,6 @@ function renderProducts() {
         <div class="size-grid" style="display:flex;flex-direction:row;gap:5px;margin-top:10px;padding-top:10px;border-top:1px solid #e5e7eb;overflow-x:auto">${sizeCells}</div>
       </div>`;
     }
-    /* OFFICE-COLOR-V3 */ if(p.colored && p.colors && Object.keys(p.colors).length > 0) {
-      const colorCells2 = Object.entries(p.colors).map(([c,qty])=>{
-        const safeId = c.replace(/[^a-z0-9]/gi,'_');
-        const isZ = qty===0;
-        return `<div class="size-cell ${isZ?'size-zero':''}" style="flex:1;min-width:44px;text-align:center;padding:6px 3px;border-radius:10px;background:${isZ?'#f3f4f6':'#fff3e8'};border:1.5px solid ${isZ?'#e5e7eb':'#fb923c'};cursor:pointer;display:inline-block" onclick="event.stopPropagation();colorStep('${p.id}','${c}',1)" oncontextmenu="event.preventDefault();event.stopPropagation();colorStep('${p.id}','${c}',-1)">
-          <span class="size-lbl" style="font-size:9px;font-weight:700;color:${isZ?'#9ca3af':'#ea580c'};display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c)}</span>
-          <span class="size-qty" id="cqty-${p.id}-${safeId}" style="font-size:15px;font-weight:700;color:${isZ?'#9ca3af':'#111'};display:block">${qty}</span>
-        </div>`;
-      }).join('');
-      const sub2 = p.uniteParPack ? `<span style="font-size:10px;color:#9ca3af"> ×${p.uniteParPack}</span>` : '';
-      return `<div class="product-card oc" draggable="true" data-pid="${p.id}"
-        onclick="openDetail('${p.id}')"
-        ondragstart="dragStart(event,'${p.id}')"
-        ondragover="dragOver(event)"
-        ondrop="dragDrop(event,'${p.id}')"
-        ondragend="dragEnd(event)"
-        ondragleave="dragLeave(event)">
-        <div class="pc-top">
-          <div><div class="pc-name">${esc(p.name)}</div><div class="pc-cat">${esc(p.category)}</div></div>
-          <div><div class="pc-qty${isLow?' low':''}">${p.qty}${sub2}</div><div class="pc-unit">${esc(p.unit)}</div></div>
-        </div>
-        ${isLow?`<div><span class="alert-tag">⚠ Seuil bas (≤ ${p.seuil})</span></div>`:''}
-        <div class="size-grid" style="display:flex;flex-direction:row;gap:5px;margin-top:10px;padding-top:10px;border-top:1px solid #e5e7eb;overflow-x:auto">${colorCells2}</div>
-      </div>`;
-    }
     const isLow2 = isLow;
     return `<div class="product-card ${cc}" draggable="true" data-pid="${p.id}"
         onclick="openDetail('${p.id}')"
@@ -1387,109 +1348,6 @@ function renderProducts() {
       </div>
     </div>`;
   }).join('');
-}
-
-function colorStep(pid, color, delta) {
-  const found = findProduct(pid);
-  if(!found || !found.p.colored) return;
-  if(!found.p.colors) found.p.colors = {};
-  const cur = found.p.colors[color] || 0;
-
-  // If decrementing in office, ask inventaire vs don
-  if(delta < 0 && currentZone === 'office' && cur > 0) {
-    const newColorQty = Math.max(0, cur + delta);
-    const diff = cur - newColorQty;
-    colorStepAskDon(pid, color, newColorQty, diff, found.p);
-    return;
-  }
-
-  found.p.colors[color] = Math.max(0, cur + delta);
-  found.p.qty = r2(Object.values(found.p.colors).reduce((s,v)=>s+v,0));
-  const safeId = color.replace(/[^a-z0-9]/gi,'_');
-  const el = document.getElementById(`cqty-${pid}-${safeId}`);
-  if(el) el.textContent = found.p.colors[color];
-  const pdQty = document.getElementById('pd-qty');
-  if(pdQty && currentProduct && currentProduct.id === pid) pdQty.textContent = found.p.qty;
-  save();
-  clearTimeout(window._colorToast);
-  window._colorToast = setTimeout(()=>{
-    toast(`${found.p.name} — ${color}: ${found.p.colors[color]}`, 'success');
-    renderProducts();
-  }, 800);
-}
-
-function colorStepAskDon(pid, color, newColorQty, diff, product) {
-  const persons = [...new Set((S.attributions||[]).map(a=>a.person))].sort();
-  const box = document.createElement('div');
-  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-end;justify-content:center;padding:20px';
-  box.innerHTML = `<div style="background:#fff;border-radius:18px;padding:24px;width:100%;max-width:400px;box-shadow:0 8px 40px rgba(0,0,0,.2)">
-    <div style="font-size:16px;font-weight:700;margin-bottom:4px">${esc(product.name)} — ${esc(color)}</div>
-    <div style="font-size:13px;color:#6b7280;margin-bottom:18px">−${diff} ${esc(product.unit)}</div>
-    <div style="font-size:13px;font-weight:600;margin-bottom:12px">C'est quoi cette modification ?</div>
-    <button id="cas-inv" style="width:100%;padding:13px;border:none;border-radius:12px;background:#ea580c;color:#fff;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;margin-bottom:8px">📋 Inventaire</button>
-    <button id="cas-don" style="width:100%;padding:13px;border:none;border-radius:12px;background:#7c3aed;color:#fff;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;margin-bottom:8px">🎁 Don à quelqu'un</button>
-    <button id="cas-cancel" style="width:100%;padding:11px;border:1.5px solid #e5e7eb;border-radius:12px;background:#fff;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;color:#6b7280">Annuler</button>
-  </div>`;
-  document.body.appendChild(box);
-
-  box.querySelector('#cas-inv').onclick = () => {
-    document.body.removeChild(box);
-    const found = findProduct(pid);
-    if(!found) return;
-    found.p.colors[color] = newColorQty;
-    found.p.qty = r2(Object.values(found.p.colors).reduce((s,v)=>s+v,0));
-    const today = new Date().toISOString().slice(0,10);
-    found.p.history.push({id:uid(), type:'inventaire', date:today, qty:found.p.qty, colors:{...found.p.colors}});
-    save();
-    toast(`✅ ${esc(product.name)} ${esc(color)} → ${newColorQty}`, 'success');
-    renderProducts();
-  };
-
-  box.querySelector('#cas-don').onclick = () => {
-    document.body.removeChild(box);
-    // Ask person
-    const persons = [...new Set((S.attributions||[]).map(a=>a.person))].sort();
-    const box2 = document.createElement('div');
-    box2.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-end;justify-content:center;padding:20px';
-    box2.innerHTML = `<div style="background:#fff;border-radius:18px;padding:24px;width:100%;max-width:400px;box-shadow:0 8px 40px rgba(0,0,0,.2)">
-      <div style="font-size:16px;font-weight:700;margin-bottom:4px">Don — ${esc(product.name)} ${esc(color)}</div>
-      <div style="font-size:13px;color:#6b7280;margin-bottom:16px">${diff} ${esc(product.unit)} donnés</div>
-      <datalist id="cas-person-dl">${persons.map(p=>`<option value="${esc(p)}">`).join('')}</datalist>
-      <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:6px">À qui ?</label>
-      <input id="cas-person-input" type="text" list="cas-person-dl" placeholder="Nom de la personne" autocomplete="off" maxlength="100"
-        style="width:100%;padding:12px;border:1.5px solid #e5e7eb;border-radius:11px;font-size:14px;font-family:inherit;margin-bottom:8px;box-sizing:border-box">
-      <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Notes (optionnel)</label>
-      <input id="cas-notes" type="text" placeholder="Optionnel" maxlength="200"
-        style="width:100%;padding:12px;border:1.5px solid #e5e7eb;border-radius:11px;font-size:14px;font-family:inherit;margin-bottom:14px;box-sizing:border-box">
-      <button id="cas-confirm" style="width:100%;padding:13px;border:none;border-radius:12px;background:#7c3aed;color:#fff;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;margin-bottom:8px">✅ Confirmer</button>
-      <button id="cas-back2" style="width:100%;padding:11px;border:1.5px solid #e5e7eb;border-radius:12px;background:#fff;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;color:#6b7280">← Retour</button>
-    </div>`;
-    document.body.appendChild(box2);
-
-    box2.querySelector('#cas-confirm').onclick = () => {
-      const person = box2.querySelector('#cas-person-input').value.trim();
-      const notes = box2.querySelector('#cas-notes').value.trim();
-      if(!person) { box2.querySelector('#cas-person-input').style.borderColor='#ef4444'; return; }
-      document.body.removeChild(box2);
-      const found = findProduct(pid);
-      if(!found) return;
-      found.p.colors[color] = newColorQty;
-      found.p.qty = r2(Object.values(found.p.colors).reduce((s,v)=>s+v,0));
-      const today = new Date().toISOString().slice(0,10);
-      found.p.history.push({id:uid(), type:'attribution', date:today, qty:found.p.qty, colors:{...found.p.colors}, person});
-      if(!S.attributions) S.attributions = [];
-      S.attributions.push({id:uid(), person, productId:pid, productName:product.name, productUnit:product.unit, color, qty:diff, date:today, notes:notes||undefined, zone:'office'});
-      save();
-      toast(`✅ Don de ${diff} ${esc(product.unit)} ${esc(color)} à ${person}`, 'success');
-      renderProducts();
-    };
-    box2.querySelector('#cas-back2').onclick = () => {
-      document.body.removeChild(box2);
-      colorStepAskDon(pid, color, newColorQty, diff, product);
-    };
-  };
-
-  box.querySelector('#cas-cancel').onclick = () => document.body.removeChild(box);
 }
 
 function sizeStep(pid, size, delta) {
