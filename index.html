@@ -1327,30 +1327,14 @@ function renderProducts() {
         <div class="size-grid" style="display:flex;flex-direction:row;gap:5px;margin-top:10px;padding-top:10px;border-top:1px solid #e5e7eb;overflow-x:auto">${sizeCells}</div>
       </div>`;
     }
-    // Office colored product card
-    if(p.colored && currentZone==='office') {
-      const colorCells = Object.entries(p.colors||{}).map(([c,qty])=>{
+    // Office colored product card - simple text grid
+    if(p.colored && p.colors && Object.keys(p.colors).length > 0) {
+      const colorCells = Object.entries(p.colors).map(([c,qty])=>{
         const safeId = c.replace(/[^a-z0-9]/gi,'_');
-        return `<div style="flex:1;min-width:48px;text-align:center;padding:6px 3px;border-radius:10px;background:${qty===0?'#f3f4f6':'#fff3e8'};border:1.5px solid ${qty===0?'#e5e7eb':'#f97316'};cursor:pointer;display:inline-block" onclick="event.stopPropagation();colorStep('${p.id}','${c}',1)" oncontextmenu="event.preventDefault();event.stopPropagation();colorStep('${p.id}','${c}',-1)" title="${c}: clic=+1, clic droit=-1">
-          <span style="font-size:9px;font-weight:700;color:${qty===0?'#9ca3af':'#ea580c'};display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c}</span>
-          <span id="cqty-${p.id}-${safeId}" style="font-size:15px;font-weight:700;color:${qty===0?'#9ca3af':'#1f2937'};display:block">${qty}</span>
-        </div>`;
+        return '<div style="flex:1;min-width:44px;text-align:center;padding:6px 3px;border-radius:10px;background:#f3f4f6;border:1.5px solid #e5e7eb;cursor:pointer" onclick="event.stopPropagation();colorStep(\''+p.id+'\',\''+c+'\',1)" oncontextmenu="event.preventDefault();event.stopPropagation();colorStep(\''+p.id+'\',\''+c+'\',-1)"><div style="font-size:9px;font-weight:700;color:#6b7280">'+esc(c)+'</div><div id="cqty-'+p.id+'-'+safeId+'" style="font-size:16px;font-weight:700;color:#111">'+qty+'</div></div>';
       }).join('');
-      const sub = p.uniteParPack ? ` <span style="font-size:10px;color:var(--text2);font-weight:400">×${p.uniteParPack}</span>` : '';
-      return `<div class="product-card oc" draggable="true" data-pid="${p.id}"
-        onclick="openDetail('${p.id}')"
-        ondragstart="dragStart(event,'${p.id}')"
-        ondragover="dragOver(event)"
-        ondrop="dragDrop(event,'${p.id}')"
-        ondragend="dragEnd(event)"
-        ondragleave="dragLeave(event)">
-        <div class="pc-top">
-          <div><div class="pc-name">${esc(p.name)}</div><div class="pc-cat">${esc(p.category)}</div></div>
-          <div><div class="pc-qty${isLow?' low':''}">${p.qty}${sub}</div><div class="pc-unit">${esc(p.unit)}</div></div>
-        </div>
-        ${isLow?`<div><span class="alert-tag">⚠ Seuil bas (≤ ${p.seuil})</span></div>`:''}
-        <div class="size-grid" style="display:flex;flex-direction:row;gap:5px;margin-top:10px;padding-top:10px;border-top:1px solid #e5e7eb;overflow-x:auto">${colorCells}</div>
-      </div>`;
+      const sub = p.uniteParPack ? ' <span style="font-size:10px;color:#9ca3af">x'+p.uniteParPack+'</span>' : '';
+      return '<div class="product-card oc" draggable="true" data-pid="'+p.id+'" onclick="openDetail(\''+p.id+'\')" ondragstart="dragStart(event,\''+p.id+'\')" ondragover="dragOver(event)" ondrop="dragDrop(event,\''+p.id+'\')" ondragend="dragEnd(event)" ondragleave="dragLeave(event)"><div class="pc-top"><div><div class="pc-name">'+esc(p.name)+'</div><div class="pc-cat">'+esc(p.category)+'</div></div><div><div class="pc-qty'+(isLow?' low':'')+'">'+p.qty+sub+'</div><div class="pc-unit">'+esc(p.unit)+'</div></div></div>'+(isLow?'<div><span class="alert-tag">⚠ Seuil bas (≤ '+p.seuil+')</span></div>':'')+'<div style="display:flex;gap:5px;margin-top:10px;padding-top:10px;border-top:1px solid #e5e7eb;overflow-x:auto">'+colorCells+'</div></div>';
     }
     const isLow2 = isLow;
     return `<div class="product-card ${cc}" draggable="true" data-pid="${p.id}"
