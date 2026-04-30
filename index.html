@@ -1349,11 +1349,16 @@ function renderProducts() {
         const safeId = c.replace(/[^a-z0-9]/gi,'_');
         const lbl = c.slice(0,2).toUpperCase();
         const isZ = qty===0;
-        return `<div class="size-cell ${isZ?'size-zero':''}" style="flex:1;min-width:40px;text-align:center;padding:6px 3px;border-radius:10px;background:${isZ?'#f3f4f6':'#fff3e8'};border:1.5px solid ${isZ?'#e5e7eb':'#fb923c'};cursor:pointer;display:inline-block" onclick="event.stopPropagation();colorStep('${p.id}','${c}',1)" oncontextmenu="event.preventDefault();event.stopPropagation();colorStep('${p.id}','${c}',-1)" title="${c} (+1 / clic droit -1)">
+        return `<div class="size-cell ${isZ?'size-zero':''}" style="flex:1;min-width:40px;text-align:center;padding:6px 3px;border-radius:10px;background:${isZ?'#f3f4f6':'#fff3e8'};border:1.5px solid ${isZ?'#e5e7eb':'#fb923c'};cursor:pointer;display:inline-block;user-select:none"
+          onclick="event.stopPropagation();colorStep('${p.id}','${c}',1)"
+          data-pid="${p.id}" data-color="${c}"
+          oncontextmenu="event.preventDefault();event.stopPropagation();">
           <span class="size-lbl" style="font-size:10px;font-weight:700;color:${isZ?'#9ca3af':'#ea580c'};display:block">${lbl}</span>
           <span class="size-qty" id="cqty-${p.id}-${safeId}" style="font-size:15px;font-weight:700;color:${isZ?'#9ca3af':'#111'};display:block">${qty}</span>
         </div>`;
       }).join('');
+      // Recalc correct total from colors
+      const realTotal = Object.values(p.colors).reduce((s,v)=>s+v,0);
       return `<div class="product-card oc" draggable="true" data-pid="${p.id}"
         onclick="openDetail('${p.id}')"
         ondragstart="dragStart(event,'${p.id}')"
@@ -1363,10 +1368,13 @@ function renderProducts() {
         ondragleave="dragLeave(event)">
         <div class="pc-top">
           <div><div class="pc-name">${esc(p.name)}</div><div class="pc-cat">${esc(p.category)}</div></div>
-          <div><div class="pc-qty${isLow?' low':''}">${p.qty}</div><div class="pc-unit">${esc(p.unit)}</div></div>
+          <div><div class="pc-qty${isLow?' low':''}" id="pqty-${p.id}">${realTotal}</div><div class="pc-unit">${esc(p.unit)}</div></div>
         </div>
         ${isLow?`<div><span class="alert-tag">⚠ Seuil bas (≤ ${p.seuil})</span></div>`:''}
-        <div class="size-grid" style="display:flex;flex-direction:row;gap:5px;margin-top:10px;padding-top:10px;border-top:1px solid #e5e7eb;overflow-x:auto">${colorCells}</div>
+        <div style="display:flex;gap:5px;margin-top:10px;padding-top:10px;border-top:1px solid #e5e7eb;overflow-x:auto;align-items:center" onclick="event.stopPropagation()">
+          <div style="display:flex;gap:5px;flex:1;overflow-x:auto">${colorCells}</div>
+          <button class="cs-save" onclick="event.stopPropagation();colorSaveAll('${p.id}')" style="flex-shrink:0;margin-left:4px">💾</button>
+        </div>
       </div>`;
     }
     const isLow2 = isLow;
@@ -1431,31 +1439,93 @@ function colorStep(pid, color, delta) {
   const el = document.getElementById('cqty-'+pid+'-'+safeId);
   if(el) {
     el.textContent = found.p.colors[color];
-    const cell = el.closest('.size-cell');
+    const cell = el.closest('[data-color]');
     if(cell) {
-      cell.classList.toggle('size-zero', found.p.colors[color]===0);
-      cell.style.background = found.p.colors[color]===0?'#f3f4f6':'#fff3e8';
-      cell.style.borderColor = found.p.colors[color]===0?'#e5e7eb':'#fb923c';
+      const isZ = found.p.colors[color]===0;
+      cell.classList.toggle('size-zero', isZ);
+      cell.style.background = isZ?'#f3f4f6':'#fff3e8';
+      cell.style.borderColor = isZ?'#e5e7eb':'#fb923c';
     }
   }
+  // Update card total
+  const totalEl = document.getElementById('pqty-'+pid);
+  if(totalEl) totalEl.textContent = found.p.qty;
   const pdQty = document.getElementById('pd-qty');
   if(pdQty && currentProduct && currentProduct.id===pid) pdQty.textContent = found.p.qty;
-  // Save to history (debounced — one entry per color per day)
-  const today = new Date().toISOString().slice(0,10);
-  const existing = found.p.history.find(h=>h.date===today && h.type==='inventaire' && h.color===color);
-  if(existing) {
-    existing.qty = found.p.colors[color];
-    existing.totalQty = found.p.qty;
-  } else {
-    found.p.history.push({id:uid(), type:'inventaire', date:today, qty:found.p.qty, color, colors:{...found.p.colors}});
-  }
   save();
   clearTimeout(window._colorToast);
   window._colorToast = setTimeout(()=>{
     toast(esc(found.p.name)+' — '+esc(color)+': '+found.p.colors[color], 'success');
-    renderProducts();
-  }, 800);
+  }, 600);
 }
+
+function colorSaveAll(pid) {
+  const found = findProduct(pid);
+  if(!found) return;
+  const today = new Date().toISOString().slice(0,10);
+  const existing = found.p.history.find(h=>h.date===today&&h.type==='inventaire');
+  const snap = {...found.p.colors};
+  found.p.qty = r2(Object.values(snap).reduce((s,v)=>s+v,0));
+  if(existing) { existing.qty=found.p.qty; existing.colors=snap; }
+  else found.p.history.push({id:uid(),type:'inventaire',date:today,qty:found.p.qty,colors:snap});
+  save();
+  toast(`✅ ${esc(found.p.name)} sauvegardé — ${found.p.qty} packs`, 'success');
+  renderProducts();
+}
+
+// Long press on color cell = donation
+(function() {
+  let _lpTimer = null;
+  document.addEventListener('touchstart', e => {
+    const cell = e.target.closest('[data-color][data-pid]');
+    if(!cell) return;
+    _lpTimer = setTimeout(()=>{
+      _lpTimer = null;
+      const pid = cell.dataset.pid;
+      const color = cell.dataset.color;
+      const found = findProduct(pid);
+      if(!found) return;
+      const qty = found.p.colors[color]||0;
+      if(qty<=0) return;
+      cardSaveAskDonColor(pid, color, found.p);
+    }, 600);
+  }, {passive:true});
+  document.addEventListener('touchend', () => { clearTimeout(_lpTimer); _lpTimer=null; }, {passive:true});
+  document.addEventListener('touchmove', () => { clearTimeout(_lpTimer); _lpTimer=null; }, {passive:true});
+})();
+
+function cardSaveAskDonColor(pid, color, product) {
+  const persons = [...new Set((S.attributions||[]).map(a=>a.person))].sort();
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-end;justify-content:center;padding:20px';
+  box.innerHTML = `<div style="background:#fff;border-radius:18px;padding:24px;width:100%;max-width:400px">
+    <div style="font-size:16px;font-weight:700;margin-bottom:4px">${esc(product.name)} — ${esc(color)}</div>
+    <div style="font-size:13px;color:#6b7280;margin-bottom:16px">Stock: ${product.colors[color]} — Donner 1</div>
+    <datalist id="don-color-dl">${persons.map(p=>`<option value="${esc(p)}">`).join('')}</datalist>
+    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">À qui ?</label>
+    <input id="don-color-person" type="text" list="don-color-dl" placeholder="Nom..." autocomplete="off" maxlength="100"
+      style="width:100%;padding:12px;border:1.5px solid #e5e7eb;border-radius:11px;font-size:14px;font-family:inherit;margin-bottom:14px;box-sizing:border-box">
+    <div style="display:flex;gap:8px">
+      <button id="don-color-cancel" style="flex:1;padding:12px;border:1.5px solid #e5e7eb;border-radius:11px;background:#fff;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">Annuler</button>
+      <button id="don-color-ok" style="flex:1;padding:12px;border:none;border-radius:11px;background:#7c3aed;color:#fff;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">✅ Don</button>
+    </div>
+  </div>`;
+  document.body.appendChild(box);
+  box.querySelector('#don-color-ok').onclick = () => {
+    const person = box.querySelector('#don-color-person').value.trim();
+    if(!person) { box.querySelector('#don-color-person').style.borderColor='#ef4444'; return; }
+    document.body.removeChild(box);
+    colorStep(pid, color, -1);
+    const today = new Date().toISOString().slice(0,10);
+    if(!S.attributions) S.attributions=[];
+    S.attributions.push({id:uid(),person,productId:pid,productName:product.name,color,qty:1,date:today,zone:'office'});
+    save();
+    toast(`✅ 1 ${esc(color)} donné à ${person}`,'success');
+  };
+  box.querySelector('#don-color-cancel').onclick = () => document.body.removeChild(box);
+}
+
+
 
 function cardStep(pid, delta) {
   const input = document.getElementById('cs-'+pid);
