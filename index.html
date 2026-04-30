@@ -2044,14 +2044,28 @@ function importJSON(e) {
 
       const allowedZoneKeys = /^[a-zA-Z0-9_-]{1,50}$/;
 
-      // Ask user: merge or replace?
-      const doMerge = await confirm2(
-        'Mode d\'import',
-        'Comment voulez-vous importer ces données ?<br><br>' +
-        '<strong>Fusionner</strong> : ajoute les nouveaux produits sans supprimer l\'existant.<br>' +
-        '<strong>Remplacer</strong> : efface tout et repart des nouvelles données.',
-        'Fusionner'
-      );
+      // Ask user: merge or replace with custom dialog
+      const doMerge = await new Promise(res => {
+        const box = document.createElement('div');
+        box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+        box.innerHTML = `<div style="background:#fff;border-radius:18px;padding:24px;max-width:340px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.2)">
+          <div style="font-size:17px;font-weight:700;margin-bottom:8px">Mode d'import</div>
+          <div style="font-size:13px;color:#6b7280;margin-bottom:20px;line-height:1.6">
+            <b>Fusionner</b> — ajoute les nouveaux produits sans supprimer l'existant.<br><br>
+            <b>Remplacer</b> — efface tout et repart des nouvelles données.
+          </div>
+          <div style="display:flex;gap:8px">
+            <button id="imp-cancel" style="flex:1;padding:12px;border:1.5px solid #e5e7eb;border-radius:11px;background:#fff;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">Annuler</button>
+            <button id="imp-replace" style="flex:1;padding:12px;border:none;border-radius:11px;background:#ef4444;color:#fff;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">Remplacer</button>
+            <button id="imp-merge" style="flex:1;padding:12px;border:none;border-radius:11px;background:#2d35a8;color:#fff;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">Fusionner</button>
+          </div>
+        </div>`;
+        document.body.appendChild(box);
+        box.querySelector('#imp-merge').onclick = () => { document.body.removeChild(box); res(true); };
+        box.querySelector('#imp-replace').onclick = () => { document.body.removeChild(box); res(false); };
+        box.querySelector('#imp-cancel').onclick = () => { document.body.removeChild(box); res(null); };
+      });
+      if(doMerge === null) return; // cancelled
 
       for(const [k,z] of Object.entries(src.zones)){
         if(!allowedZoneKeys.test(k)) continue;
