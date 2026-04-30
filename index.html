@@ -1210,13 +1210,16 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('splash').style.display = 'none';
     document.getElementById('main').classList.remove('hidden');
     document.getElementById('bottom-nav').classList.remove('hidden');
-    switchZone('entrepot');
+    // Restore last visited zone
+    const lastZone = localStorage.getItem('sz_last_zone') || 'entrepot';
+    switchZone(lastZone);
   }, 1800);
 });
 
 // ===== ZONE SWITCH =====
 function switchZone(z) {
   currentZone = z;
+  localStorage.setItem('sz_last_zone', z);
   // nav styling
   document.querySelectorAll('.nav-btn').forEach(b => b.className = 'nav-btn');
   const zoneNavMap = {entrepot:'nac-e',vetements:'nac-v',office:'nac-o',stats:'nac-s',prets:'nac-p',alertes:'nac-a',reglages:'nac-r'};
@@ -1428,12 +1431,24 @@ function colorStep(pid, color, delta) {
   const el = document.getElementById('cqty-'+pid+'-'+safeId);
   if(el) {
     el.textContent = found.p.colors[color];
-    el.closest('.size-cell').classList.toggle('size-zero', found.p.colors[color]===0);
-    el.closest('.size-cell').style.background = found.p.colors[color]===0?'#f3f4f6':'#fff3e8';
-    el.closest('.size-cell').style.borderColor = found.p.colors[color]===0?'#e5e7eb':'#fb923c';
+    const cell = el.closest('.size-cell');
+    if(cell) {
+      cell.classList.toggle('size-zero', found.p.colors[color]===0);
+      cell.style.background = found.p.colors[color]===0?'#f3f4f6':'#fff3e8';
+      cell.style.borderColor = found.p.colors[color]===0?'#e5e7eb':'#fb923c';
+    }
   }
   const pdQty = document.getElementById('pd-qty');
   if(pdQty && currentProduct && currentProduct.id===pid) pdQty.textContent = found.p.qty;
+  // Save to history (debounced — one entry per color per day)
+  const today = new Date().toISOString().slice(0,10);
+  const existing = found.p.history.find(h=>h.date===today && h.type==='inventaire' && h.color===color);
+  if(existing) {
+    existing.qty = found.p.colors[color];
+    existing.totalQty = found.p.qty;
+  } else {
+    found.p.history.push({id:uid(), type:'inventaire', date:today, qty:found.p.qty, color, colors:{...found.p.colors}});
+  }
   save();
   clearTimeout(window._colorToast);
   window._colorToast = setTimeout(()=>{
