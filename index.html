@@ -506,12 +506,20 @@ table.conso-tbl tfoot td.num{font-weight:700}
       <label class="fl">Numéro d'ordre <span style="font-size:11px;color:var(--text2);font-weight:400">(décale les autres automatiquement)</span></label>
       <input type="number" id="ps-ordre" class="fi fi-sm" placeholder="ex: 3" min="1" style="margin-bottom:14px">
       <!-- Colors / Sizes management -->
-      <div id="ps-colors-section" style="display:none;margin-bottom:14px">
-        <label class="fl">Couleurs / Variantes</label>
-        <div id="ps-colors-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
-        <div style="display:flex;gap:6px">
-          <input type="text" id="ps-new-color" class="fi" maxlength="30" placeholder="Nouvelle couleur..." autocomplete="off" style="flex:1">
-          <button onclick="psAddColor()" style="padding:10px 14px;border:none;border-radius:10px;background:var(--blue);color:#fff;font-weight:600;font-family:inherit;cursor:pointer">+</button>
+      <div id="ps-colors-section" style="margin-bottom:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <label class="fl" style="margin:0">Variantes par couleur</label>
+          <label class="toggle-sw">
+            <input type="checkbox" id="ps-colored-toggle" onchange="psToggleColored(this.checked)">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div id="ps-colors-body" style="display:none">
+          <div id="ps-colors-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
+          <div style="display:flex;gap:6px">
+            <input type="text" id="ps-new-color" class="fi" maxlength="30" placeholder="Nouvelle couleur..." autocomplete="off" style="flex:1">
+            <button onclick="psAddColor()" style="padding:10px 14px;border:none;border-radius:10px;background:var(--blue);color:#fff;font-weight:600;font-family:inherit;cursor:pointer">+</button>
+          </div>
         </div>
       </div>
       <div id="ps-sizes-section" style="display:none;margin-bottom:14px">
@@ -1605,13 +1613,18 @@ function openDetail(id) {
   document.getElementById('ps-cat').value = found.p.category;
   document.getElementById('ps-ordre').value = found.p.ordre != null ? found.p.ordre : '';
   document.getElementById('ps-official').value = found.p.officialName || '';
-  // Show colors section for colored products
+  // Colors section — always show for office, toggle based on colored flag
   const colSection = document.getElementById('ps-colors-section');
   const sizeSection = document.getElementById('ps-sizes-section');
-  if(found.p.colored && colSection) {
-    colSection.style.display = 'block';
-    psRenderColorsList(found.p);
-  } else if(colSection) colSection.style.display = 'none';
+  const toggle = document.getElementById('ps-colored-toggle');
+  const colBody = document.getElementById('ps-colors-body');
+  if(colSection) {
+    const isOffice = found.zk === 'office';
+    colSection.style.display = (isOffice || found.p.colored) ? 'block' : 'none';
+    if(toggle) toggle.checked = !!found.p.colored;
+    if(colBody) colBody.style.display = found.p.colored ? 'block' : 'none';
+    if(found.p.colored) psRenderColorsList(found.p);
+  }
   if(found.p.sized && sizeSection) {
     sizeSection.style.display = 'block';
     psRenderSizesList(found.p);
@@ -1794,6 +1807,15 @@ function recalcQty(product) {
 }
 
 // ===== PARAMS =====
+function psToggleColored(enabled) {
+  if(!currentProduct) return;
+  currentProduct.colored = enabled;
+  if(!currentProduct.colors) currentProduct.colors = {};
+  const colBody = document.getElementById('ps-colors-body');
+  if(colBody) colBody.style.display = enabled ? 'block' : 'none';
+  if(enabled) psRenderColorsList(currentProduct);
+}
+
 function psRenderColorsList(product) {
   const list = document.getElementById('ps-colors-list');
   if(!list) return;
