@@ -939,6 +939,13 @@ function migrateData(data) {
       }
     });
   }
+  // Migrate office products: ensure colored/colors fields exist
+  if(data.zones && data.zones.office) {
+    data.zones.office.products.forEach(p => {
+      if(p.colored === undefined) p.colored = false;
+      if(!p.colors) p.colors = {};
+    });
+  }
   // Migrate vetements products: add sizes if missing
   if (data.zones && data.zones.vetements) {
     data.zones.vetements.products.forEach(p => {
@@ -1326,6 +1333,31 @@ function renderProducts() {
         <div class="size-grid" style="display:flex;flex-direction:row;gap:5px;margin-top:10px;padding-top:10px;border-top:1px solid #e5e7eb;overflow-x:auto">${sizeCells}</div>
       </div>`;
     }
+    if(p.colored && p.colors && Object.keys(p.colors).length > 0) {
+      const colorCells = Object.entries(p.colors).map(([c,qty])=>{
+        const safeId = c.replace(/[^a-z0-9]/gi,'_');
+        const lbl = c.slice(0,2).toUpperCase();
+        const isZ = qty===0;
+        return `<div class="size-cell ${isZ?'size-zero':''}" style="flex:1;min-width:40px;text-align:center;padding:6px 3px;border-radius:10px;background:${isZ?'#f3f4f6':'#fff3e8'};border:1.5px solid ${isZ?'#e5e7eb':'#fb923c'};cursor:pointer;display:inline-block" onclick="event.stopPropagation();colorStep('${p.id}','${c}',1)" oncontextmenu="event.preventDefault();event.stopPropagation();colorStep('${p.id}','${c}',-1)" title="${c} (+1 / clic droit -1)">
+          <span class="size-lbl" style="font-size:10px;font-weight:700;color:${isZ?'#9ca3af':'#ea580c'};display:block">${lbl}</span>
+          <span class="size-qty" id="cqty-${p.id}-${safeId}" style="font-size:15px;font-weight:700;color:${isZ?'#9ca3af':'#111'};display:block">${qty}</span>
+        </div>`;
+      }).join('');
+      return `<div class="product-card oc" draggable="true" data-pid="${p.id}"
+        onclick="openDetail('${p.id}')"
+        ondragstart="dragStart(event,'${p.id}')"
+        ondragover="dragOver(event)"
+        ondrop="dragDrop(event,'${p.id}')"
+        ondragend="dragEnd(event)"
+        ondragleave="dragLeave(event)">
+        <div class="pc-top">
+          <div><div class="pc-name">${esc(p.name)}</div><div class="pc-cat">${esc(p.category)}</div></div>
+          <div><div class="pc-qty${isLow?' low':''}">${p.qty}</div><div class="pc-unit">${esc(p.unit)}</div></div>
+        </div>
+        ${isLow?`<div><span class="alert-tag">⚠ Seuil bas (≤ ${p.seuil})</span></div>`:''}
+        <div class="size-grid" style="display:flex;flex-direction:row;gap:5px;margin-top:10px;padding-top:10px;border-top:1px solid #e5e7eb;overflow-x:auto">${colorCells}</div>
+      </div>`;
+    }
     const isLow2 = isLow;
     return `<div class="product-card ${cc}" draggable="true" data-pid="${p.id}"
         onclick="openDetail('${p.id}')"
@@ -1374,6 +1406,31 @@ function sizeStep(pid, size, delta) {
   window._sizeToast = setTimeout(()=>{
     toast(`${found.p.name} — ${size}: ${found.p.sizes[size]}`, 'success');
     renderProducts(); // refresh qty display on card
+  }, 800);
+}
+
+function colorStep(pid, color, delta) {
+  const found = findProduct(pid);
+  if(!found || !found.p.colored) return;
+  if(!found.p.colors) found.p.colors = {};
+  const cur = found.p.colors[color] || 0;
+  found.p.colors[color] = Math.max(0, cur + delta);
+  found.p.qty = r2(Object.values(found.p.colors).reduce((s,v)=>s+v,0));
+  const safeId = color.replace(/[^a-z0-9]/gi,'_');
+  const el = document.getElementById('cqty-'+pid+'-'+safeId);
+  if(el) {
+    el.textContent = found.p.colors[color];
+    el.closest('.size-cell').classList.toggle('size-zero', found.p.colors[color]===0);
+    el.closest('.size-cell').style.background = found.p.colors[color]===0?'#f3f4f6':'#fff3e8';
+    el.closest('.size-cell').style.borderColor = found.p.colors[color]===0?'#e5e7eb':'#fb923c';
+  }
+  const pdQty = document.getElementById('pd-qty');
+  if(pdQty && currentProduct && currentProduct.id===pid) pdQty.textContent = found.p.qty;
+  save();
+  clearTimeout(window._colorToast);
+  window._colorToast = setTimeout(()=>{
+    toast(esc(found.p.name)+' — '+esc(color)+': '+found.p.colors[color], 'success');
+    renderProducts();
   }, 800);
 }
 
