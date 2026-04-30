@@ -2707,7 +2707,7 @@ function printPersonFiche() {
 // Calcule la conso par mois pour un produit {ym:'2026-04', cons:N}
 function calcConso(product) {
   const invs=[...product.history]
-    .filter(h=>h.type==='inventaire'||h.type==='inventaire_base')
+    .filter(h=>(h.type==='inventaire'||h.type==='inventaire_base') && h.date && h.date.match(/^\d{4}-\d{2}-\d{2}$/))
     .sort((a,b)=>new Date(a.date)-new Date(b.date));
   const r={};
   for(let i=1;i<invs.length;i++){
@@ -2715,18 +2715,28 @@ function calcConso(product) {
     const livs=product.history
       .filter(h=>h.type==='livraison'&&new Date(h.date)>new Date(prev.date)&&new Date(h.date)<=new Date(cur.date))
       .reduce((s,h)=>s+h.qty,0);
-    const c=Math.max(0,prev.qty+livs-cur.qty);
+    const c=Math.max(0,r2(prev.qty+livs-cur.qty));
     const ym=cur.date.slice(0,7);
-    r[ym]=(r[ym]||0)+c;
+    if(ym && ym.match(/^\d{4}-\d{2}$/)) r[ym]=r2((r[ym]||0)+c);
   }
   return r;
 }
 
 function ymLabel(ym,period){
+  if(!ym) return '?';
   if(period==='year') return ym.slice(0,4);
-  if(period==='quarter'){const m=parseInt(ym.slice(5,7));return ym.slice(0,4)+' T'+Math.ceil(m/3);}
+  if(period==='quarter'){
+    // key format: 2026-Q1
+    const parts = ym.split('-Q');
+    if(parts.length===2) return parts[0]+' T'+parts[1];
+    const m=parseInt(ym.slice(5,7));
+    return ym.slice(0,4)+' T'+Math.ceil(m/3);
+  }
+  // month: YYYY-MM
   const mn=['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
-  return mn[parseInt(ym.slice(5,7))-1]+' '+ym.slice(0,4);
+  const m = parseInt(ym.slice(5,7));
+  if(isNaN(m) || m<1 || m>12) return ym;
+  return mn[m-1]+' '+ym.slice(0,4);
 }
 function ymPeriod(ym,period){
   if(period==='year') return ym.slice(0,4);
