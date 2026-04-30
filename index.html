@@ -2723,7 +2723,7 @@ function printPersonFiche() {
 // Calcule la conso par mois pour un produit {ym:'2026-04', cons:N}
 function calcConso(product) {
   const invs=[...product.history]
-    .filter(h=>(h.type==='inventaire'||h.type==='inventaire_base') && h.date && h.date.match(/^\d{4}-\d{2}-\d{2}$/))
+    .filter(h=>(h.type==='inventaire'||h.type==='inventaire_base') && h.date && /^\d{4}-\d{2}-\d{2}$/.test(h.date))
     .sort((a,b)=>new Date(a.date)-new Date(b.date));
   const r={};
   for(let i=1;i<invs.length;i++){
@@ -2834,10 +2834,11 @@ function renderConsoTable(){
       const raw=calcConso(p);
       const grouped={};
       Object.entries(raw).forEach(([ym,v])=>{
+        if(!/^\d{4}-\d{2}$/.test(ym)) return; // skip invalid keys
         const pk=ymPeriod(ym,period);
-        grouped[pk]=(grouped[pk]||0)+v;
+        grouped[pk]=r2((grouped[pk]||0)+v);
       });
-      const total=Object.values(grouped).reduce((a,v)=>a+v,0);
+      const total=r2(Object.values(grouped).reduce((a,v)=>a+v,0));
       rows.push({name:p.name,cat:p.category,unit:p.unit,zone:z.name,grouped,total});
     });
   });
@@ -3012,7 +3013,7 @@ function renderStats() {
         <div class="top-name">${esc(p.name)} <span style="font-size:11px;color:var(--text2);font-weight:400">${esc(p.cat)}</span></div>
         <div class="top-bar-bg"><div class="top-bar-fill" style="width:${Math.max(4,(p.cons/maxC)*100)}%;background:${p.color}"></div></div>
       </div>
-      <div class="top-qty">${p.cons}</div>
+      <div class="top-qty">${r2(p.cons)}</div>
     </div>`).join('');
 
   // Zone options for selects
