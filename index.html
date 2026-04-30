@@ -1327,14 +1327,30 @@ function renderProducts() {
         <div class="size-grid" style="display:flex;flex-direction:row;gap:5px;margin-top:10px;padding-top:10px;border-top:1px solid #e5e7eb;overflow-x:auto">${sizeCells}</div>
       </div>`;
     }
-    // Office colored product card - simple text grid
     if(p.colored && p.colors && Object.keys(p.colors).length > 0) {
-      const colorCells = Object.entries(p.colors).map(([c,qty])=>{
+      const colorCells2 = Object.entries(p.colors).map(([c,qty])=>{
         const safeId = c.replace(/[^a-z0-9]/gi,'_');
-        return '<div style="flex:1;min-width:44px;text-align:center;padding:6px 3px;border-radius:10px;background:#f3f4f6;border:1.5px solid #e5e7eb;cursor:pointer" onclick="event.stopPropagation();colorStep(\''+p.id+'\',\''+c+'\',1)" oncontextmenu="event.preventDefault();event.stopPropagation();colorStep(\''+p.id+'\',\''+c+'\',-1)"><div style="font-size:9px;font-weight:700;color:#6b7280">'+esc(c)+'</div><div id="cqty-'+p.id+'-'+safeId+'" style="font-size:16px;font-weight:700;color:#111">'+qty+'</div></div>';
+        const isZ = qty===0;
+        return `<div class="size-cell ${isZ?'size-zero':''}" style="flex:1;min-width:44px;text-align:center;padding:6px 3px;border-radius:10px;background:${isZ?'#f3f4f6':'#fff3e8'};border:1.5px solid ${isZ?'#e5e7eb':'#fb923c'};cursor:pointer;display:inline-block" onclick="event.stopPropagation();colorStep('${p.id}','${c}',1)" oncontextmenu="event.preventDefault();event.stopPropagation();colorStep('${p.id}','${c}',-1)">
+          <span class="size-lbl" style="font-size:9px;font-weight:700;color:${isZ?'#9ca3af':'#ea580c'};display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c)}</span>
+          <span class="size-qty" id="cqty-${p.id}-${safeId}" style="font-size:15px;font-weight:700;color:${isZ?'#9ca3af':'#111'};display:block">${qty}</span>
+        </div>`;
       }).join('');
-      const sub = p.uniteParPack ? ' <span style="font-size:10px;color:#9ca3af">x'+p.uniteParPack+'</span>' : '';
-      return '<div class="product-card oc" draggable="true" data-pid="'+p.id+'" onclick="openDetail(\''+p.id+'\')" ondragstart="dragStart(event,\''+p.id+'\')" ondragover="dragOver(event)" ondrop="dragDrop(event,\''+p.id+'\')" ondragend="dragEnd(event)" ondragleave="dragLeave(event)"><div class="pc-top"><div><div class="pc-name">'+esc(p.name)+'</div><div class="pc-cat">'+esc(p.category)+'</div></div><div><div class="pc-qty'+(isLow?' low':'')+'">'+p.qty+sub+'</div><div class="pc-unit">'+esc(p.unit)+'</div></div></div>'+(isLow?'<div><span class="alert-tag">⚠ Seuil bas (≤ '+p.seuil+')</span></div>':'')+'<div style="display:flex;gap:5px;margin-top:10px;padding-top:10px;border-top:1px solid #e5e7eb;overflow-x:auto">'+colorCells+'</div></div>';
+      const sub2 = p.uniteParPack ? `<span style="font-size:10px;color:#9ca3af"> ×${p.uniteParPack}</span>` : '';
+      return `<div class="product-card oc" draggable="true" data-pid="${p.id}"
+        onclick="openDetail('${p.id}')"
+        ondragstart="dragStart(event,'${p.id}')"
+        ondragover="dragOver(event)"
+        ondrop="dragDrop(event,'${p.id}')"
+        ondragend="dragEnd(event)"
+        ondragleave="dragLeave(event)">
+        <div class="pc-top">
+          <div><div class="pc-name">${esc(p.name)}</div><div class="pc-cat">${esc(p.category)}</div></div>
+          <div><div class="pc-qty${isLow?' low':''}">${p.qty}${sub2}</div><div class="pc-unit">${esc(p.unit)}</div></div>
+        </div>
+        ${isLow?`<div><span class="alert-tag">⚠ Seuil bas (≤ ${p.seuil})</span></div>`:''}
+        <div class="size-grid" style="display:flex;flex-direction:row;gap:5px;margin-top:10px;padding-top:10px;border-top:1px solid #e5e7eb;overflow-x:auto">${colorCells2}</div>
+      </div>`;
     }
     const isLow2 = isLow;
     return `<div class="product-card ${cc}" draggable="true" data-pid="${p.id}"
@@ -2856,10 +2872,12 @@ function renderConsoTable(){
   </tr></thead>`;
 
   const tbody=rows.map(r=>{
+    const rowVals=periods.map(pk=>r2(r.grouped[pk]||0)).filter(v=>v>0);
+    const rowMax=rowVals.length?Math.max(...rowVals):1;
     const cells=periods.map(pk=>{
       const v=r2(r.grouped[pk]||0);
       if(!v) return `<td class="num zero">—</td>`;
-      const pct=v/maxV;
+      const pct=v/rowMax;
       const cls=pct>0.65?'hi':pct>0.35?'med':'';
       const bw=Math.round(pct*36);
       return `<td class="num ${cls}">${v}<span class="mini-bar" style="width:${bw}px;background:${cls==='hi'?'#ef4444':cls==='med'?'#f59e0b':'#2d35a8'}"></span></td>`;
@@ -2982,7 +3000,7 @@ function renderStats() {
   // Top consumed
   const allProds=[];
   zones.forEach(([k,z])=>z.products.forEach(p=>{
-    const c=Object.values(calcConso(p)).reduce((a,v)=>a+v,0);
+    const c=r2(Object.values(calcConso(p)).reduce((a,v)=>a+v,0));
     allProds.push({name:p.name,cat:p.category,cons:c,color:k==='vetements'?'#7c3aed':k==='office'?'#ea580c':'#2d35a8'});
   }));
   allProds.sort((a,b)=>b.cons-a.cons);
