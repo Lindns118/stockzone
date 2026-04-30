@@ -1800,7 +1800,6 @@ function showModal(id) {
     document.getElementById('pr-qty').value=1;
     document.getElementById('pr-to').value='';
     document.getElementById('pr-notes').value='';
-    // Populate product datalist from all zones
     const allProds = Object.values(S.zones).flatMap(z=>z.products.map(p=>p.name));
     const dl = document.getElementById('pr-prod-list');
     if(dl) dl.innerHTML = [...new Set(allProds)].sort().map(n=>`<option value="${esc(n)}">`).join('');
@@ -1809,13 +1808,26 @@ function showModal(id) {
     setPretType('pret');
   }
   const modalEl = document.getElementById('modal-'+id);
-  if(modalEl) modalEl.classList.remove('hidden');
+  if(modalEl) {
+    modalEl.classList.remove('hidden');
+    // Push state so back button closes modal
+    history.pushState({modal: id}, '', '');
+  }
 }
 function hideModal(id) {
   const el = document.getElementById(id);
   if(el) el.classList.add('hidden');
 }
 function overlayClose(e, id) { if(e.target===e.currentTarget) hideModal(id); }
+
+// Back button closes open modal
+window.addEventListener('popstate', function(e) {
+  // Find any open modal and close it
+  const openModal = document.querySelector('.modal-overlay:not(.hidden)');
+  if(openModal) {
+    openModal.classList.add('hidden');
+  }
+});
 
 function addInvRow() {
   const zd = S.zones[currentZone]||{products:[]};
