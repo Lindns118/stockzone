@@ -1381,6 +1381,15 @@ function colorStep(pid, color, delta) {
   if(!found || !found.p.colored) return;
   if(!found.p.colors) found.p.colors = {};
   const cur = found.p.colors[color] || 0;
+
+  // If decrementing in office, ask inventaire vs don
+  if(delta < 0 && currentZone === 'office' && cur > 0) {
+    const newColorQty = Math.max(0, cur + delta);
+    const diff = cur - newColorQty;
+    colorStepAskDon(pid, color, newColorQty, diff, found.p);
+    return;
+  }
+
   found.p.colors[color] = Math.max(0, cur + delta);
   found.p.qty = r2(Object.values(found.p.colors).reduce((s,v)=>s+v,0));
   const safeId = color.replace(/[^a-z0-9]/gi,'_');
@@ -1394,6 +1403,80 @@ function colorStep(pid, color, delta) {
     toast(`${found.p.name} — ${color}: ${found.p.colors[color]}`, 'success');
     renderProducts();
   }, 800);
+}
+
+function colorStepAskDon(pid, color, newColorQty, diff, product) {
+  const persons = [...new Set((S.attributions||[]).map(a=>a.person))].sort();
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-end;justify-content:center;padding:20px';
+  box.innerHTML = `<div style="background:#fff;border-radius:18px;padding:24px;width:100%;max-width:400px;box-shadow:0 8px 40px rgba(0,0,0,.2)">
+    <div style="font-size:16px;font-weight:700;margin-bottom:4px">${esc(product.name)} — ${esc(color)}</div>
+    <div style="font-size:13px;color:#6b7280;margin-bottom:18px">−${diff} ${esc(product.unit)}</div>
+    <div style="font-size:13px;font-weight:600;margin-bottom:12px">C'est quoi cette modification ?</div>
+    <button id="cas-inv" style="width:100%;padding:13px;border:none;border-radius:12px;background:#ea580c;color:#fff;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;margin-bottom:8px">📋 Inventaire</button>
+    <button id="cas-don" style="width:100%;padding:13px;border:none;border-radius:12px;background:#7c3aed;color:#fff;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;margin-bottom:8px">🎁 Don à quelqu'un</button>
+    <button id="cas-cancel" style="width:100%;padding:11px;border:1.5px solid #e5e7eb;border-radius:12px;background:#fff;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;color:#6b7280">Annuler</button>
+  </div>`;
+  document.body.appendChild(box);
+
+  box.querySelector('#cas-inv').onclick = () => {
+    document.body.removeChild(box);
+    const found = findProduct(pid);
+    if(!found) return;
+    found.p.colors[color] = newColorQty;
+    found.p.qty = r2(Object.values(found.p.colors).reduce((s,v)=>s+v,0));
+    const today = new Date().toISOString().slice(0,10);
+    found.p.history.push({id:uid(), type:'inventaire', date:today, qty:found.p.qty, colors:{...found.p.colors}});
+    save();
+    toast(`✅ ${esc(product.name)} ${esc(color)} → ${newColorQty}`, 'success');
+    renderProducts();
+  };
+
+  box.querySelector('#cas-don').onclick = () => {
+    document.body.removeChild(box);
+    // Ask person
+    const persons = [...new Set((S.attributions||[]).map(a=>a.person))].sort();
+    const box2 = document.createElement('div');
+    box2.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-end;justify-content:center;padding:20px';
+    box2.innerHTML = `<div style="background:#fff;border-radius:18px;padding:24px;width:100%;max-width:400px;box-shadow:0 8px 40px rgba(0,0,0,.2)">
+      <div style="font-size:16px;font-weight:700;margin-bottom:4px">Don — ${esc(product.name)} ${esc(color)}</div>
+      <div style="font-size:13px;color:#6b7280;margin-bottom:16px">${diff} ${esc(product.unit)} donnés</div>
+      <datalist id="cas-person-dl">${persons.map(p=>`<option value="${esc(p)}">`).join('')}</datalist>
+      <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:6px">À qui ?</label>
+      <input id="cas-person-input" type="text" list="cas-person-dl" placeholder="Nom de la personne" autocomplete="off" maxlength="100"
+        style="width:100%;padding:12px;border:1.5px solid #e5e7eb;border-radius:11px;font-size:14px;font-family:inherit;margin-bottom:8px;box-sizing:border-box">
+      <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Notes (optionnel)</label>
+      <input id="cas-notes" type="text" placeholder="Optionnel" maxlength="200"
+        style="width:100%;padding:12px;border:1.5px solid #e5e7eb;border-radius:11px;font-size:14px;font-family:inherit;margin-bottom:14px;box-sizing:border-box">
+      <button id="cas-confirm" style="width:100%;padding:13px;border:none;border-radius:12px;background:#7c3aed;color:#fff;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;margin-bottom:8px">✅ Confirmer</button>
+      <button id="cas-back2" style="width:100%;padding:11px;border:1.5px solid #e5e7eb;border-radius:12px;background:#fff;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;color:#6b7280">← Retour</button>
+    </div>`;
+    document.body.appendChild(box2);
+
+    box2.querySelector('#cas-confirm').onclick = () => {
+      const person = box2.querySelector('#cas-person-input').value.trim();
+      const notes = box2.querySelector('#cas-notes').value.trim();
+      if(!person) { box2.querySelector('#cas-person-input').style.borderColor='#ef4444'; return; }
+      document.body.removeChild(box2);
+      const found = findProduct(pid);
+      if(!found) return;
+      found.p.colors[color] = newColorQty;
+      found.p.qty = r2(Object.values(found.p.colors).reduce((s,v)=>s+v,0));
+      const today = new Date().toISOString().slice(0,10);
+      found.p.history.push({id:uid(), type:'attribution', date:today, qty:found.p.qty, colors:{...found.p.colors}, person});
+      if(!S.attributions) S.attributions = [];
+      S.attributions.push({id:uid(), person, productId:pid, productName:product.name, productUnit:product.unit, color, qty:diff, date:today, notes:notes||undefined, zone:'office'});
+      save();
+      toast(`✅ Don de ${diff} ${esc(product.unit)} ${esc(color)} à ${person}`, 'success');
+      renderProducts();
+    };
+    box2.querySelector('#cas-back2').onclick = () => {
+      document.body.removeChild(box2);
+      colorStepAskDon(pid, color, newColorQty, diff, product);
+    };
+  };
+
+  box.querySelector('#cas-cancel').onclick = () => document.body.removeChild(box);
 }
 
 function sizeStep(pid, size, delta) {
@@ -1435,14 +1518,105 @@ function cardSave(pid) {
   if(!found) return;
   const input = document.getElementById('cs-'+pid);
   if(!input) return;
-  const qty = Math.max(0, parseInt(input.value) || 0);
+  const newQty = Math.max(0, parseInt(input.value) || 0);
+  const oldQty = found.p.qty;
+
+  // For vetements or office: if qty decreased, ask if it's inventory or donation
+  if((currentZone === 'vetements' || currentZone === 'office') && newQty < oldQty) {
+    const diff = oldQty - newQty;
+    cardSaveAskDon(pid, newQty, diff, found.p);
+    return;
+  }
+  // For all other cases: straight inventory
+  cardSaveInventaire(pid, newQty, found.p);
+}
+
+function cardSaveInventaire(pid, qty, product) {
   const today = new Date().toISOString().slice(0,10);
-  found.p.history.push({id:uid(), type:'inventaire', date:today, qty});
-  recalcQty(found.p);
+  product.history.push({id:uid(), type:'inventaire', date:today, qty});
+  recalcQty(product);
   save();
-  toast(`✅ ${esc(found.p.name)} → ${found.p.qty} ${esc(found.p.unit)}`, 'success');
+  toast(`✅ ${esc(product.name)} → ${product.qty} ${esc(product.unit)}`, 'success');
   renderProducts();
-  // Restore the input value after re-render (already done by renderProducts)
+}
+
+function cardSaveAskDon(pid, newQty, diff, product) {
+  // Show inline popup asking: inventaire ou don ?
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-end;justify-content:center;padding:20px';
+  box.innerHTML = `<div style="background:#fff;border-radius:18px;padding:24px;width:100%;max-width:400px;box-shadow:0 8px 40px rgba(0,0,0,.2)">
+    <div style="font-size:16px;font-weight:700;margin-bottom:4px">${esc(product.name)}</div>
+    <div style="font-size:13px;color:#6b7280;margin-bottom:18px">Stock : ${product.qty} → ${newQty} (−${diff} ${esc(product.unit)})</div>
+    <div style="font-size:13px;font-weight:600;margin-bottom:12px">C'est quoi cette modification ?</div>
+    <button id="ask-inv" style="width:100%;padding:13px;border:none;border-radius:12px;background:#2d35a8;color:#fff;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;margin-bottom:8px">📋 Inventaire</button>
+    <button id="ask-don" style="width:100%;padding:13px;border:none;border-radius:12px;background:#7c3aed;color:#fff;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;margin-bottom:8px">👕 Don à quelqu'un</button>
+    <button id="ask-cancel" style="width:100%;padding:11px;border:1.5px solid #e5e7eb;border-radius:12px;background:#fff;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;color:#6b7280">Annuler</button>
+  </div>`;
+  document.body.appendChild(box);
+
+  box.querySelector('#ask-inv').onclick = () => {
+    document.body.removeChild(box);
+    cardSaveInventaire(pid, newQty, product);
+  };
+  box.querySelector('#ask-don').onclick = () => {
+    document.body.removeChild(box);
+    cardSaveAskPerson(pid, newQty, diff, product);
+  };
+  box.querySelector('#ask-cancel').onclick = () => {
+    document.body.removeChild(box);
+  };
+}
+
+function cardSaveAskPerson(pid, newQty, diff, product) {
+  const persons = [...new Set((S.attributions||[]).map(a=>a.person))].sort();
+  const datalist = persons.map(p=>`<option value="${esc(p)}">`).join('');
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-end;justify-content:center;padding:20px';
+  box.innerHTML = `<div style="background:#fff;border-radius:18px;padding:24px;width:100%;max-width:400px;box-shadow:0 8px 40px rgba(0,0,0,.2)">
+    <div style="font-size:16px;font-weight:700;margin-bottom:4px">Don — ${esc(product.name)}</div>
+    <div style="font-size:13px;color:#6b7280;margin-bottom:16px">${diff} ${esc(product.unit)} donnés</div>
+    <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:6px">À qui ?</label>
+    <datalist id="ask-person-dl">${datalist}</datalist>
+    <input id="ask-person-input" type="text" list="ask-person-dl" placeholder="Nom de la personne" autocomplete="off" maxlength="100"
+      style="width:100%;padding:12px;border:1.5px solid #e5e7eb;border-radius:11px;font-size:14px;font-family:inherit;margin-bottom:8px;box-sizing:border-box">
+    <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Notes (optionnel)</label>
+    <input id="ask-don-notes" type="text" placeholder="Ex: taille L, couleur rouge..." maxlength="200"
+      style="width:100%;padding:12px;border:1.5px solid #e5e7eb;border-radius:11px;font-size:14px;font-family:inherit;margin-bottom:14px;box-sizing:border-box">
+    <button id="ask-confirm" style="width:100%;padding:13px;border:none;border-radius:12px;background:#7c3aed;color:#fff;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;margin-bottom:8px">✅ Confirmer le don</button>
+    <button id="ask-back" style="width:100%;padding:11px;border:1.5px solid #e5e7eb;border-radius:12px;background:#fff;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;color:#6b7280">← Retour</button>
+  </div>`;
+  document.body.appendChild(box);
+
+  box.querySelector('#ask-confirm').onclick = () => {
+    const person = box.querySelector('#ask-person-input').value.trim();
+    const notes = box.querySelector('#ask-don-notes').value.trim();
+    if(!person) { box.querySelector('#ask-person-input').style.borderColor='#ef4444'; return; }
+    document.body.removeChild(box);
+
+    const today = new Date().toISOString().slice(0,10);
+    // Save as inventaire in history
+    product.history.push({id:uid(), type:'inventaire', date:today, qty:newQty});
+    recalcQty(product);
+
+    // Save attribution record
+    if(!S.attributions) S.attributions = [];
+    S.attributions.push({
+      id:uid(), person, productId:pid,
+      productName:product.name, productUnit:product.unit,
+      qty:diff, date:today,
+      notes:notes||undefined,
+      zone:'vetements'
+    });
+
+    save();
+    toast(`✅ Don de ${diff} ${esc(product.unit)} à ${person}`, 'success');
+    renderProducts();
+  };
+
+  box.querySelector('#ask-back').onclick = () => {
+    document.body.removeChild(box);
+    cardSaveAskDon(pid, newQty, diff, product);
+  };
 }
 
 function sortedProds(arr) {
