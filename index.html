@@ -1331,10 +1331,9 @@ function renderProducts() {
     if(p.colored && currentZone==='office') {
       const colorCells = Object.entries(p.colors||{}).map(([c,qty])=>{
         const safeId = c.replace(/[^a-z0-9]/gi,'_');
-        const cs = colorStyle(c);
-        return `<div style="flex:1;min-width:48px;text-align:center;padding:5px 3px;border-radius:10px;${cs};cursor:pointer;display:inline-block" onclick="event.stopPropagation();colorStep('${p.id}','${c}',1)" oncontextmenu="event.preventDefault();event.stopPropagation();colorStep('${p.id}','${c}',-1)" title="${c}">
-          <span style="font-size:9px;font-weight:700;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c}</span>
-          <span id="cqty-${p.id}-${safeId}" style="font-size:15px;font-weight:700;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.5);display:block">${qty}</span>
+        return `<div style="flex:1;min-width:48px;text-align:center;padding:6px 3px;border-radius:10px;background:${qty===0?'#f3f4f6':'#fff3e8'};border:1.5px solid ${qty===0?'#e5e7eb':'#f97316'};cursor:pointer;display:inline-block" onclick="event.stopPropagation();colorStep('${p.id}','${c}',1)" oncontextmenu="event.preventDefault();event.stopPropagation();colorStep('${p.id}','${c}',-1)" title="${c}: clic=+1, clic droit=-1">
+          <span style="font-size:9px;font-weight:700;color:${qty===0?'#9ca3af':'#ea580c'};display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c}</span>
+          <span id="cqty-${p.id}-${safeId}" style="font-size:15px;font-weight:700;color:${qty===0?'#9ca3af':'#1f2937'};display:block">${qty}</span>
         </div>`;
       }).join('');
       const sub = p.uniteParPack ? ` <span style="font-size:10px;color:var(--text2);font-weight:400">×${p.uniteParPack}</span>` : '';
