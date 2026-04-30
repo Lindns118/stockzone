@@ -101,6 +101,16 @@ body{font-family:'DM Sans',sans-serif;background:#eef0f7;color:var(--text);min-h
 /* PRODUCT LIST */
 .product-list{padding:6px 14px 10px;display:flex;flex-direction:column;gap:9px}
 .product-card{background:#fff;border-radius:var(--radius);padding:15px 16px;border-left:4px solid var(--blue);cursor:pointer;box-shadow:var(--shadow);transition:transform .12s}
+/* card stepper */
+.card-stepper{display:flex;align-items:center;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--gray2)}
+.cs-btn{width:36px;height:36px;border:none;border-radius:9px;background:var(--gray);font-size:22px;font-weight:400;cursor:pointer;color:var(--text);flex-shrink:0;transition:background .12s;line-height:1;display:flex;align-items:center;justify-content:center}
+.cs-btn:active{background:var(--gray2)}
+.cs-minus{color:var(--red)}
+.cs-plus{color:var(--green)}
+.cs-input{flex:1;border:1.5px solid var(--gray2);border-radius:9px;text-align:center;font-size:18px;font-weight:700;font-family:inherit;color:var(--text);background:#fff;outline:none;padding:6px 4px;min-width:0}
+.cs-input:focus{border-color:var(--blue)}
+.cs-save{width:40px;height:36px;border:none;border-radius:9px;background:var(--blue);color:#fff;font-size:16px;cursor:pointer;flex-shrink:0;transition:background .12s}
+.cs-save:active{background:#1a28a0}
 .product-card:active{transform:scale(.98)}
 .product-card.vc{border-left-color:var(--purple)}
 .product-card.oc{border-left-color:var(--orange)}
@@ -145,6 +155,21 @@ body{font-family:'DM Sans',sans-serif;background:#eef0f7;color:var(--text);min-h
 
 /* PRODUCT DETAIL */
 .pd-header{display:flex;align-items:flex-start;gap:10px;padding-bottom:16px;border-bottom:1px solid var(--gray2);margin-bottom:14px}
+/* ===== QUICK ENTRY ===== */
+.quick-entry-wrap{padding:4px 0 8px}
+.quick-type-row{display:flex;gap:8px;margin-bottom:16px}
+.quick-type-btn{flex:1;padding:11px 8px;border:2px solid var(--gray2);border-radius:12px;background:var(--gray);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;transition:all .18s;color:var(--text2)}
+.quick-type-btn.active.qt-inv{background:#e8eaff;border-color:var(--blue);color:var(--blue)}
+.quick-type-btn.active.qt-liv{background:#f0fdf4;border-color:var(--green);color:var(--green)}
+.quick-date-row{margin-bottom:14px}
+.quick-qty-label{margin-bottom:8px;font-weight:600}
+.quick-stepper{display:flex;align-items:center;gap:0;margin-bottom:6px;border:2px solid var(--gray2);border-radius:14px;overflow:hidden}
+.stepper-btn{width:56px;height:56px;border:none;background:var(--gray);font-size:28px;font-weight:300;cursor:pointer;color:var(--text);flex-shrink:0;transition:background .15s;line-height:1}
+.stepper-btn:active{background:var(--gray2)}
+.stepper-minus{border-right:1px solid var(--gray2)}
+.stepper-plus{border-left:1px solid var(--gray2)}
+.stepper-input{flex:1;border:none;text-align:center;font-size:32px;font-weight:700;font-family:inherit;color:var(--text);background:#fff;outline:none;min-width:0;padding:8px 0}
+.quick-unit-lbl{text-align:center;font-size:12px;color:var(--text2);margin-bottom:14px}
 .pd-name{font-size:21px;font-weight:700;flex:1}
 .pd-cat{font-size:13px;color:var(--text2);margin-top:2px}
 .pd-qty-block{text-align:right;flex-shrink:0}
@@ -420,10 +445,39 @@ table.conso-tbl tfoot td.num{font-weight:700}
   </div>
   <div class="tab-row">
     <button class="tab-btn ta" onclick="showTab('hist',this)">📋 Historique</button>
+    <button class="tab-btn" onclick="showTab('quick',this)">⚡ Saisie</button>
     <button class="tab-btn" onclick="showTab('conso',this)">📉 Conso</button>
     <button class="tab-btn" onclick="showTab('params',this)">⚙ Params</button>
   </div>
   <div id="tc-hist"></div>
+  <div id="tc-quick" class="hidden">
+    <div class="quick-entry-wrap">
+      <div class="quick-type-row">
+        <button class="quick-type-btn qt-inv active" id="qt-inv" onclick="quickSetType('inventaire',this)">📋 Inventaire</button>
+        <button class="quick-type-btn qt-liv" id="qt-liv" onclick="quickSetType('livraison',this)">🚚 Livraison</button>
+      </div>
+      <div class="quick-date-row">
+        <label class="fl">Date</label>
+        <input type="date" id="quick-date" class="fi">
+      </div>
+      <div class="quick-qty-label fl" id="quick-qty-label">Stock actuel</div>
+      <div class="quick-stepper">
+        <button class="stepper-btn stepper-minus" onclick="quickStep(-1)">−</button>
+        <input type="number" id="quick-qty" class="stepper-input" min="0" value="0" oninput="quickClamp()">
+        <button class="stepper-btn stepper-plus" onclick="quickStep(1)">+</button>
+      </div>
+      <div class="quick-unit-lbl" id="quick-unit-lbl"></div>
+      <div class="fg" id="quick-four-wrap" style="display:none">
+        <label class="fl">Fournisseur</label>
+        <input type="text" id="quick-four" class="fi" maxlength="100" placeholder="Optionnel" autocomplete="off">
+      </div>
+      <div class="fg">
+        <label class="fl">Notes</label>
+        <input type="text" id="quick-notes" class="fi" maxlength="200" placeholder="Optionnel" autocomplete="off">
+      </div>
+      <button class="btn-primary" style="margin-top:6px" onclick="saveQuickEntry()">✅ Valider</button>
+    </div>
+  </div>
   <div id="tc-conso" class="hidden"></div>
   <div id="tc-params" class="hidden">
     <div class="param-section">
@@ -1053,6 +1107,7 @@ function renderProducts() {
     return;
   }
   const cc = currentZone==='vetements'?'vc':currentZone==='office'?'oc':'';
+  const today = new Date().toISOString().slice(0,10);
   el.innerHTML = prods.map(p=>{
     const isLow = p.seuil>0&&p.qty<=p.seuil;
     return `<div class="product-card ${cc}" onclick="openDetail('${p.id}')">
@@ -1061,8 +1116,37 @@ function renderProducts() {
         <div><div class="pc-qty${isLow?' low':''}">${p.qty}</div><div class="pc-unit">${esc(p.unit)}</div></div>
       </div>
       ${isLow?`<div><span class="alert-tag">⚠ Seuil bas (≤ ${p.seuil})</span></div>`:''}
+      <div class="card-stepper" onclick="event.stopPropagation()">
+        <button class="cs-btn cs-minus" onclick="cardStep('${p.id}',-1)">−</button>
+        <input type="number" id="cs-${p.id}" class="cs-input" value="${p.qty}" min="0" max="999999"
+          oninput="event.stopPropagation()" onchange="event.stopPropagation()" onclick="event.stopPropagation()" onfocus="event.stopPropagation()">
+        <button class="cs-btn cs-plus" onclick="cardStep('${p.id}',1)">+</button>
+        <button class="cs-save" onclick="cardSave('${p.id}')">💾</button>
+      </div>
     </div>`;
   }).join('');
+}
+
+function cardStep(pid, delta) {
+  const input = document.getElementById('cs-'+pid);
+  if(!input) return;
+  const val = parseInt(input.value)||0;
+  input.value = Math.max(0, val+delta);
+}
+
+function cardSave(pid) {
+  const found = findProduct(pid);
+  if(!found) return;
+  const input = document.getElementById('cs-'+pid);
+  if(!input) return;
+  const qty = Math.max(0, parseInt(input.value) || 0);
+  const today = new Date().toISOString().slice(0,10);
+  found.p.history.push({id:uid(), type:'inventaire', date:today, qty});
+  recalcQty(found.p);
+  save();
+  toast(`✅ ${esc(found.p.name)} → ${found.p.qty} ${esc(found.p.unit)}`, 'success');
+  renderProducts();
+  // Restore the input value after re-render (already done by renderProducts)
 }
 
 function sortedProds(arr) {
@@ -1139,11 +1223,91 @@ function renderHistory() {
 function showTab(tab, btn) {
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('ta'));
   if(btn) btn.classList.add('ta');
-  ['hist','conso','params'].forEach(t=>{const el=document.getElementById('tc-'+t);if(el)el.classList.toggle('hidden',t!==tab);});
-  if (tab==='conso') renderConsoTab();
+  ['hist','quick','conso','params'].forEach(t=>{
+    const el=document.getElementById('tc-'+t);
+    if(el) el.classList.toggle('hidden', t!==tab);
+  });
+  if(tab==='quick') initQuickEntry();
 }
 
-// ===== EDIT HISTORY =====
+// ===== QUICK ENTRY =====
+let quickType = 'inventaire';
+
+function initQuickEntry() {
+  if(!currentProduct) return;
+  quickType = 'inventaire';
+  // Reset UI
+  document.getElementById('qt-inv').classList.add('active');
+  document.getElementById('qt-liv').classList.remove('active');
+  document.getElementById('quick-qty-label').textContent = 'Stock actuel';
+  document.getElementById('quick-four-wrap').style.display = 'none';
+  document.getElementById('quick-unit-lbl').textContent = currentProduct.unit || '';
+  document.getElementById('quick-notes').value = '';
+  document.getElementById('quick-four').value = '';
+  // Pre-fill qty with current stock for inventaire
+  document.getElementById('quick-qty').value = currentProduct.qty || 0;
+  // Set today's date
+  document.getElementById('quick-date').value = new Date().toISOString().slice(0,10);
+}
+
+function quickSetType(type, btn) {
+  quickType = type;
+  document.querySelectorAll('.quick-type-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const isLiv = type === 'livraison';
+  document.getElementById('quick-qty-label').textContent = isLiv ? 'Quantité reçue' : 'Stock actuel';
+  document.getElementById('quick-four-wrap').style.display = isLiv ? 'block' : 'none';
+  document.getElementById('quick-qty').value = isLiv ? 1 : (currentProduct?.qty || 0);
+}
+
+function quickStep(delta) {
+  const input = document.getElementById('quick-qty');
+  const val = parseInt(input.value) || 0;
+  input.value = Math.max(0, val + delta);
+}
+
+function quickClamp() {
+  const input = document.getElementById('quick-qty');
+  const val = parseInt(input.value);
+  if(isNaN(val) || val < 0) input.value = 0;
+  if(val > 1e9) input.value = 1e9;
+}
+
+function saveQuickEntry() {
+  if(!currentProduct) return;
+  const qty = Math.max(0, parseInt(document.getElementById('quick-qty').value) || 0);
+  const date = document.getElementById('quick-date').value;
+  const notes = document.getElementById('quick-notes').value.trim().slice(0,200);
+  const four = document.getElementById('quick-four').value.trim().slice(0,100);
+
+  if(!date) { toast('Choisissez une date', 'error'); return; }
+
+  // Always create a NEW entry — never modify existing
+  currentProduct.history.push({
+    id: uid(),
+    type: quickType,
+    date,
+    qty,
+    notes: notes || undefined,
+    fournisseur: (quickType==='livraison' && four) ? four : undefined
+  });
+
+  recalcQty(currentProduct);
+  save();
+
+  document.getElementById('pd-qty').textContent = currentProduct.qty;
+  const label = quickType === 'livraison' ? 'Livraison' : 'Inventaire';
+  toast(`✅ ${label} ajouté — stock : ${currentProduct.qty} ${currentProduct.unit}`, 'success');
+
+  // Switch to history tab
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('ta',i===0));
+  ['hist','quick','conso','params'].forEach((t,i)=>{
+    const el=document.getElementById('tc-'+t);
+    if(el) el.classList.toggle('hidden', i!==0);
+  });
+  renderHistory();
+  renderProducts();
+}
 function editHistItem(hid, e) {
   e.stopPropagation();
   if (!currentProduct) return;
@@ -1176,6 +1340,7 @@ function saveHistEdit() {
   renderHistory();
   document.getElementById('pd-qty').textContent = product.qty;
   toast('✅ Entrée modifiée','success');
+  renderProducts();
 }
 
 async function deleteHistItem(hid, e) {
