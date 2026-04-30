@@ -670,7 +670,12 @@ table.conso-tbl tfoot td.num{font-weight:700}
     <button class="pt-btn" id="pt-e" onclick="setPretType('emprunt')">⬇ Emprunt</button>
   </div>
   <div class="pret-desc" id="pret-desc">🎁 Vous prêtez un article à quelqu'un</div>
-  <div class="fg"><label class="fl">Produit</label><input type="text" id="pr-prod" class="fi" maxlength="100" placeholder="Nom du produit" autocomplete="off"></div>
+  <div class="fg">
+    <label class="fl">Produit</label>
+    <input type="text" id="pr-prod" class="fi" maxlength="100" placeholder="Chercher ou saisir un produit..." autocomplete="off" list="pr-prod-list" oninput="filterPretProds(this.value)">
+    <datalist id="pr-prod-list"></datalist>
+    <div id="pr-prod-hint" style="font-size:11px;color:var(--text2);margin-top:4px;display:none">✨ Nouveau produit — sera créé dans le stock</div>
+  </div>
   <div class="form-row">
     <div class="fg"><label class="fl">Quantité</label><input type="number" id="pr-qty" class="fi" value="1" min="1"></div>
     <div class="fg"><label class="fl" id="pr-to-lbl">Prêté à</label><input type="text" id="pr-to" class="fi" maxlength="100" placeholder="Nom / Société" autocomplete="off"></div>
@@ -1280,7 +1285,13 @@ function renderProducts() {
       </div>`;
     }
     const isLow2 = isLow;
-    return `<div class="product-card ${cc}" onclick="openDetail('${p.id}')">
+    return `<div class="product-card ${cc}" draggable="true" data-pid="${p.id}"
+        onclick="openDetail('${p.id}')"
+        ondragstart="dragStart(event,'${p.id}')"
+        ondragover="dragOver(event)"
+        ondrop="dragDrop(event,'${p.id}')"
+        ondragend="dragEnd(event)"
+        ondragleave="dragLeave(event)">
       <div class="pc-top">
         <div><div class="pc-name">${esc(p.name)}</div><div class="pc-cat">${esc(p.category)}</div></div>
         <div><div class="pc-qty${isLow2?' low':''}">${p.qty}</div><div class="pc-unit">${esc(p.unit)}</div></div>
@@ -1666,6 +1677,12 @@ function showModal(id) {
     document.getElementById('pr-qty').value=1;
     document.getElementById('pr-to').value='';
     document.getElementById('pr-notes').value='';
+    // Populate product datalist from all zones
+    const allProds = Object.values(S.zones).flatMap(z=>z.products.map(p=>p.name));
+    const dl = document.getElementById('pr-prod-list');
+    if(dl) dl.innerHTML = [...new Set(allProds)].sort().map(n=>`<option value="${esc(n)}">`).join('');
+    const hint = document.getElementById('pr-prod-hint');
+    if(hint) hint.style.display='none';
     setPretType('pret');
   }
   const modalEl = document.getElementById('modal-'+id);
@@ -1810,6 +1827,13 @@ function setPretType(t) {
   document.getElementById('pr-to-lbl').textContent=t==='pret'?'Prêté à':'Emprunté à';
 }
 
+
+function filterPretProds(val) {
+  const allProds = Object.values(S.zones).flatMap(z=>z.products.map(p=>p.name));
+  const exists = allProds.some(n=>n.toLowerCase()===val.toLowerCase().trim());
+  const hint = document.getElementById('pr-prod-hint');
+  if(hint) hint.style.display = (val.trim() && !exists) ? 'block' : 'none';
+}
 function savePret() {
   const prod=document.getElementById('pr-prod').value.trim();
   const qty=parseFloat(document.getElementById('pr-qty').value)||1;
@@ -1818,6 +1842,17 @@ function savePret() {
   const retour=document.getElementById('pr-retour').value;
   const notes=document.getElementById('pr-notes').value.trim();
   if(!prod||!to){toast('⚠ Remplissez les champs obligatoires','error');return;}
+  // Auto-create product if not found
+  const allProds=Object.values(S.zones).flatMap(z=>z.products.map(p=>p.name));
+  if(!allProds.some(n=>n.toLowerCase()===prod.toLowerCase())) {
+    const zk=currentZone&&S.zones[currentZone]?currentZone:'entrepot';
+    S.zones[zk].products.push({
+      id:uid(),name:prod,category:'Général',qty:0,unit:'pièces',seuil:0,history:[
+        {id:uid(),type:'inventaire_base',date,qty:0}
+      ]
+    });
+    toast(`✨ Produit "${prod}" créé dans ${S.zones[zk].name}`,'success');
+  }
   S.prets.push({id:uid(),type:currentPretType,produit:prod,qty,to,date,retour:retour||null,notes,status:'encours'});
   save();hideModal('modal-pret');
   toast('✅ Enregistré','success');
@@ -2129,6 +2164,12 @@ table.inv-tbl input.sz-inp:focus{border-color:var(--blue);background:#fff}
 .btn-secondary{padding:11px;border:1.5px solid var(--blue);border-radius:11px;background:#fff;color:var(--blue);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;transition:all .18s;text-align:center}
 .btn-secondary:active{background:var(--blue-light)}
 
+
+/* DRAG & DROP */
+.product-card.dragging{opacity:.4;transform:scale(.97)}
+.product-card.drag-over{border-top:3px solid var(--blue)}
+.drag-handle{display:flex;align-items:center;justify-content:flex-end;padding:4px 0 0;opacity:.3;font-size:16px;cursor:grab}
+
 .cmp-summary{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;padding:12px 14px;background:var(--blue-light);border-radius:11px}
 .cmp-sum-item{display:flex;flex-direction:column}
 .cmp-sum-num{font-size:20px;font-weight:700;color:var(--blue)}
@@ -2265,6 +2306,40 @@ function calcApplyLivraison() {
   renderProducts();
 }
 
+
+// ===== DRAG & DROP PRODUCT REORDER =====
+let _dragPid = null;
+function dragStart(e, pid) {
+  _dragPid = pid;
+  setTimeout(()=>e.target.classList.add('dragging'), 0);
+}
+function dragEnd(e) {
+  e.target.classList.remove('dragging');
+  document.querySelectorAll('.product-card').forEach(c=>c.classList.remove('drag-over'));
+  _dragPid = null;
+}
+function dragOver(e) {
+  e.preventDefault();
+  e.currentTarget.classList.add('drag-over');
+}
+function dragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+function dragDrop(e, targetPid) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if(!_dragPid || _dragPid === targetPid) return;
+  const zd = S.zones[currentZone];
+  if(!zd) return;
+  const prods = zd.products;
+  const fromIdx = prods.findIndex(p=>p.id===_dragPid);
+  const toIdx = prods.findIndex(p=>p.id===targetPid);
+  if(fromIdx<0||toIdx<0) return;
+  const [moved] = prods.splice(fromIdx, 1);
+  prods.splice(toIdx, 0, moved);
+  save();
+  renderProducts();
+}
 // ===== ATTRIBUTIONS VETEMENTS =====
 // Cart: {productId: {size: qty}}
 let attrCart = {};
@@ -2508,6 +2583,24 @@ function ymPeriod(ym,period){
   return ym;
 }
 
+
+function statsGoZone(zk) {
+  // Switch to table tab filtered by zone
+  const tabs = document.querySelectorAll('.stats-tab');
+  tabs.forEach((b,i)=>b.classList.toggle('sta',i===1));
+  document.querySelectorAll('.stats-panel').forEach(p=>p.classList.remove('active'));
+  const tbl = document.getElementById('sp-table');
+  if(tbl) tbl.classList.add('active');
+  // Set zone filter
+  setTimeout(()=>{
+    const zoneEl = document.getElementById('tbl-zone');
+    if(zoneEl){ zoneEl.value=zk; }
+    populateCatFilter('tbl-cat','tbl-zone');
+    renderConsoTable();
+    // Scroll to table
+    tbl && tbl.scrollIntoView({behavior:'smooth'});
+  }, 50);
+}
 function statsTab(id,btn){
   document.querySelectorAll('.stats-tab').forEach(b=>b.classList.remove('sta'));
   btn.classList.add('sta');
@@ -2714,7 +2807,7 @@ function renderStats() {
   // Zone cards
   const zCards=zones.map(([k,z])=>{
     const al=z.products.filter(p=>p.seuil>0&&p.qty<=p.seuil).length;
-    return `<div class="sz-card" onclick="switchZone('${k}')" style="cursor:pointer"><div class="sz-icon">${z.icon}</div><div class="sz-num">${z.products.length}</div><div class="sz-name">${esc(z.name)}</div>${al?`<div class="sz-alert">⚠ ${al} alerte${al>1?'s':''}</div>`:''}<div style="font-size:10px;color:var(--text2);margin-top:4px">Voir →</div></div>`;
+    return `<div class="sz-card" onclick="statsGoZone('${k}')" style="cursor:pointer"><div class="sz-icon">${z.icon}</div><div class="sz-num">${z.products.length}</div><div class="sz-name">${esc(z.name)}</div>${al?`<div class="sz-alert">⚠ ${al} alerte${al>1?'s':''}</div>`:''}<div style="font-size:10px;color:var(--text2);margin-top:4px">Stats →</div></div>`;
   }).join('');
 
   // Donut
