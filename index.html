@@ -1510,11 +1510,18 @@ function colorSaveAll(pid) {
 
 function cardSaveAskDonColor(pid, color, product) {
   const persons = [...new Set((S.attributions||[]).map(a=>a.person))].sort();
+  const maxQty = product.colors[color] || 0;
   const box = document.createElement('div');
   box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-end;justify-content:center;padding:20px';
   box.innerHTML = `<div style="background:#fff;border-radius:18px;padding:24px;width:100%;max-width:400px">
     <div style="font-size:16px;font-weight:700;margin-bottom:4px">${esc(product.name)} — ${esc(color)}</div>
-    <div style="font-size:13px;color:#6b7280;margin-bottom:16px">Stock: ${product.colors[color]} — Donner 1</div>
+    <div style="font-size:13px;color:#6b7280;margin-bottom:14px">Stock actuel : ${maxQty}</div>
+    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">Quantité à donner</label>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <button onclick="var i=document.getElementById('dcq');i.value=Math.max(1,+i.value-1)" style="width:42px;height:42px;border:1.5px solid #e5e7eb;border-radius:10px;background:#f3f4f6;font-size:22px;cursor:pointer">−</button>
+      <input id="dcq" type="number" min="1" max="${maxQty}" value="1" style="flex:1;padding:10px;border:1.5px solid #e5e7eb;border-radius:11px;font-size:20px;font-weight:700;text-align:center;font-family:inherit">
+      <button onclick="var i=document.getElementById('dcq');i.value=Math.min(${maxQty},+i.value+1)" style="width:42px;height:42px;border:1.5px solid #e5e7eb;border-radius:10px;background:#f3f4f6;font-size:22px;cursor:pointer">+</button>
+    </div>
     <datalist id="don-color-dl">${persons.map(p=>`<option value="${esc(p)}">`).join('')}</datalist>
     <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">À qui ?</label>
     <input id="don-color-person" type="text" list="don-color-dl" placeholder="Nom..." autocomplete="off" maxlength="100"
@@ -1527,17 +1534,18 @@ function cardSaveAskDonColor(pid, color, product) {
   document.body.appendChild(box);
   box.querySelector('#don-color-ok').onclick = () => {
     const person = box.querySelector('#don-color-person').value.trim();
+    const qty = Math.min(maxQty, Math.max(1, parseInt(box.querySelector('#dcq').value)||1));
     if(!person) { box.querySelector('#don-color-person').style.borderColor='#ef4444'; return; }
     document.body.removeChild(box);
-    colorStep(pid, color, -1);
-    const today = new Date().toISOString().slice(0,10);
+    for(let i=0;i<qty;i++) colorStep(pid, color, -1);
     if(!S.attributions) S.attributions=[];
-    S.attributions.push({id:uid(),person,productId:pid,productName:product.name,color,qty:1,date:nowIso(),zone:'office'});
+    S.attributions.push({id:uid(),person,productId:pid,productName:product.name,color,qty,date:nowIso(),zone:'office'});
     save();
-    toast(`✅ 1 ${esc(color)} donné à ${person}`,'success');
+    toast('✅ '+qty+' '+esc(color)+' donné'+(qty>1?'s':'')+' à '+person,'success');
   };
   box.querySelector('#don-color-cancel').onclick = () => document.body.removeChild(box);
 }
+
 
 
 
