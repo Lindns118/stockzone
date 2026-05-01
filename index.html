@@ -411,6 +411,7 @@ table.conso-tbl tfoot td.num{font-weight:700}
     <button class="act-btn act-liv" onclick="showModal('livraison')">🚚 Livraison</button>
     <button class="act-btn act-pret" onclick="showModal('pret')">🔄 Prêt</button>
     <button class="act-btn" id="attr-zone-btn" style="display:none;background:#7c3aed;color:#fff" onclick="switchZone('attributions')">👕 Attributions</button>
+    <button class="act-btn" id="add-group-btn" style="display:none;background:var(--orange-light);color:var(--orange);border:1.5px solid var(--orange)" onclick="openAddGroupModal()">＋ Groupe</button>
     <button class="act-btn" style="background:#0f766e;color:#fff" onclick="openCalcModal()">🧮 Calc</button>
     <button class="act-btn act-exp" onclick="showModal('export')">⬇ Export</button>
   </div>
@@ -507,7 +508,8 @@ table.conso-tbl tfoot td.num{font-weight:700}
       <input type="number" id="ps-ordre" class="fi fi-sm" placeholder="ex: 3" min="1" style="margin-bottom:14px">
       <!-- Groupe -->
       <label class="fl">Groupe <span style="font-size:11px;color:var(--text2)">(regroupe les variantes sous un parent)</span></label>
-      <input type="text" id="ps-groupe" class="fi" maxlength="60" style="margin-bottom:14px" autocomplete="off" placeholder="Ex: Aerosol, Classeur...">
+      <datalist id="groupe-dl"></datalist>
+      <input type="text" id="ps-groupe" class="fi" maxlength="60" style="margin-bottom:14px" list="groupe-dl" placeholder="Ex: Aerosol, Classeur...">
       <div id="ps-sizes-section" style="display:none;margin-bottom:14px">
         <label class="fl">Tailles actives</label>
         <div id="ps-sizes-list" style="display:flex;flex-wrap:wrap;gap:6px"></div>
@@ -1247,6 +1249,9 @@ function switchZone(z) {
     // Show attribution button for vetements
     const attrBtn = document.getElementById('attr-zone-btn');
     if(attrBtn) attrBtn.style.display = z==='vetements' ? 'inline-flex' : 'none';
+    // Show add-group button for office
+    const addGroupBtn = document.getElementById('add-group-btn');
+    if(addGroupBtn) addGroupBtn.style.display = z==='office' ? 'inline-flex' : 'none';
   } else if (z === 'attributions') {
     document.getElementById('zh-icon').textContent = '👕';
     document.getElementById('zh-name').textContent = 'Attributions';
@@ -1349,6 +1354,15 @@ function renderProducts() {
   // Office zone: render with groupe collapsible sections
   if (currentZone === 'office' && !q) {
     const openGroups = JSON.parse(localStorage.getItem('sz_open_groups')||'{}');
+    // Build master group list: registered groups + any groupe on products not yet registered
+    if(!S.zones.office.groups) S.zones.office.groups = [];
+    const knownGroups = [...S.zones.office.groups];
+    prods.forEach(p => { if(p.groupe && !knownGroups.includes(p.groupe)) knownGroups.push(p.groupe); });
+
+    // Update datalist autocomplete
+    const dl = document.getElementById('groupe-dl');
+    if(dl) dl.innerHTML = knownGroups.map(g=>`<option value="${esc(g)}">`).join('');
+
     const grouped = {};
     const ungrouped = [];
     prods.forEach(p => {
@@ -1359,26 +1373,38 @@ function renderProducts() {
         ungrouped.push(p);
       }
     });
+
     let html = ungrouped.map(p=>makeStdCard(p)).join('');
-    Object.entries(grouped).forEach(([gname, gprods]) => {
-      const isOpen = !!openGroups[currentZone+':'+gname];
+    knownGroups.forEach(gname => {
+      const gprods = grouped[gname] || [];
+      const isOpen = !!openGroups['office:'+gname];
       const hasAlert = gprods.some(p=>p.seuil>0&&p.qty<=p.seuil);
       const totalQty = gprods.reduce((s,p)=>s+p.qty,0);
+      const isEmpty = gprods.length === 0;
       html += `<div class="group-header oc${hasAlert?' group-alert':''}" onclick="toggleGroup('${esc(gname)}')">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <div>
             <div style="font-weight:700;font-size:15px">${esc(gname)}</div>
-            <div style="font-size:12px;color:var(--text2)">${gprods.length} article${gprods.length>1?'s':''} · ${totalQty} en stock</div>
+            <div style="font-size:12px;color:var(--text2)">${isEmpty ? 'Vide — aucun produit' : `${gprods.length} article${gprods.length>1?'s':''} · ${totalQty} en stock`}</div>
           </div>
-          <div style="font-size:18px;color:var(--orange)">${isOpen?'▲':'▼'}</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            ${isEmpty ? `<button style="background:none;border:none;font-size:16px;color:#ef4444;cursor:pointer;padding:4px 8px;border-radius:8px" onclick="deleteOfficeGroup('${esc(gname)}',event)" title="Supprimer ce groupe">🗑</button>` : ''}
+            <div style="font-size:18px;color:var(--orange)">${isOpen?'▲':'▼'}</div>
+          </div>
         </div>
       </div>`;
-      if (isOpen) {
+      if (isOpen && !isEmpty) {
         html += `<div class="group-children">${gprods.map(p=>makeStdCard(p)).join('')}</div>`;
       }
     });
     el.innerHTML = html;
     return;
+  }
+
+  // For non-office zones: still update datalist if params panel is open
+  if(currentZone === 'office') {
+    const dl = document.getElementById('groupe-dl');
+    if(dl && S.zones.office.groups) dl.innerHTML = S.zones.office.groups.map(g=>`<option value="${esc(g)}">`).join('');
   }
 
   el.innerHTML = prods.map(p=>{
@@ -1569,6 +1595,50 @@ function toggleGroup(groupName) {
   localStorage.setItem(key, JSON.stringify(openGroups));
   renderProducts();
 }
+
+function openAddGroupModal() {
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-end;justify-content:center;padding:20px';
+  box.innerHTML = `<div style="background:#fff;border-radius:18px;padding:24px;width:100%;max-width:400px;box-shadow:0 8px 40px rgba(0,0,0,.2)">
+    <div style="font-size:16px;font-weight:700;margin-bottom:16px;color:#431407">📁 Nouveau groupe</div>
+    <input id="ag-name" type="text" placeholder="Ex: Aerosol, Classeur..." maxlength="60" autocomplete="off"
+      style="width:100%;padding:12px;border:1.5px solid #e5e7eb;border-radius:11px;font-size:14px;font-family:inherit;margin-bottom:14px;box-sizing:border-box">
+    <button id="ag-confirm" style="width:100%;padding:13px;border:none;border-radius:12px;background:#ea580c;color:#fff;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;margin-bottom:8px">✅ Créer le groupe</button>
+    <button id="ag-cancel" style="width:100%;padding:11px;border:1.5px solid #e5e7eb;border-radius:12px;background:#fff;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;color:#6b7280">Annuler</button>
+  </div>`;
+  document.body.appendChild(box);
+  const inp = box.querySelector('#ag-name');
+  inp.focus();
+  box.querySelector('#ag-confirm').onclick = () => {
+    const name = inp.value.trim();
+    if(!name) { inp.style.borderColor='#ef4444'; return; }
+    document.body.removeChild(box);
+    if(!S.zones.office.groups) S.zones.office.groups = [];
+    if(!S.zones.office.groups.includes(name)) {
+      S.zones.office.groups.push(name);
+      save();
+    }
+    const openGroups = JSON.parse(localStorage.getItem('sz_open_groups')||'{}');
+    openGroups['office:'+name] = true;
+    localStorage.setItem('sz_open_groups', JSON.stringify(openGroups));
+    renderProducts();
+    toast(`✅ Groupe "${name}" créé`, 'success');
+  };
+  inp.addEventListener('keydown', e => { if(e.key==='Enter') box.querySelector('#ag-confirm').click(); });
+  box.querySelector('#ag-cancel').onclick = () => document.body.removeChild(box);
+}
+
+function deleteOfficeGroup(gname, event) {
+  event.stopPropagation();
+  if(!S.zones.office.groups) return;
+  const hasProds = (S.zones.office.products||[]).some(p=>p.groupe===gname);
+  if(hasProds) { toast('⚠ Retirez d\'abord tous les produits du groupe', 'error'); return; }
+  S.zones.office.groups = S.zones.office.groups.filter(g=>g!==gname);
+  save();
+  renderProducts();
+  toast(`🗑 Groupe "${gname}" supprimé`, 'success');
+}
+
 function sortedProds(arr) {
   return [...arr].sort((a,b)=>{
     if(currentSort==='ordre'){
@@ -1872,8 +1942,16 @@ function saveParams() {
   const groupeEl2 = document.getElementById('ps-groupe');
   if(groupeEl2) {
     const gval = groupeEl2.value.trim();
-    if(gval) currentProduct.groupe = gval;
-    else delete currentProduct.groupe;
+    if(gval) {
+      currentProduct.groupe = gval;
+      // Register in office groups list if not already there
+      if(currentZone === 'office') {
+        if(!S.zones.office.groups) S.zones.office.groups = [];
+        if(!S.zones.office.groups.includes(gval)) S.zones.office.groups.push(gval);
+      }
+    } else {
+      delete currentProduct.groupe;
+    }
   }
 
   // Handle ordre with shift
