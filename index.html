@@ -1361,40 +1361,48 @@ function renderProducts() {
 
     // Update datalist autocomplete
     const dl = document.getElementById('groupe-dl');
-    if(dl) dl.innerHTML = knownGroups.map(g=>`<option value="${esc(g)}">`).join('');
+    if(dl) dl.innerHTML = [...knownGroups].sort((a,b)=>a.localeCompare(b,'fr')).map(g=>`<option value="${esc(g)}">`).join('');
 
     const grouped = {};
-    const ungrouped = [];
     prods.forEach(p => {
       if (p.groupe) {
         if (!grouped[p.groupe]) grouped[p.groupe] = [];
         grouped[p.groupe].push(p);
-      } else {
-        ungrouped.push(p);
       }
     });
 
-    let html = ungrouped.map(p=>makeStdCard(p)).join('');
-    knownGroups.forEach(gname => {
-      const gprods = grouped[gname] || [];
-      const isOpen = !!openGroups['office:'+gname];
-      const hasAlert = gprods.some(p=>p.seuil>0&&p.qty<=p.seuil);
-      const totalQty = gprods.reduce((s,p)=>s+p.qty,0);
-      const isEmpty = gprods.length === 0;
-      html += `<div class="group-header oc${hasAlert?' group-alert':''}" onclick="toggleGroup('${esc(gname)}')">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <div style="font-weight:700;font-size:15px">${esc(gname)}</div>
-            <div style="font-size:12px;color:var(--text2)">${isEmpty ? 'Vide — aucun produit' : `${gprods.length} article${gprods.length>1?'s':''} · ${totalQty} en stock`}</div>
+    // Build a flat sorted list of items: ungrouped products and group headers, all sorted alphabetically together
+    const items = [];
+    prods.forEach(p => { if(!p.groupe) items.push({type:'product', key:p.name, p}); });
+    knownGroups.forEach(gname => items.push({type:'group', key:gname, gname}));
+    items.sort((a,b) => a.key.localeCompare(b.key, 'fr'));
+
+    let html = '';
+    items.forEach(item => {
+      if (item.type === 'product') {
+        html += makeStdCard(item.p);
+      } else {
+        const gname = item.gname;
+        const gprods = grouped[gname] || [];
+        const isOpen = !!openGroups['office:'+gname];
+        const hasAlert = gprods.some(p=>p.seuil>0&&p.qty<=p.seuil);
+        const totalQty = gprods.reduce((s,p)=>s+p.qty,0);
+        const isEmpty = gprods.length === 0;
+        html += `<div class="group-header oc${hasAlert?' group-alert':''}" onclick="toggleGroup('${esc(gname)}')">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div style="font-weight:700;font-size:15px">${esc(gname)}</div>
+              <div style="font-size:12px;color:var(--text2)">${isEmpty ? 'Vide — aucun produit' : `${gprods.length} article${gprods.length>1?'s':''} · ${totalQty} en stock`}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px">
+              ${isEmpty ? `<button style="background:none;border:none;font-size:16px;color:#ef4444;cursor:pointer;padding:4px 8px;border-radius:8px" onclick="deleteOfficeGroup('${esc(gname)}',event)" title="Supprimer ce groupe">🗑</button>` : ''}
+              <div style="font-size:18px;color:var(--orange)">${isOpen?'▲':'▼'}</div>
+            </div>
           </div>
-          <div style="display:flex;align-items:center;gap:10px">
-            ${isEmpty ? `<button style="background:none;border:none;font-size:16px;color:#ef4444;cursor:pointer;padding:4px 8px;border-radius:8px" onclick="deleteOfficeGroup('${esc(gname)}',event)" title="Supprimer ce groupe">🗑</button>` : ''}
-            <div style="font-size:18px;color:var(--orange)">${isOpen?'▲':'▼'}</div>
-          </div>
-        </div>
-      </div>`;
-      if (isOpen && !isEmpty) {
-        html += `<div class="group-children">${gprods.map(p=>makeStdCard(p)).join('')}</div>`;
+        </div>`;
+        if (isOpen && !isEmpty) {
+          html += `<div class="group-children">${gprods.map(p=>makeStdCard(p)).join('')}</div>`;
+        }
       }
     });
     el.innerHTML = html;
