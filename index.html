@@ -1321,6 +1321,66 @@ function renderProducts() {
   }
   const cc = currentZone==='vetements'?'vc':currentZone==='office'?'oc':'';
   const today = new Date().toISOString().slice(0,10);
+
+  const makeStdCard = (p, extraClass='') => {
+    const isLow = p.seuil>0&&p.qty<=p.seuil;
+    return `<div class="product-card ${cc}${extraClass}" draggable="true" data-pid="${p.id}"
+        onclick="openDetail('${p.id}')"
+        ondragstart="dragStart(event,'${p.id}')"
+        ondragover="dragOver(event)"
+        ondrop="dragDrop(event,'${p.id}')"
+        ondragend="dragEnd(event)"
+        ondragleave="dragLeave(event)">
+      <div class="pc-top">
+        <div><div class="pc-name">${esc(p.name)}</div><div class="pc-cat">${esc(p.category)}</div></div>
+        <div><div class="pc-qty${isLow?' low':''}">${p.qty}</div><div class="pc-unit">${esc(p.unit)}</div></div>
+      </div>
+      ${isLow?`<div><span class="alert-tag">⚠ Seuil bas (≤ ${p.seuil})</span></div>`:''}
+      <div class="card-stepper" onclick="event.stopPropagation()">
+        <button class="cs-btn cs-minus" onclick="cardStep('${p.id}',-1)">−</button>
+        <input type="number" id="cs-${p.id}" class="cs-input" value="${p.qty}" min="0" max="999999"
+          oninput="event.stopPropagation()" onchange="event.stopPropagation()" onclick="event.stopPropagation()" onfocus="event.stopPropagation()">
+        <button class="cs-btn cs-plus" onclick="cardStep('${p.id}',1)">+</button>
+        <button class="cs-save" onclick="cardSave('${p.id}')">💾</button>
+      </div>
+    </div>`;
+  };
+
+  // Office zone: render with groupe collapsible sections
+  if (currentZone === 'office' && !q) {
+    const openGroups = JSON.parse(localStorage.getItem('sz_open_groups')||'{}');
+    const grouped = {};
+    const ungrouped = [];
+    prods.forEach(p => {
+      if (p.groupe) {
+        if (!grouped[p.groupe]) grouped[p.groupe] = [];
+        grouped[p.groupe].push(p);
+      } else {
+        ungrouped.push(p);
+      }
+    });
+    let html = ungrouped.map(p=>makeStdCard(p)).join('');
+    Object.entries(grouped).forEach(([gname, gprods]) => {
+      const isOpen = !!openGroups[currentZone+':'+gname];
+      const hasAlert = gprods.some(p=>p.seuil>0&&p.qty<=p.seuil);
+      const totalQty = gprods.reduce((s,p)=>s+p.qty,0);
+      html += `<div class="group-header oc${hasAlert?' group-alert':''}" onclick="toggleGroup('${esc(gname)}')">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-weight:700;font-size:15px">${esc(gname)}</div>
+            <div style="font-size:12px;color:var(--text2)">${gprods.length} article${gprods.length>1?'s':''} · ${totalQty} en stock</div>
+          </div>
+          <div style="font-size:18px;color:var(--orange)">${isOpen?'▲':'▼'}</div>
+        </div>
+      </div>`;
+      if (isOpen) {
+        html += `<div class="group-children">${gprods.map(p=>makeStdCard(p)).join('')}</div>`;
+      }
+    });
+    el.innerHTML = html;
+    return;
+  }
+
   el.innerHTML = prods.map(p=>{
     const isLow = p.seuil>0&&p.qty<=p.seuil;
     if(p.sized && currentZone==='vetements') {
@@ -1341,27 +1401,7 @@ function renderProducts() {
         <div class="size-grid" style="display:flex;flex-direction:row;gap:5px;margin-top:10px;padding-top:10px;border-top:1px solid #e5e7eb;overflow-x:auto">${sizeCells}</div>
       </div>`;
     }
-    const isLow2 = isLow;
-    return `<div class="product-card ${cc}" draggable="true" data-pid="${p.id}"
-        onclick="openDetail('${p.id}')"
-        ondragstart="dragStart(event,'${p.id}')"
-        ondragover="dragOver(event)"
-        ondrop="dragDrop(event,'${p.id}')"
-        ondragend="dragEnd(event)"
-        ondragleave="dragLeave(event)">
-      <div class="pc-top">
-        <div><div class="pc-name">${esc(p.name)}</div><div class="pc-cat">${esc(p.category)}</div></div>
-        <div><div class="pc-qty${isLow2?' low':''}">${p.qty}</div><div class="pc-unit">${esc(p.unit)}</div></div>
-      </div>
-      ${isLow2?`<div><span class="alert-tag">⚠ Seuil bas (≤ ${p.seuil})</span></div>`:''}
-      <div class="card-stepper" onclick="event.stopPropagation()">
-        <button class="cs-btn cs-minus" onclick="cardStep('${p.id}',-1)">−</button>
-        <input type="number" id="cs-${p.id}" class="cs-input" value="${p.qty}" min="0" max="999999"
-          oninput="event.stopPropagation()" onchange="event.stopPropagation()" onclick="event.stopPropagation()" onfocus="event.stopPropagation()">
-        <button class="cs-btn cs-plus" onclick="cardStep('${p.id}',1)">+</button>
-        <button class="cs-save" onclick="cardSave('${p.id}')">💾</button>
-      </div>
-    </div>`;
+    return makeStdCard(p);
   }).join('');
 }
 
@@ -2487,6 +2527,7 @@ table.inv-tbl input.sz-inp:focus{border-color:var(--blue);background:#fff}
 
 .group-header{background:#fff;border-radius:13px;padding:14px 16px;margin-bottom:6px;box-shadow:var(--shadow);cursor:pointer;border-left:4px solid var(--blue)}
 .group-header:active{opacity:.8}
+.group-header.oc{border-left-color:var(--orange)}
 .group-alert{border-left-color:#ef4444}
 .group-children{margin-left:12px;margin-bottom:8px}
 .group-children .product-card{border-radius:10px;margin-bottom:6px}
