@@ -505,23 +505,9 @@ table.conso-tbl tfoot td.num{font-weight:700}
       <input type="text" id="ps-cat" class="fi" maxlength="60" style="margin-bottom:11px" autocomplete="off">
       <label class="fl">Numéro d'ordre <span style="font-size:11px;color:var(--text2);font-weight:400">(décale les autres automatiquement)</span></label>
       <input type="number" id="ps-ordre" class="fi fi-sm" placeholder="ex: 3" min="1" style="margin-bottom:14px">
-      <!-- Colors / Sizes management -->
-      <div id="ps-colors-section" style="margin-bottom:14px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <label class="fl" style="margin:0">Variantes par couleur</label>
-          <label class="toggle-sw">
-            <input type="checkbox" id="ps-colored-toggle" onchange="psToggleColored(this.checked)">
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-        <div id="ps-colors-body" style="display:none">
-          <div id="ps-colors-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
-          <div style="display:flex;gap:6px">
-            <input type="text" id="ps-new-color" class="fi" maxlength="30" placeholder="Nouvelle couleur..." autocomplete="off" style="flex:1">
-            <button onclick="psAddColor()" style="padding:10px 14px;border:none;border-radius:10px;background:var(--blue);color:#fff;font-weight:600;font-family:inherit;cursor:pointer">+</button>
-          </div>
-        </div>
-      </div>
+      <!-- Groupe -->
+      <label class="fl">Groupe <span style="font-size:11px;color:var(--text2)">(regroupe les variantes sous un parent)</span></label>
+      <input type="text" id="ps-groupe" class="fi" maxlength="60" style="margin-bottom:14px" autocomplete="off" placeholder="Ex: Aerosol, Classeur...">
       <div id="ps-sizes-section" style="display:none;margin-bottom:14px">
         <label class="fl">Tailles actives</label>
         <div id="ps-sizes-list" style="display:flex;flex-wrap:wrap;gap:6px"></div>
@@ -1355,39 +1341,6 @@ function renderProducts() {
         <div class="size-grid" style="display:flex;flex-direction:row;gap:5px;margin-top:10px;padding-top:10px;border-top:1px solid #e5e7eb;overflow-x:auto">${sizeCells}</div>
       </div>`;
     }
-    if(p.colored && p.colors && Object.keys(p.colors).length > 0) {
-      const colorCells = Object.entries(p.colors).map(([c,qty])=>{
-        const safeId = c.replace(/[^a-z0-9]/gi,'_');
-        const lbl = c.slice(0,2).toUpperCase();
-        const isZ = qty===0;
-        return `<div class="size-cell ${isZ?'size-zero':''}" style="flex:1;min-width:40px;text-align:center;padding:6px 3px;border-radius:10px;background:${isZ?'#f3f4f6':'#fff3e8'};border:1.5px solid ${isZ?'#e5e7eb':'#fb923c'};cursor:pointer;display:inline-block;user-select:none"
-          onclick="event.stopPropagation();colorStep('${p.id}','${c}',1)"
-          data-pid="${p.id}" data-color="${c}"
-          oncontextmenu="event.preventDefault();event.stopPropagation();">
-          <span class="size-lbl" style="font-size:10px;font-weight:700;color:${isZ?'#9ca3af':'#ea580c'};display:block">${lbl}</span>
-          <span class="size-qty" id="cqty-${p.id}-${safeId}" style="font-size:15px;font-weight:700;color:${isZ?'#9ca3af':'#111'};display:block">${qty}</span>
-        </div>`;
-      }).join('');
-      // Recalc correct total from colors
-      const realTotal = Object.values(p.colors).reduce((s,v)=>s+v,0);
-      return `<div class="product-card oc" draggable="true" data-pid="${p.id}"
-        onclick="openDetail('${p.id}')"
-        ondragstart="dragStart(event,'${p.id}')"
-        ondragover="dragOver(event)"
-        ondrop="dragDrop(event,'${p.id}')"
-        ondragend="dragEnd(event)"
-        ondragleave="dragLeave(event)">
-        <div class="pc-top">
-          <div><div class="pc-name">${esc(p.name)}</div><div class="pc-cat">${esc(p.category)}</div></div>
-          <div><div class="pc-qty${isLow?' low':''}" id="pqty-${p.id}">${realTotal}</div><div class="pc-unit">${esc(p.unit)}</div></div>
-        </div>
-        ${isLow?`<div><span class="alert-tag">⚠ Seuil bas (≤ ${p.seuil})</span></div>`:''}
-        <div style="display:flex;gap:5px;margin-top:10px;padding-top:10px;border-top:1px solid #e5e7eb;overflow-x:auto;align-items:center" onclick="event.stopPropagation()">
-          <div style="display:flex;gap:5px;flex:1;overflow-x:auto">${colorCells}</div>
-          <button class="cs-save" onclick="event.stopPropagation();colorSaveAll('${p.id}')" style="flex-shrink:0;margin-left:4px">💾</button>
-        </div>
-      </div>`;
-    }
     const isLow2 = isLow;
     return `<div class="product-card ${cc}" draggable="true" data-pid="${p.id}"
         onclick="openDetail('${p.id}')"
@@ -1444,112 +1397,7 @@ function sizeStep(pid, size, delta) {
   }, 800);
 }
 
-function colorStep(pid, color, delta) {
-  const found = findProduct(pid);
-  if(!found || !found.p.colored) return;
-  if(!found.p.colors) found.p.colors = {};
-  const cur = found.p.colors[color] || 0;
-  found.p.colors[color] = Math.max(0, cur + delta);
-  found.p.qty = r2(Object.values(found.p.colors).reduce((s,v)=>s+v,0));
-  const safeId = color.replace(/[^a-z0-9]/gi,'_');
-  const el = document.getElementById('cqty-'+pid+'-'+safeId);
-  if(el) {
-    el.textContent = found.p.colors[color];
-    const cell = el.closest('[data-color]');
-    if(cell) {
-      const isZ = found.p.colors[color]===0;
-      cell.classList.toggle('size-zero', isZ);
-      cell.style.background = isZ?'#f3f4f6':'#fff3e8';
-      cell.style.borderColor = isZ?'#e5e7eb':'#fb923c';
-    }
-  }
-  // Update card total
-  const totalEl = document.getElementById('pqty-'+pid);
-  if(totalEl) totalEl.textContent = found.p.qty;
-  const pdQty = document.getElementById('pd-qty');
-  if(pdQty && currentProduct && currentProduct.id===pid) pdQty.textContent = found.p.qty;
-  save();
-  clearTimeout(window._colorToast);
-  window._colorToast = setTimeout(()=>{
-    toast(esc(found.p.name)+' — '+esc(color)+': '+found.p.colors[color], 'success');
-  }, 600);
-}
-
-function colorSaveAll(pid) {
-  const found = findProduct(pid);
-  if(!found) return;
-  const today = new Date().toISOString().slice(0,10);
-  const existing = found.p.history.find(h=>h.date===today&&h.type==='inventaire');
-  const snap = {...found.p.colors};
-  found.p.qty = r2(Object.values(snap).reduce((s,v)=>s+v,0));
-  if(existing) { existing.qty=found.p.qty; existing.colors=snap; }
-  else found.p.history.push({id:uid(),type:'inventaire',date:nowIso(),qty:found.p.qty,colors:snap});
-  save();
-  toast(`✅ ${esc(found.p.name)} sauvegardé — ${found.p.qty} packs`, 'success');
-  renderProducts();
-}
-
-// Long press on color cell = donation
-(function() {
-  let _lpTimer = null;
-  document.addEventListener('touchstart', e => {
-    const cell = e.target.closest('[data-color][data-pid]');
-    if(!cell) return;
-    _lpTimer = setTimeout(()=>{
-      _lpTimer = null;
-      const pid = cell.dataset.pid;
-      const color = cell.dataset.color;
-      const found = findProduct(pid);
-      if(!found) return;
-      const qty = found.p.colors[color]||0;
-      if(qty<=0) return;
-      cardSaveAskDonColor(pid, color, found.p);
-    }, 600);
-  }, {passive:true});
-  document.addEventListener('touchend', () => { clearTimeout(_lpTimer); _lpTimer=null; }, {passive:true});
-  document.addEventListener('touchmove', () => { clearTimeout(_lpTimer); _lpTimer=null; }, {passive:true});
-})();
-
-function cardSaveAskDonColor(pid, color, product) {
-  const persons = [...new Set((S.attributions||[]).map(a=>a.person))].sort();
-  const maxQty = product.colors[color] || 0;
-  const box = document.createElement('div');
-  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-end;justify-content:center;padding:20px';
-  box.innerHTML = `<div style="background:#fff;border-radius:18px;padding:24px;width:100%;max-width:400px">
-    <div style="font-size:16px;font-weight:700;margin-bottom:4px">${esc(product.name)} — ${esc(color)}</div>
-    <div style="font-size:13px;color:#6b7280;margin-bottom:14px">Stock actuel : ${maxQty}</div>
-    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">Quantité à donner</label>
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-      <button onclick="var i=document.getElementById('dcq');i.value=Math.max(1,+i.value-1)" style="width:42px;height:42px;border:1.5px solid #e5e7eb;border-radius:10px;background:#f3f4f6;font-size:22px;cursor:pointer">−</button>
-      <input id="dcq" type="number" min="1" max="${maxQty}" value="1" style="flex:1;padding:10px;border:1.5px solid #e5e7eb;border-radius:11px;font-size:20px;font-weight:700;text-align:center;font-family:inherit">
-      <button onclick="var i=document.getElementById('dcq');i.value=Math.min(${maxQty},+i.value+1)" style="width:42px;height:42px;border:1.5px solid #e5e7eb;border-radius:10px;background:#f3f4f6;font-size:22px;cursor:pointer">+</button>
-    </div>
-    <datalist id="don-color-dl">${persons.map(p=>`<option value="${esc(p)}">`).join('')}</datalist>
-    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">À qui ?</label>
-    <input id="don-color-person" type="text" list="don-color-dl" placeholder="Nom..." autocomplete="off" maxlength="100"
-      style="width:100%;padding:12px;border:1.5px solid #e5e7eb;border-radius:11px;font-size:14px;font-family:inherit;margin-bottom:14px;box-sizing:border-box">
-    <div style="display:flex;gap:8px">
-      <button id="don-color-cancel" style="flex:1;padding:12px;border:1.5px solid #e5e7eb;border-radius:11px;background:#fff;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">Annuler</button>
-      <button id="don-color-ok" style="flex:1;padding:12px;border:none;border-radius:11px;background:#7c3aed;color:#fff;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">✅ Don</button>
-    </div>
-  </div>`;
-  document.body.appendChild(box);
-  box.querySelector('#don-color-ok').onclick = () => {
-    const person = box.querySelector('#don-color-person').value.trim();
-    const qty = Math.min(maxQty, Math.max(1, parseInt(box.querySelector('#dcq').value)||1));
-    if(!person) { box.querySelector('#don-color-person').style.borderColor='#ef4444'; return; }
-    document.body.removeChild(box);
-    for(let i=0;i<qty;i++) colorStep(pid, color, -1);
-    if(!S.attributions) S.attributions=[];
-    S.attributions.push({id:uid(),person,productId:pid,productName:product.name,color,qty,date:nowIso(),zone:'office'});
-    save();
-    toast('✅ '+qty+' '+esc(color)+' donné'+(qty>1?'s':'')+' à '+person,'success');
-  };
-  box.querySelector('#don-color-cancel').onclick = () => document.body.removeChild(box);
-}
-
-
-
+;
 
 function cardStep(pid, delta) {
   const input = document.getElementById('cs-'+pid);
@@ -1671,6 +1519,16 @@ function cardSaveAskPerson(pid, newQty, diff, product) {
   };
 }
 
+
+function toggleGroup(groupName) {
+  const key = 'sz_open_groups';
+  const openGroups = JSON.parse(localStorage.getItem(key)||'{}');
+  const k = currentZone+':'+groupName;
+  if(openGroups[k]) delete openGroups[k];
+  else openGroups[k] = true;
+  localStorage.setItem(key, JSON.stringify(openGroups));
+  renderProducts();
+}
 function sortedProds(arr) {
   return [...arr].sort((a,b)=>{
     if(currentSort==='ordre'){
@@ -1723,6 +1581,11 @@ function openDetail(id) {
   document.getElementById('ps-cat').value = found.p.category;
   document.getElementById('ps-ordre').value = found.p.ordre != null ? found.p.ordre : '';
   document.getElementById('ps-official').value = found.p.officialName || '';
+  const groupeEl = document.getElementById('ps-groupe');
+  if(groupeEl) groupeEl.value = found.p.groupe || '';
+  // Hide colors section (old system removed)
+  const colSectionOld = document.getElementById('ps-colors-section');
+  if(colSectionOld) colSectionOld.style.display='none';
   // Colors section — always show for office, toggle based on colored flag
   const colSection = document.getElementById('ps-colors-section');
   const sizeSection = document.getElementById('ps-sizes-section');
@@ -1931,27 +1794,6 @@ function recalcQty(product) {
 }
 
 // ===== PARAMS =====
-function psToggleColored(enabled) {
-  if(!currentProduct) return;
-  currentProduct.colored = enabled;
-  if(!currentProduct.colors) currentProduct.colors = {};
-  const colBody = document.getElementById('ps-colors-body');
-  if(colBody) colBody.style.display = enabled ? 'block' : 'none';
-  if(enabled) psRenderColorsList(currentProduct);
-}
-
-function psRenderColorsList(product) {
-  const list = document.getElementById('ps-colors-list');
-  if(!list) return;
-  list.innerHTML = Object.entries(product.colors||{}).map(([c,qty])=>
-    `<div style="display:flex;align-items:center;gap:4px;background:#f3f4f6;border-radius:8px;padding:4px 8px">
-      <span style="font-size:12px;font-weight:600">${esc(c)}</span>
-      <span style="font-size:11px;color:#6b7280">${qty}</span>
-      <button onclick="psRemoveColor('${esc(c)}')" style="border:none;background:none;color:#ef4444;cursor:pointer;font-size:14px;padding:0 2px;line-height:1">×</button>
-    </div>`
-  ).join('');
-}
-
 function psRenderSizesList(product) {
   const list = document.getElementById('ps-sizes-list');
   if(!list) return;
@@ -1962,34 +1804,6 @@ function psRenderSizesList(product) {
       ${active?`<span style="font-size:10px;color:#6b7280">${product.sizes[s]}</span>`:''}
     </div>`;
   }).join('');
-}
-
-function psAddColor() {
-  if(!currentProduct || !currentProduct.colored) return;
-  const input = document.getElementById('ps-new-color');
-  const color = input.value.trim();
-  if(!color) return;
-  if(!currentProduct.colors) currentProduct.colors = {};
-  if(currentProduct.colors[color] !== undefined) { toast('Couleur déjà existante', 'error'); return; }
-  currentProduct.colors[color] = 0;
-  input.value = '';
-  psRenderColorsList(currentProduct);
-  save();
-  toast(`✅ Couleur "${color}" ajoutée`, 'success');
-}
-
-function psRemoveColor(color) {
-  if(!currentProduct || !currentProduct.colors) return;
-  if(currentProduct.colors[color] > 0) {
-    toast(`⚠ Stock non nul (${currentProduct.colors[color]}) — mettez à 0 avant de supprimer`, 'error');
-    return;
-  }
-  delete currentProduct.colors[color];
-  currentProduct.qty = r2(Object.values(currentProduct.colors).reduce((s,v)=>s+v,0));
-  psRenderColorsList(currentProduct);
-  save();
-  renderProducts();
-  toast(`Couleur "${color}" supprimée`, 'success');
 }
 
 function psToggleSize(size) {
@@ -2014,10 +1828,13 @@ function saveParams() {
   if (newName) currentProduct.name = newName;
   if (newCat) currentProduct.category = newCat;
   if (newOfficial) currentProduct.officialName = newOfficial; else if(!currentProduct.officialName) currentProduct.officialName = currentProduct.name;
-  // Persist colored toggle state
-  const colorToggle = document.getElementById('ps-colored-toggle');
-  if(colorToggle) currentProduct.colored = colorToggle.checked;
-  if(!currentProduct.colors) currentProduct.colors = {};
+  // Save groupe
+  const groupeEl2 = document.getElementById('ps-groupe');
+  if(groupeEl2) {
+    const gval = groupeEl2.value.trim();
+    if(gval) currentProduct.groupe = gval;
+    else delete currentProduct.groupe;
+  }
 
   // Handle ordre with shift
   const ordreVal = document.getElementById('ps-ordre').value;
@@ -2668,6 +2485,11 @@ table.inv-tbl input.sz-inp:focus{border-color:var(--blue);background:#fff}
 .product-card.drag-over{border-top:3px solid var(--blue)}
 .drag-handle{display:flex;align-items:center;justify-content:flex-end;padding:4px 0 0;opacity:.3;font-size:16px;cursor:grab}
 
+.group-header{background:#fff;border-radius:13px;padding:14px 16px;margin-bottom:6px;box-shadow:var(--shadow);cursor:pointer;border-left:4px solid var(--blue)}
+.group-header:active{opacity:.8}
+.group-alert{border-left-color:#ef4444}
+.group-children{margin-left:12px;margin-bottom:8px}
+.group-children .product-card{border-radius:10px;margin-bottom:6px}
 .cmp-summary{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;padding:12px 14px;background:var(--blue-light);border-radius:11px}
 .cmp-sum-item{display:flex;flex-direction:column}
 .cmp-sum-num{font-size:20px;font-weight:700;color:var(--blue)}
