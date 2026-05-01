@@ -1887,16 +1887,19 @@ async function deleteHistItem(hid, e) {
 }
 
 function recalcQty(product) {
-  const invs = product.history.filter(h=>h.type==='inventaire'||h.type==='inventaire_base').sort((a,b)=>new Date(b.date)-new Date(a.date));
+  // Sort by date DESC, then by array index DESC (last inserted wins on same date)
+  const invs = product.history
+    .map((h,i)=>({...h,_i:i}))
+    .filter(h=>h.type==='inventaire'||h.type==='inventaire_base')
+    .sort((a,b)=> new Date(b.date)-new Date(a.date) || b._i-a._i);
   if (!invs.length) {
-    // No inventory left — sum any remaining deliveries or set 0
     product.qty = product.history.filter(h=>h.type==='livraison').reduce((s,h)=>s+h.qty, 0);
     return;
   }
   let qty = invs[0].qty;
   const refDate = new Date(invs[0].date);
   product.history.filter(h=>h.type==='livraison'&&new Date(h.date)>refDate).forEach(h=>qty+=h.qty);
-  product.qty = qty;
+  product.qty = r2(qty);
 }
 
 // ===== PARAMS =====
