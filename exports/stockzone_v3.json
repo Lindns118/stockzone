@@ -1186,7 +1186,7 @@
             "sizes": {
               "S": 0,
               "M": 2,
-            "L": 2,
+              "L": 2,
               "XL": 0,
               "2XL": 0,
               "3XL": 0
@@ -1199,9 +1199,920 @@
                 "qty": 4
               }
             ]
+          },
+          {
+            "id": "cb5f40f7ed0948aab6db996ea7f07f5b",
+            "name": "T-shirts blanc",
+            "category": "T-shirts",
+            "qty": 46,
+            "unit": "pièces",
+            "seuil": 0,
+            "ordre": 2,
+            "sized": true,
+            "sizes": {
+              "S": 5,
+              "M": 28,
+              "L": 8,
+              "XL": 5,
+              "2XL": 0,
+              "3XL": 0
+            },
+            "history": [
+              {
+                "id": "c1081bc330ee48a89bcc78773f74a922",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 46
+              }
+            ]
+          },
+          {
+            "id": "bbff3223704f4043a993f111822678d1",
+            "name": "Vestes imperméables",
+            "category": "Vestes",
+            "qty": 11,
+            "unit": "pièces",
+            "seuil": 0,
+            "ordre": 3,
+            "sized": true,
+            "sizes": {
+              "S": 2,
+              "M": 3,
+              "L": 4,
+              "XL": 2,
+              "2XL": 0,
+              "3XL": 0
+            },
+            "history": [
+              {
+                "id": "e3edac27096944998918995cccb0f64b",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 11
+              }
+            ]
           }
         ]
+      },
+      "office": {
+        "name": "Office",
+        "icon": "🏢",
+        "color": "office",
+        "products": [
+          {
+            "id": "4fb743abb5ed4b56ae1ab39ed3743029",
+            "name": "Umonium Spray",
+            "officialName": "Umonium Spray Désinfectant",
+            "category": "Office",
+            "qty": 28,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 2,
+            "colored": false,
+            "colors": {},
+            "history": [
+              {
+                "id": "b47f12e44d3846f3ae03960e25a35cbb",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 28
+              }
+            ],
+            "groupe": "Nettoyage"
+          },
+          {
+            "id": "b1fb7de6d9884b91a6ca9becc13848c9",
+            "name": "Mr Propre Désinf.",
+            "officialName": "Mr Propre Désinfectant",
+            "category": "Office",
+            "qty": 16,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 3,
+            "colored": false,
+            "colors": {},
+            "history": [
+              {
+                "id": "3450f6bd41764c87ad8b334cdec8a5d7",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 16
+              }
+            ],
+            "groupe": "Nettoyage"
+          },
+          {
+            "id": "fb800c67787349e0aa9062556a91354d",
+            "name": "Gobelet Carton",
+            "officialName": "Gobelet Carton",
+            "category": "Office",
+            "qty": 15,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 4,
+            "colored": false,
+            "colors": {},
+            "history": [
+              {
+                "id": "c2665bd615ff450fb4de3b0cb16b544e",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 15
+              }
+            ]
+          },
+          {
+            "id": "6767775710d04b769745bf166b6c962c",
+            "name": "Etiquette",
+            "officialName": "Etiquette adhésive",
+            "category": "Office",
+            "qty": 14,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 5,
+            "colored": true,
+            "colors": {
+              "Jaune": 1,
+              "Orange": 9,
+              "Vert": 4
+            },
+            "history": [
+              {
+                "id": "3e2cba8e52dc47c29d91a837e213319c",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 14,
+                "colors": {
+                  "Jaune": 1,
+                  "Orange": 9,
+                  "Vert": 4
+                }
+              }
+            ],
+            "groupe": "Marquage"
+          },
+          {
+            "id": "8475a4865e4b4f00873b8d51df29f2fb",
+            "name": "Bouchon d'oreille",
+            "officialName": "Bouchon oreille protection",
+            "category": "Office",
+            "qty": 8,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 6,
+            "colored": false,
+            "colors": {},
+            "history": [
+              {
+                "id": "14565dfab0ec465abd22846eed16b1ea",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 8
+              }
+            ]
+          },
+          {
+            "id": "d406ff065b2e4450b5536fa7395f8690",
+            "name": "Label",
+            "officialName": "Label adhésif",
+            "category": "Office",
+            "qty": 182,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 8,
+            "colored": true,
+            "colors": {
+              "Jaune-vert": 25,
+              "Rouge": 45,
+              "Blanc": 37,
+              "Bleu ciel": 21,
+              "Jaune": 34,
+              "Vert": 20
+            },
+            "history": [
+              {
+                "id": "cd21abf95d19433a912b7d3d6638eaf6",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 182,
+                "colors": {
+                  "Jaune-vert": 25,
+                  "Rouge": 45,
+                  "Blanc": 37,
+                  "Bleu ciel": 21,
+                  "Jaune": 34,
+                  "Vert": 20
+                }
+              }
+            ],
+            "groupe": "Marquage"
+          },
+          {
+            "id": "f2d1cc0776d34de69b382d5819df030c",
+            "name": "Uronium Lingette",
+            "officialName": "Uronium Lingette désinfectante",
+            "category": "Office",
+            "qty": 10,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 9,
+            "colored": false,
+            "colors": {},
+            "history": [
+              {
+                "id": "3d2ee3383adf4145b896ee13e1315738",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 10
+              }
+            ],
+            "groupe": "Nettoyage"
+          },
+          {
+            "id": "57c50d65d43c4385b5ea8ca39cf686b5",
+            "name": "Classeur",
+            "officialName": "Classeur",
+            "category": "Office",
+            "qty": 18,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 10,
+            "colored": true,
+            "colors": {
+              "Bleu": 9,
+              "Noir": 5,
+              "Blanc": 1,
+              "Vert": 3
+            },
+            "history": [
+              {
+                "id": "5f579024b1e8430ebe46c38bd910e52b",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 18,
+                "colors": {
+                  "Bleu": 9,
+                  "Noir": 5,
+                  "Blanc": 1,
+                  "Vert": 3
+                }
+              }
+            ],
+            "groupe": "Classement"
+          },
+          {
+            "id": "6aa1494acaa84ea1897fb67b7d0b97d9",
+            "name": "Cutter",
+            "officialName": "Cutter",
+            "category": "Office",
+            "qty": 240,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 11,
+            "colored": false,
+            "colors": {},
+            "history": [
+              {
+                "id": "ba846625fff64eca957638138aa91fcd",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 240
+              }
+            ]
+          },
+          {
+            "id": "8d0d812e19114d8bb07d6bf497163e90",
+            "name": "Marqueur indélébile noir",
+            "officialName": "Marqueur indélébile noir",
+            "category": "Office",
+            "qty": 8,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 12,
+            "colored": false,
+            "colors": {},
+            "history": [
+              {
+                "id": "4b2d388360524c4bb106670c5e22c402",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 8
+              }
+            ],
+            "groupe": "Marquage"
+          },
+          {
+            "id": "63867c8f89d44a24aef72cfc5e86db14",
+            "name": "Agraffeuse B8",
+            "officialName": "Agraffeuse B8",
+            "category": "Office",
+            "qty": 10,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 13,
+            "colored": false,
+            "colors": {},
+            "history": [
+              {
+                "id": "0a1518208439444cab2b137441841e13",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 10
+              }
+            ],
+            "groupe": "Agrafes"
+          },
+          {
+            "id": "d9099cf48d51402881ac032ef51f8ec3",
+            "name": "Agraffe B8",
+            "officialName": "Agraffe B8",
+            "category": "Office",
+            "qty": 10,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 14,
+            "colored": false,
+            "colors": {},
+            "history": [
+              {
+                "id": "3eeac53b546a493ca0c11849d5f0694c",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 10
+              }
+            ],
+            "groupe": "Agrafes"
+          },
+          {
+            "id": "2611538c061843819306a50e9f34325d",
+            "name": "Intercalaire",
+            "officialName": "Intercalaire",
+            "category": "Office",
+            "qty": 20,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 15,
+            "colored": true,
+            "colors": {
+              "Multi": 20
+            },
+            "history": [
+              {
+                "id": "f0ac834c21a044f4b71b130a6354a0ab",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 20,
+                "colors": {
+                  "Multi": 20
+                }
+              }
+            ],
+            "groupe": "Classement"
+          },
+          {
+            "id": "77322b2be19841fa800f208df43fa6f5",
+            "name": "Anti Spray Dust",
+            "officialName": "Anti Spray Dust",
+            "category": "Office",
+            "qty": 2,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 16,
+            "colored": false,
+            "colors": {},
+            "history": [
+              {
+                "id": "86cc385e143b482da02117c83aac141b",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 2
+              }
+            ],
+            "groupe": "Nettoyage"
+          },
+          {
+            "id": "8dc1edd33abe4ed084f8481ba821ec72",
+            "name": "Best Copy",
+            "officialName": "Best Copy A4",
+            "category": "Office",
+            "qty": 20,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 17,
+            "colored": true,
+            "colors": {
+              "A4": 20
+            },
+            "history": [
+              {
+                "id": "59e7c53041e24dd8add2b98c1832f390",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 20,
+                "colors": {
+                  "A4": 20
+                }
+              }
+            ]
+          },
+          {
+            "id": "041472ec32ef4ad8bd67e240d053cff0",
+            "name": "Post-it",
+            "officialName": "Post-it",
+            "category": "Office",
+            "qty": 4,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 18,
+            "colored": false,
+            "colors": {},
+            "history": [
+              {
+                "id": "5eea5ad98fe24790950adc66b649b441",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 4
+              }
+            ]
+          },
+          {
+            "id": "4f23d0a1523b4ec3bba8c573971726f4",
+            "name": "Agraffeuse 50",
+            "officialName": "Agraffeuse 50",
+            "category": "Office",
+            "qty": 3,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 19,
+            "colored": false,
+            "colors": {},
+            "history": [
+              {
+                "id": "724dbc6897aa4ef39292e49e83f16485",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 3
+              }
+            ],
+            "groupe": "Agrafes"
+          },
+          {
+            "id": "4fcd20f93ea3477985e27e405ad8ad4c",
+            "name": "Agraffe 50",
+            "officialName": "Agraffe 50",
+            "category": "Office",
+            "qty": 0,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 20,
+            "colored": false,
+            "colors": {},
+            "history": [
+              {
+                "id": "e25d3c5c9625491684d1784431098f26",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 0
+              }
+            ],
+            "groupe": "Agrafes"
+          },
+          {
+            "id": "54d19e2afc004596857c7144bebf30e9",
+            "name": "Classeur vert",
+            "officialName": "Classeur vert",
+            "category": "Office",
+            "qty": 3,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 21,
+            "colored": false,
+            "colors": {},
+            "history": [
+              {
+                "id": "0e7cbea31bbe47bb9b10bdcbe5630275",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 3
+              }
+            ],
+            "groupe": "Classement"
+          },
+          {
+            "id": "da1e3dc198eb484c9c8c41d06b30c5ac",
+            "name": "Thermomètre Tête",
+            "officialName": "Thermomètre frontal",
+            "category": "Office",
+            "qty": 1,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 22,
+            "colored": false,
+            "colors": {},
+            "history": [
+              {
+                "id": "85c147a885a74688ad60dd4111ce3bee",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 1
+              }
+            ]
+          },
+          {
+            "id": "63afbfd789c540418d0df24bf0bf28d3",
+            "name": "Knipex pince",
+            "officialName": "Knipex pince",
+            "category": "Office",
+            "qty": 9,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 23,
+            "colored": false,
+            "colors": {},
+            "history": [
+              {
+                "id": "11debf867b9d422c917ea73a79773dea",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 9
+              }
+            ]
+          },
+          {
+            "id": "fe667dc642924b1e96b91e5f1a155f42",
+            "name": "Boîte Archive",
+            "officialName": "Boîte Archive",
+            "category": "Office",
+            "qty": 3,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 24,
+            "colored": false,
+            "colors": {},
+            "history": [
+              {
+                "id": "b9c23741f7dd4afb8b0d644262a38cd7",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 3
+              }
+            ]
+          },
+          {
+            "id": "29838acf70f94b4cae3d275d99a0a64a",
+            "name": "Zip noir",
+            "officialName": "Sac Zip noir",
+            "category": "Office",
+            "qty": 0,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 25,
+            "colored": false,
+            "colors": {},
+            "history": [
+              {
+                "id": "8c2b418054eb4c92b078bdd7af139ba9",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 0
+              }
+            ]
+          },
+          {
+            "id": "47812ba1e5c9448d9399e399c2033c8f",
+            "name": "Souris Ergo noir",
+            "officialName": "Souris ergonomique noir",
+            "category": "Office",
+            "qty": 0,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 26,
+            "colored": false,
+            "colors": {},
+            "history": [
+              {
+                "id": "e2185c4b08ea43e396c3baa896a10437",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 0
+              }
+            ]
+          },
+          {
+            "id": "60be52a1205b4b2692e9c2abfa0165c1",
+            "name": "Gel hydroalcoolique",
+            "officialName": "Gel hydroalcoolique",
+            "category": "Office",
+            "qty": 0,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 27,
+            "colored": false,
+            "colors": {},
+            "history": [
+              {
+                "id": "89597af838544fa0a9a2cb801c3491ed",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 0
+              }
+            ],
+            "groupe": "Nettoyage"
+          },
+          {
+            "id": "c96f9b2002b2444087e621c80c7ab17c",
+            "name": "Rouge",
+            "officialName": "File Exacompta Rouge",
+            "category": "Office",
+            "qty": 0,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 1,
+            "groupe": "Exacompta",
+            "history": [
+              {
+                "id": "e433c20967ec4aa59f872789656fc1aa",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 0
+              }
+            ]
+          },
+          {
+            "id": "48e58dc62e7c478783f1448055d046d6",
+            "name": "Jaune",
+            "officialName": "File Exacompta Jaune",
+            "category": "Office",
+            "qty": 5,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 2,
+            "groupe": "Exacompta",
+            "history": [
+              {
+                "id": "ada88c7166424099b9def3e6a6dea9cb",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 5
+              }
+            ]
+          },
+          {
+            "id": "3d348ae8611a40239f8abc5cef4a40b1",
+            "name": "Vert",
+            "officialName": "File Exacompta Vert",
+            "category": "Office",
+            "qty": 11,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 3,
+            "groupe": "Exacompta",
+            "history": [
+              {
+                "id": "dc461ac01d1c4987999665025b89cbb1",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 11
+              }
+            ]
+          },
+          {
+            "id": "9beb0f000f7d4deb918aed827ff70d89",
+            "name": "Bleu",
+            "officialName": "File Exacompta Bleu",
+            "category": "Office",
+            "qty": 13,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 4,
+            "groupe": "Exacompta",
+            "history": [
+              {
+                "id": "f732e74742a7436292f90ee16569ee3c",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 13
+              }
+            ]
+          },
+          {
+            "id": "f86adaac2012437b91e1050a4f74a50d",
+            "name": "Rouge",
+            "officialName": "Aérosol Rouge",
+            "category": "Office",
+            "qty": 3,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 1,
+            "groupe": "Aerosol",
+            "history": [
+              {
+                "id": "b01c7d45c7d54ce4aef2b01980930f9c",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 3
+              }
+            ]
+          },
+          {
+            "id": "63086f7409a749c0be7cd07d2239e032",
+            "name": "Jaune",
+            "officialName": "Aérosol Jaune",
+            "category": "Office",
+            "qty": 72,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 2,
+            "groupe": "Aerosol",
+            "history": [
+              {
+                "id": "b3bbd64069ea4346b82f2bc598a16678",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 72
+              }
+            ]
+          },
+          {
+            "id": "f6200b7dff164d2fa43114ef4953f8f3",
+            "name": "Vert",
+            "officialName": "Aérosol Vert",
+            "category": "Office",
+            "qty": 4,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 3,
+            "groupe": "Aerosol",
+            "history": [
+              {
+                "id": "9b30caad43c54481a18b6e09186b3cea",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 4
+              }
+            ]
+          },
+          {
+            "id": "f9cc9bc79ec04df7bdd9adb948636560",
+            "name": "Orange",
+            "officialName": "Aérosol Orange",
+            "category": "Office",
+            "qty": 13,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 4,
+            "groupe": "Aerosol",
+            "history": [
+              {
+                "id": "1e7e1f5040444cd381df313f47728582",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 13
+              }
+            ]
+          },
+          {
+            "id": "378c723c26a54533bb0bab822c3655f8",
+            "name": "Bleu",
+            "officialName": "Aérosol Bleu",
+            "category": "Office",
+            "qty": 18,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 5,
+            "groupe": "Aerosol",
+            "history": [
+              {
+                "id": "30349c85b0c94463ac346abfe1ef46de",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 18
+              }
+            ]
+          },
+          {
+            "id": "a730d980588149089f43df027b438f45",
+            "name": "Jaune",
+            "officialName": "Marqueur Fluo Jaune",
+            "category": "Office",
+            "qty": 0,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 1,
+            "groupe": "Fluo",
+            "history": [
+              {
+                "id": "bcf55a46aac74cfebae8f72a67c3e01e",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 0
+              }
+            ]
+          },
+          {
+            "id": "00977603378f46f19d508149f21cc787",
+            "name": "Rose",
+            "officialName": "Marqueur Fluo Rose",
+            "category": "Office",
+            "qty": 0,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 2,
+            "groupe": "Fluo",
+            "history": [
+              {
+                "id": "c8a3280547564f47ba20d04489d7fe05",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 0
+              }
+            ]
+          },
+          {
+            "id": "a01cdb33123946d886e807971bfc67c5",
+            "name": "Bleu",
+            "officialName": "Marqueur Fluo Bleu",
+            "category": "Office",
+            "qty": 0,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 3,
+            "groupe": "Fluo",
+            "history": [
+              {
+                "id": "f12988563d524e3ea9265effe3c13cca",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 0
+              }
+            ]
+          },
+          {
+            "id": "519dfd62a8104604b8320d5e56580b05",
+            "name": "Vert",
+            "officialName": "Marqueur Fluo Vert",
+            "category": "Office",
+            "qty": 0,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 4,
+            "groupe": "Fluo",
+            "history": [
+              {
+                "id": "3fc4e8d229f541ecb2fd111c859e857e",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 0
+              }
+            ]
+          },
+          {
+            "id": "98ec04a4e8e54fcd822f340cb20e0436",
+            "name": "Orange",
+            "officialName": "Marqueur Fluo Orange",
+            "category": "Office",
+            "qty": 0,
+            "unit": "packs",
+            "seuil": 0,
+            "ordre": 5,
+            "groupe": "Fluo",
+            "history": [
+              {
+                "id": "df3b69b1ff914abaa82b0cb090c0a705",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 0
+              }
+            ]
+          }
+        ],
+        "groups": [
+          "Aerosol",
+          "Agrafes",
+          "Classement",
+          "Exacompta",
+          "Fluo",
+          "Marquage",
+          "Nettoyage"
+        ]
       }
-    }
+    },
+    "prets": [],
+    "attributions": [],
+    "palettes": {},
+    "units": [
+      "pièces",
+      "kg",
+      "rouleaux",
+      "ramettes",
+      "paires",
+      "litres",
+      "boîtes",
+      "mètres",
+      "sachets",
+      "cartons",
+      "palettes",
+      "packs"
+    ]
   }
 }
