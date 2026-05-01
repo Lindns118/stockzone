@@ -1152,19 +1152,20 @@ async function gdLoad() {
     const dateStr = backup.date ? new Date(backup.date).toLocaleString('fr-FR') : '?';
     const nbProds = Object.values(backup.data.zones).reduce((s,z)=>s+(z.products?.length||0),0);
 
-    await confirm2('Restaurer depuis Drive ?',
-      `Sauvegarde du ${dateStr}\n${nbProds} produits trouvés.\nVos données actuelles seront remplacées.`,
-      () => {
-        S = migrateData(backup.data);
-        save();
-        GD.status = 'ok';
-        GD.lastSync = new Date().toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
-        gdSaveConfig();
-        switchZone(currentZone);
-        renderReglages();
-        toast('☁️ Données restaurées depuis Drive', 'success');
-      }
+    const ok = await confirm2('Restaurer depuis Drive ?',
+      `Sauvegarde du ${dateStr} — ${nbProds} produits.\nVos données actuelles seront remplacées.`,
+      'Restaurer'
     );
+    if(ok) {
+      S = migrateData(backup.data);
+      save();
+      GD.status = 'ok';
+      GD.lastSync = new Date().toLocaleString('fr-FR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+      gdSaveConfig();
+      switchZone(currentZone);
+      renderReglages();
+      toast('☁️ Données restaurées depuis Drive', 'success');
+    }
     GD.status = 'ok';
     renderReglages();
   } catch(e) {
@@ -1416,6 +1417,11 @@ function sizeStep(pid, size, delta) {
   const cur = found.p.sizes[size] || 0;
   found.p.sizes[size] = Math.max(0, cur + delta);
   found.p.qty = Object.values(found.p.sizes).reduce((s,v)=>s+v,0);
+  // Save to history
+  const _td = new Date().toISOString().split('T')[0];
+  const _hex = found.p.history.find(h=>h.date&&h.date.startsWith(_td)&&h.type==='inventaire');
+  if(_hex){_hex.qty=found.p.qty;_hex.sizes={...found.p.sizes};}
+  else found.p.history.push({id:uid(),type:'inventaire',date:nowIso(),qty:found.p.qty,sizes:{...found.p.sizes}});
   // Update display inline without full re-render
   const el = document.getElementById(`sqty-${pid}-${size}`);
   if(el) {
@@ -1951,6 +1957,7 @@ function psAddColor() {
   currentProduct.colors[color] = 0;
   input.value = '';
   psRenderColorsList(currentProduct);
+  save();
   toast(`✅ Couleur "${color}" ajoutée`, 'success');
 }
 
@@ -1963,6 +1970,8 @@ function psRemoveColor(color) {
   delete currentProduct.colors[color];
   currentProduct.qty = r2(Object.values(currentProduct.colors).reduce((s,v)=>s+v,0));
   psRenderColorsList(currentProduct);
+  save();
+  renderProducts();
   toast(`Couleur "${color}" supprimée`, 'success');
 }
 
@@ -1988,6 +1997,10 @@ function saveParams() {
   if (newName) currentProduct.name = newName;
   if (newCat) currentProduct.category = newCat;
   if (newOfficial) currentProduct.officialName = newOfficial; else if(!currentProduct.officialName) currentProduct.officialName = currentProduct.name;
+  // Persist colored toggle state
+  const colorToggle = document.getElementById('ps-colored-toggle');
+  if(colorToggle) currentProduct.colored = colorToggle.checked;
+  if(!currentProduct.colors) currentProduct.colors = {};
 
   // Handle ordre with shift
   const ordreVal = document.getElementById('ps-ordre').value;
