@@ -1371,11 +1371,35 @@ function renderProducts() {
       }
     });
 
-    // Build a flat sorted list of items: ungrouped products and group headers, all sorted alphabetically together
+    // Build a flat sorted list: ungrouped products + group headers, respecting currentSort
     const items = [];
-    prods.forEach(p => { if(!p.groupe) items.push({type:'product', key:p.name, p}); });
-    knownGroups.forEach(gname => items.push({type:'group', key:gname, gname}));
-    items.sort((a,b) => a.key.localeCompare(b.key, 'fr'));
+    prods.forEach(p => { if(!p.groupe) items.push({type:'product', p}); });
+    knownGroups.forEach(gname => items.push({type:'group', gname}));
+
+    const itemSortKey = item => {
+      if (item.type === 'product') {
+        const p = item.p;
+        if (currentSort === 'ordre') return [p.ordre ?? 9999, p.name];
+        if (currentSort === 'desc')  return [-p.qty, p.name];
+        if (currentSort === 'asc')   return [p.qty, p.name];
+        if (currentSort === 'alert') return [p.seuil>0&&p.qty<=p.seuil ? 0 : 1, p.name];
+        return [0, p.name]; // az
+      } else {
+        const gprods = grouped[item.gname] || [];
+        const totalQty = gprods.reduce((s,p)=>s+p.qty,0);
+        const minOrdre = gprods.length ? Math.min(...gprods.map(p=>p.ordre??9999)) : 9999;
+        if (currentSort === 'ordre') return [minOrdre, item.gname];
+        if (currentSort === 'desc')  return [-totalQty, item.gname];
+        if (currentSort === 'asc')   return [totalQty, item.gname];
+        if (currentSort === 'alert') return [gprods.some(p=>p.seuil>0&&p.qty<=p.seuil) ? 0 : 1, item.gname];
+        return [0, item.gname]; // az
+      }
+    };
+    items.sort((a,b) => {
+      const [na, sa] = itemSortKey(a);
+      const [nb, sb] = itemSortKey(b);
+      return na !== nb ? na - nb : sa.localeCompare(sb, 'fr');
+    });
 
     let html = '';
     items.forEach(item => {
