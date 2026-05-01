@@ -1,0 +1,1207 @@
+{
+  "version": 1,
+  "date": "2026-05-01T09:44:37.361499",
+  "data": {
+    "zones": {
+      "entrepot": {
+        "name": "Entrepôt",
+        "icon": "📦",
+        "color": "entrepot",
+        "products": [
+          {
+            "id": "bd50e76972d14ed6afab18085b2787fd",
+            "name": "Shuttles",
+            "category": "Entrepôt",
+            "qty": 6.4,
+            "unit": "palettes",
+            "seuil": 0,
+            "ordre": 1,
+            "history": [
+              {
+                "id": "ca72188c5d2b47d58fc5fbeba4da148a",
+                "type": "inventaire_base",
+                "date": "2026-03-02",
+                "qty": 5.5
+              },
+              {
+                "id": "8889e4ab1f1545f2bae8c99e9ac20d95",
+                "type": "inventaire",
+                "date": "2026-03-09",
+                "qty": 0.5
+              },
+              {
+                "id": "2f0f320e0409424aa1ccf5c99170ed2f",
+                "type": "livraison",
+                "date": "2026-03-10",
+                "qty": 6
+              },
+              {
+                "id": "884645ff3cf24be3a1130dc42df5ef8f",
+                "type": "livraison",
+                "date": "2026-03-13",
+                "qty": 6
+              },
+              {
+                "id": "95ad45488301440faaf0cf43e7339587",
+                "type": "inventaire",
+                "date": "2026-03-16",
+                "qty": 8
+              },
+              {
+                "id": "cc7f0b4730d44edd9956f68fc078e44a",
+                "type": "livraison",
+                "date": "2026-03-20",
+                "qty": 6
+              },
+              {
+                "id": "c27c58e9e7b8483b90267fced8133cda",
+                "type": "inventaire",
+                "date": "2026-03-23",
+                "qty": 8
+              },
+              {
+                "id": "c3fa855bf0404577b4e72c6654c52776",
+                "type": "livraison",
+                "date": "2026-03-27",
+                "qty": 6
+              },
+              {
+                "id": "dea0f83cd63a447d8f51951ec95864c5",
+                "type": "inventaire",
+                "date": "2026-03-30",
+                "qty": 7.5
+              },
+              {
+                "id": "c991083437764b01aabbaa5389158681",
+                "type": "livraison",
+                "date": "2026-04-01",
+                "qty": 6
+              },
+              {
+                "id": "a8f2f636fb6b41168ad03ac535fbaccb",
+                "type": "inventaire",
+                "date": "2026-04-06",
+                "qty": 11
+              },
+              {
+                "id": "6bb4e8dc587345b6a01cd1916ae7fdc7",
+                "type": "inventaire",
+                "date": "2026-04-13",
+                "qty": 6.9
+              },
+              {
+                "id": "768d489fd2d34ecc8c132fc065d5d5c7",
+                "type": "livraison",
+                "date": "2026-04-17",
+                "qty": 6
+              },
+              {
+                "id": "9b311c1c6f1940b9927fd0970eb1ff8d",
+                "type": "inventaire",
+                "date": "2026-04-20",
+                "qty": 8
+              },
+              {
+                "id": "a1b230d3446e46829be33ce503b66444",
+                "type": "inventaire",
+                "date": "2026-04-27",
+                "qty": 6.4
+              }
+            ]
+          },
+          {
+            "id": "00087e2bcb8f4efe85e77315aed4f32d",
+            "name": "Planche 3m",
+            "category": "Entrepôt",
+            "qty": 2,
+            "unit": "palettes",
+            "seuil": 0,
+            "ordre": 2,
+            "history": [
+              {
+                "id": "58b4c7ca9593406793659dd4e9139cfb",
+                "type": "inventaire_base",
+                "date": "2026-03-02",
+                "qty": 2.5
+              },
+              {
+                "id": "ba4e2b39e28e4784af8cae0e886c87ed",
+                "type": "inventaire",
+                "date": "2026-03-09",
+                "qty": 2.5
+              },
+              {
+                "id": "3d26495b2cac44d1ae73592b0f359dd4",
+                "type": "inventaire",
+                "date": "2026-03-16",
+                "qty": 3.5
+              },
+              {
+                "id": "b0cedcb277904602b1bfc9403a670f79",
+                "type": "inventaire",
+                "date": "2026-03-23",
+                "qty": 2.4
+              },
+              {
+                "id": "1709cf949c374f4d9a80a368aa8838c8",
+                "type": "inventaire",
+                "date": "2026-03-30",
+                "qty": 2.3
+              },
+              {
+                "id": "61aadd9e332149bb8bf479b0507a0696",
+                "type": "inventaire",
+                "date": "2026-04-06",
+                "qty": 2.3
+              },
+              {
+                "id": "6bf8a4bd8c3840d89aa5d685ea9a1f70",
+                "type": "inventaire",
+                "date": "2026-04-13",
+                "qty": 2.2
+              },
+              {
+                "id": "74b5343ce5274bc8aaf755930f85761a",
+                "type": "inventaire",
+                "date": "2026-04-20",
+                "qty": 0.5
+              },
+              {
+                "id": "8d847e0a66984ba7a52616ab925d210f",
+                "type": "livraison",
+                "date": "2026-04-21",
+                "qty": 2
+              },
+              {
+                "id": "d716a64a9cf64273a4c6d407d38f0f84",
+                "type": "inventaire",
+                "date": "2026-04-27",
+                "qty": 2
+              }
+            ]
+          },
+          {
+            "id": "4e28440a112d4857a3ea6e42d7f467cc",
+            "name": "Planche 2m",
+            "category": "Entrepôt",
+            "qty": 4.1,
+            "unit": "palettes",
+            "seuil": 0,
+            "ordre": 3,
+            "history": [
+              {
+                "id": "afe4ee7a682542f88b34a663473c206b",
+                "type": "inventaire_base",
+                "date": "2026-03-02",
+                "qty": 1.5
+              },
+              {
+                "id": "d96f8fc72a63473aabbdb9c4cd286cad",
+                "type": "inventaire",
+                "date": "2026-03-09",
+                "qty": 1.4
+              },
+              {
+                "id": "b2148a2f56a449a8b739be666680ab68",
+                "type": "livraison",
+                "date": "2026-03-13",
+                "qty": 3
+              },
+              {
+                "id": "fd5c0beb98c44dfeab583f07617b8637",
+                "type": "inventaire",
+                "date": "2026-03-16",
+                "qty": 3.5
+              },
+              {
+                "id": "bf62db33ddc142c38f618c2860490324",
+                "type": "inventaire",
+                "date": "2026-03-23",
+                "qty": 3.3
+              },
+              {
+                "id": "f7ebb609ad2541c18ee31f667a9fd21c",
+                "type": "inventaire",
+                "date": "2026-03-30",
+                "qty": 3.2
+              },
+              {
+                "id": "6f2ebc20878a4ee686c191d8bfd4a9c1",
+                "type": "inventaire",
+                "date": "2026-04-06",
+                "qty": 3.2
+              },
+              {
+                "id": "669cae0b73e346ff8598ca3d2257b59d",
+                "type": "livraison",
+                "date": "2026-04-06",
+                "qty": 1
+              },
+              {
+                "id": "62c4bcad13da4498ac2ec10e19a44c20",
+                "type": "inventaire",
+                "date": "2026-04-13",
+                "qty": 4.2
+              },
+              {
+                "id": "dee7fd70988a4bc4b2450b12f2fc8917",
+                "type": "inventaire",
+                "date": "2026-04-20",
+                "qty": 4.1
+              },
+              {
+                "id": "24bab98cd4074daebf71ecb59afbcdbe",
+                "type": "inventaire",
+                "date": "2026-04-27",
+                "qty": 4.1
+              }
+            ]
+          },
+          {
+            "id": "46beece1191042439ee3c070d2d9e377",
+            "name": "Beams 3m",
+            "category": "Entrepôt",
+            "qty": 2.5,
+            "unit": "palettes",
+            "seuil": 0,
+            "ordre": 4,
+            "history": [
+              {
+                "id": "3c70090554a14fcb9c3a557ac4e68d0c",
+                "type": "inventaire_base",
+                "date": "2026-03-02",
+                "qty": 2
+              },
+              {
+                "id": "15005a6f0d06433ca80093fb8ffec58a",
+                "type": "inventaire",
+                "date": "2026-03-09",
+                "qty": 1.5
+              },
+              {
+                "id": "4248ae0e4384428bac1b89595cf7a9d5",
+                "type": "livraison",
+                "date": "2026-03-13",
+                "qty": 1
+              },
+              {
+                "id": "5e7a0a994d6c4e4880da51534fb1c457",
+                "type": "inventaire",
+                "date": "2026-03-16",
+                "qty": 2.3
+              },
+              {
+                "id": "ebcfc2a076164747bcfdc9db7a612135",
+                "type": "inventaire",
+                "date": "2026-03-23",
+                "qty": 2.3
+              },
+              {
+                "id": "1aa3856b2b8d4d07bb70f7d4df884302",
+                "type": "inventaire",
+                "date": "2026-03-30",
+                "qty": 2.2
+              },
+              {
+                "id": "0d0a2e6ed75849378673f796383a39a3",
+                "type": "inventaire",
+                "date": "2026-04-06",
+                "qty": 2.25
+              },
+              {
+                "id": "773e294739b441d4bf405f1e2487e943",
+                "type": "inventaire",
+                "date": "2026-04-13",
+                "qty": 1.9
+              },
+              {
+                "id": "62e03c3386bf4549ac1b135f9a821a4f",
+                "type": "inventaire",
+                "date": "2026-04-20",
+                "qty": 1.65
+              },
+              {
+                "id": "2a3f59d9e8de41289a1bc76350ebee33",
+                "type": "livraison",
+                "date": "2026-04-21",
+                "qty": 1
+              },
+              {
+                "id": "b89afac77b054a939fef5783af796278",
+                "type": "inventaire",
+                "date": "2026-04-27",
+                "qty": 2.5
+              }
+            ]
+          },
+          {
+            "id": "6221c3f5a71f4714819bc15b3ff0c5e9",
+            "name": "Beams 2m",
+            "category": "Entrepôt",
+            "qty": 2.6,
+            "unit": "palettes",
+            "seuil": 0,
+            "ordre": 5,
+            "history": [
+              {
+                "id": "858b513373db413a87abb895683dcac7",
+                "type": "inventaire_base",
+                "date": "2026-03-02",
+                "qty": 3.75
+              },
+              {
+                "id": "b9fdb4c0b0f44f059112fb9ffb8e919a",
+                "type": "inventaire",
+                "date": "2026-03-09",
+                "qty": 3.5
+              },
+              {
+                "id": "35223eadf33e49b3a5d21d232413ebec",
+                "type": "inventaire",
+                "date": "2026-03-16",
+                "qty": 3.2
+              },
+              {
+                "id": "54255fcb5e9c45999564f6711822eae7",
+                "type": "inventaire",
+                "date": "2026-03-23",
+                "qty": 3.2
+              },
+              {
+                "id": "075bf1259f234bafa0a6e4f3de567398",
+                "type": "inventaire",
+                "date": "2026-03-30",
+                "qty": 3.1
+              },
+              {
+                "id": "e11652c77bb24ba29fcc6ad025cbba0d",
+                "type": "inventaire",
+                "date": "2026-04-06",
+                "qty": 3
+              },
+              {
+                "id": "102bfb9468584529b7fc0d24cf6a94a2",
+                "type": "inventaire",
+                "date": "2026-04-13",
+                "qty": 3
+              },
+              {
+                "id": "259a16986a0c4936bfe45818c4ae918d",
+                "type": "inventaire",
+                "date": "2026-04-20",
+                "qty": 2.8
+              },
+              {
+                "id": "4b0c6e7512d149549ddb95fe462588e4",
+                "type": "inventaire",
+                "date": "2026-04-27",
+                "qty": 2.6
+              }
+            ]
+          },
+          {
+            "id": "3dc2d4a5c7d84f528821a057640fd11a",
+            "name": "Plastique 6/6",
+            "category": "Entrepôt",
+            "qty": 1.45,
+            "unit": "palettes",
+            "seuil": 0,
+            "ordre": 6,
+            "history": [
+              {
+                "id": "1abc28f4bd884f69a003c8718e8a7457",
+                "type": "inventaire_base",
+                "date": "2026-03-02",
+                "qty": 3
+              },
+              {
+                "id": "ed8e471a1cb6407bb75cb1adf1eafe95",
+                "type": "inventaire",
+                "date": "2026-03-09",
+                "qty": 3
+              },
+              {
+                "id": "be893b148df143ce8b36abe65b8b418d",
+                "type": "inventaire",
+                "date": "2026-03-16",
+                "qty": 3
+              },
+              {
+                "id": "5346705688814305bf9fc07fec1f4e90",
+                "type": "inventaire",
+                "date": "2026-03-23",
+                "qty": 2.75
+              },
+              {
+                "id": "85f28b1451b34a73a469df7592cc000e",
+                "type": "inventaire",
+                "date": "2026-03-30",
+                "qty": 2.5
+              },
+              {
+                "id": "e4afa062f40e498daeac83dc171f4da8",
+                "type": "inventaire",
+                "date": "2026-04-06",
+                "qty": 2.15
+              },
+              {
+                "id": "7db6def541a34468bedbc5691febbc13",
+                "type": "inventaire",
+                "date": "2026-04-13",
+                "qty": 2.1
+              },
+              {
+                "id": "9a13cd1a557945f198a9f8265c022b00",
+                "type": "inventaire",
+                "date": "2026-04-20",
+                "qty": 1.75
+              },
+              {
+                "id": "44f235708baf4bd0ad2224f356d172e0",
+                "type": "inventaire",
+                "date": "2026-04-27",
+                "qty": 1.45
+              },
+              {
+                "id": "33607aa12a744c4fa38a47af13ed8d45",
+                "type": "livraison",
+                "date": "2026-04-29",
+                "qty": 2
+              }
+            ]
+          },
+          {
+            "id": "413331e0081f437b9f431170e81e8b63",
+            "name": "Shrink 125",
+            "category": "Entrepôt",
+            "qty": 1.45,
+            "unit": "palettes",
+            "seuil": 0,
+            "ordre": 7,
+            "history": [
+              {
+                "id": "59722adcab714a3289c0d2b4647d3f16",
+                "type": "inventaire_base",
+                "date": "2026-03-02",
+                "qty": 3
+              },
+              {
+                "id": "ed97aaf8cbd44aca9a8c5fa7bce787b6",
+                "type": "inventaire",
+                "date": "2026-03-09",
+                "qty": 2.7
+              },
+              {
+                "id": "132c53fdc0d34e0bb275ca886860b58a",
+                "type": "inventaire",
+                "date": "2026-03-16",
+                "qty": 2.5
+              },
+              {
+                "id": "518c04be3fe745b897da03911fba4ffd",
+                "type": "inventaire",
+                "date": "2026-03-23",
+                "qty": 2.5
+              },
+              {
+                "id": "302e7d4ef3b1435fa7ef9ab44c9f79e3",
+                "type": "inventaire",
+                "date": "2026-03-30",
+                "qty": 2.2
+              },
+              {
+                "id": "d27b97b51e3f485ea63a41472ddc1a1d",
+                "type": "inventaire",
+                "date": "2026-04-06",
+                "qty": 2.25
+              },
+              {
+                "id": "c79004a1fa4c4bf5b475367cd2115514",
+                "type": "inventaire",
+                "date": "2026-04-13",
+                "qty": 2.1
+              },
+              {
+                "id": "f73c43068d9a4d5cb7e36e019242cbbb",
+                "type": "inventaire",
+                "date": "2026-04-20",
+                "qty": 1.75
+              },
+              {
+                "id": "3d357adfcd4a4e3ba6160a5b0fab3c6a",
+                "type": "inventaire",
+                "date": "2026-04-27",
+                "qty": 1.45
+              },
+              {
+                "id": "b2ce4504776d4558873f9d8032c0ee91",
+                "type": "livraison",
+                "date": "2026-04-29",
+                "qty": 2
+              }
+            ]
+          },
+          {
+            "id": "ba5d930cfeae49ab9430edee960e161d",
+            "name": "Corde",
+            "category": "Entrepôt",
+            "qty": 5.5,
+            "unit": "palettes",
+            "seuil": 0,
+            "ordre": 8,
+            "history": [
+              {
+                "id": "fbd57981522d43b7bf02838ce1e61598",
+                "type": "inventaire_base",
+                "date": "2026-03-02",
+                "qty": 7
+              },
+              {
+                "id": "5fddce17e4e2464da788bedb4a16eb23",
+                "type": "inventaire",
+                "date": "2026-03-09",
+                "qty": 6.5
+              },
+              {
+                "id": "ea8f7b168083427d88415393e3e095b0",
+                "type": "inventaire",
+                "date": "2026-03-16",
+                "qty": 6
+              },
+              {
+                "id": "0dd93230d67f4305a3ab6614126fff7d",
+                "type": "inventaire",
+                "date": "2026-03-23",
+                "qty": 5
+              },
+              {
+                "id": "64ba87fb76be426a9902409f7aac7dc9",
+                "type": "inventaire",
+                "date": "2026-03-30",
+                "qty": 5
+              },
+              {
+                "id": "5434d07bd70c4f6f88c19e497daa984c",
+                "type": "inventaire",
+                "date": "2026-04-06",
+                "qty": 5.5
+              },
+              {
+                "id": "8776aad03b5144ed87fff96a503b98c3",
+                "type": "inventaire",
+                "date": "2026-04-13",
+                "qty": 5.5
+              },
+              {
+                "id": "191ee08d594f41389c7c9c79f9878e45",
+                "type": "inventaire",
+                "date": "2026-04-20",
+                "qty": 0
+              },
+              {
+                "id": "47d0288ca84a4f01849949fff7f0ab19",
+                "type": "inventaire",
+                "date": "2026-04-27",
+                "qty": 5.5
+              }
+            ]
+          },
+          {
+            "id": "e66f1fb4c5fa4beb83dfa39586bcc99c",
+            "name": "Palette",
+            "category": "Entrepôt",
+            "qty": 2000,
+            "unit": "pièces",
+            "seuil": 0,
+            "ordre": 9,
+            "history": [
+              {
+                "id": "c550c0d7c15e40fe858bc9fbb5abeca1",
+                "type": "inventaire_base",
+                "date": "2026-03-02",
+                "qty": 3200
+              },
+              {
+                "id": "f4c6b39e73c74591ad307a2fd476a9cc",
+                "type": "inventaire",
+                "date": "2026-03-09",
+                "qty": 3000
+              },
+              {
+                "id": "0c652d5656c143fb8698c8bb37bbbf4e",
+                "type": "inventaire",
+                "date": "2026-03-16",
+                "qty": 3000
+              },
+              {
+                "id": "c70bfae19ff846849e626c724490b111",
+                "type": "inventaire",
+                "date": "2026-03-23",
+                "qty": 2900
+              },
+              {
+                "id": "466c8738b656442abb6072defe4880e7",
+                "type": "inventaire",
+                "date": "2026-03-30",
+                "qty": 2750
+              },
+              {
+                "id": "2c0cfdaff9f14b44a7891438c3029716",
+                "type": "inventaire",
+                "date": "2026-04-06",
+                "qty": 2700
+              },
+              {
+                "id": "b762817f3697425295d79cd235cc0d70",
+                "type": "inventaire",
+                "date": "2026-04-13",
+                "qty": 2250
+              },
+              {
+                "id": "74680d0e727c4ca7bdc21dcaec40d92d",
+                "type": "inventaire",
+                "date": "2026-04-20",
+                "qty": 2150
+              },
+              {
+                "id": "b1b6aee6a5a943159ae4ca7280eb12a6",
+                "type": "inventaire",
+                "date": "2026-04-27",
+                "qty": 2000
+              }
+            ]
+          },
+          {
+            "id": "7ead5f7a1110485286047ac7f29d4d4b",
+            "name": "Shrink 50",
+            "category": "Entrepôt",
+            "qty": 2,
+            "unit": "palettes",
+            "seuil": 0,
+            "ordre": 10,
+            "history": [
+              {
+                "id": "c61c269a29b64945ab6aa57b6e748770",
+                "type": "inventaire_base",
+                "date": "2026-03-02",
+                "qty": 2
+              },
+              {
+                "id": "9637bba215264530992c9af0c0622492",
+                "type": "inventaire",
+                "date": "2026-03-09",
+                "qty": 2
+              },
+              {
+                "id": "404c5abfae1d48e1afd5e0465abf01df",
+                "type": "inventaire",
+                "date": "2026-03-16",
+                "qty": 2
+              },
+              {
+                "id": "75b1856790a94c649694ad8e9309bf7c",
+                "type": "inventaire",
+                "date": "2026-03-23",
+                "qty": 2
+              },
+              {
+                "id": "2ff4cfbb82c544f2a291ea5409cc5cdb",
+                "type": "inventaire",
+                "date": "2026-03-30",
+                "qty": 2
+              },
+              {
+                "id": "26bc0e4d707c4301936369670677b322",
+                "type": "inventaire",
+                "date": "2026-04-06",
+                "qty": 1.65
+              },
+              {
+                "id": "2226e266f15a4f29923c1856651582b4",
+                "type": "inventaire",
+                "date": "2026-04-13",
+                "qty": 0
+              },
+              {
+                "id": "a1f42569c20548c29a6f3175bcbb59dc",
+                "type": "inventaire",
+                "date": "2026-04-20",
+                "qty": 2
+              },
+              {
+                "id": "0d3560dd258c470ea137fd75a3c88f3d",
+                "type": "inventaire",
+                "date": "2026-04-27",
+                "qty": 2
+              }
+            ]
+          },
+          {
+            "id": "e257fec31b1e4682bc4d82aac49a9f9a",
+            "name": "Tape",
+            "category": "Entrepôt",
+            "qty": 1.3,
+            "unit": "palettes",
+            "seuil": 0,
+            "ordre": 11,
+            "history": [
+              {
+                "id": "0d435c1f231746f39b4023933be39c3e",
+                "type": "inventaire_base",
+                "date": "2026-03-02",
+                "qty": 1
+              },
+              {
+                "id": "785da4813a174f6f965e354ce15d13ec",
+                "type": "inventaire",
+                "date": "2026-03-09",
+                "qty": 0.8
+              },
+              {
+                "id": "4b19db0baa8745d085a0dcd15cbb9f02",
+                "type": "livraison",
+                "date": "2026-03-11",
+                "qty": 1
+              },
+              {
+                "id": "31c1efa4c9454ba2bc2ded7d6f70743b",
+                "type": "inventaire",
+                "date": "2026-03-16",
+                "qty": 1.8
+              },
+              {
+                "id": "aed13c9f235d4df6878eda50a80a1dac",
+                "type": "inventaire",
+                "date": "2026-03-23",
+                "qty": 1.8
+              },
+              {
+                "id": "c139f9f4670a4dea84367c3e7bac8481",
+                "type": "inventaire",
+                "date": "2026-03-30",
+                "qty": 1.5
+              },
+              {
+                "id": "5a90797f048546d99fb41685abde6434",
+                "type": "inventaire",
+                "date": "2026-04-06",
+                "qty": 1.6
+              },
+              {
+                "id": "62cb4a939842466ba838ffacc9f182c9",
+                "type": "inventaire",
+                "date": "2026-04-13",
+                "qty": 0
+              },
+              {
+                "id": "a87e293c1a054e678af8324adde781de",
+                "type": "inventaire",
+                "date": "2026-04-20",
+                "qty": 1.4
+              },
+              {
+                "id": "15089ae3d2344da0bf1732390e0f030a",
+                "type": "inventaire",
+                "date": "2026-04-27",
+                "qty": 1.3
+              }
+            ]
+          },
+          {
+            "id": "d032b5633cab422aa6c2c0225f2c074b",
+            "name": "Sel",
+            "category": "Entrepôt",
+            "qty": 0,
+            "unit": "palettes",
+            "seuil": 0,
+            "ordre": 12,
+            "history": [
+              {
+                "id": "e54b489189684accb5f1746fb6be1adc",
+                "type": "inventaire_base",
+                "date": "2026-03-02",
+                "qty": 0
+              },
+              {
+                "id": "a8b4ce77210e4a2dae794ccc6122352d",
+                "type": "inventaire",
+                "date": "2026-03-09",
+                "qty": 0
+              },
+              {
+                "id": "2b00f735e0b94e0687e59deea3dbba80",
+                "type": "inventaire",
+                "date": "2026-03-16",
+                "qty": 0
+              },
+              {
+                "id": "19f971bd307040e797b0b651fd967074",
+                "type": "inventaire",
+                "date": "2026-03-23",
+                "qty": 0
+              },
+              {
+                "id": "e5b9a4d9cf124f2592b17d2a4088065e",
+                "type": "inventaire",
+                "date": "2026-03-30",
+                "qty": 0
+              },
+              {
+                "id": "5e9ba8b858c847199ea2f1bfa3659d98",
+                "type": "inventaire",
+                "date": "2026-04-06",
+                "qty": 0
+              },
+              {
+                "id": "14874c24a8924efba5cc15a88e068d1c",
+                "type": "inventaire",
+                "date": "2026-04-13",
+                "qty": 0
+              },
+              {
+                "id": "edc0662db2da403fa226011a0ec3503c",
+                "type": "inventaire",
+                "date": "2026-04-20",
+                "qty": 0
+              },
+              {
+                "id": "30a6802dfd404d61951c4f4c8705659e",
+                "type": "inventaire",
+                "date": "2026-04-27",
+                "qty": 0
+              }
+            ]
+          },
+          {
+            "id": "88ae80cc366b427b8fa23318fcd11c07",
+            "name": "Absorbant",
+            "category": "Entrepôt",
+            "qty": 0,
+            "unit": "palettes",
+            "seuil": 0,
+            "ordre": 13,
+            "history": [
+              {
+                "id": "2f02b3c88ebd447d9915b866e15ae2fe",
+                "type": "inventaire_base",
+                "date": "2026-03-02",
+                "qty": 0
+              },
+              {
+                "id": "a1020321b1f54084ab430f2e8d16624b",
+                "type": "inventaire",
+                "date": "2026-03-09",
+                "qty": 0
+              },
+              {
+                "id": "3ee5eba6357d4f398524a6d480b858df",
+                "type": "inventaire",
+                "date": "2026-03-16",
+                "qty": 0
+              },
+              {
+                "id": "c75066b8205e489ebc6371ce1196df17",
+                "type": "inventaire",
+                "date": "2026-03-23",
+                "qty": 0
+              },
+              {
+                "id": "cb6747fd85c240fdbb832350bbe80f91",
+                "type": "inventaire",
+                "date": "2026-03-30",
+                "qty": 0
+              },
+              {
+                "id": "af4114e76dd5426694f339e89e114eb1",
+                "type": "inventaire",
+                "date": "2026-04-06",
+                "qty": 0
+              },
+              {
+                "id": "0b270b81d1824088a645b9ac727b3cdc",
+                "type": "inventaire",
+                "date": "2026-04-13",
+                "qty": 0
+              },
+              {
+                "id": "478f683526eb437db173ea133070849b",
+                "type": "inventaire",
+                "date": "2026-04-20",
+                "qty": 0
+              },
+              {
+                "id": "dbf941789431463aa2b286c1da471c50",
+                "type": "inventaire",
+                "date": "2026-04-27",
+                "qty": 0
+              }
+            ]
+          },
+          {
+            "id": "620b2ad94ca64b05b07e661d6c05dbcc",
+            "name": "Sangle",
+            "category": "Entrepôt",
+            "qty": 0,
+            "unit": "palettes",
+            "seuil": 0,
+            "ordre": 14,
+            "history": [
+              {
+                "id": "319ed1c0df6d44ab98cd57c836600ced",
+                "type": "inventaire_base",
+                "date": "2026-03-02",
+                "qty": 0
+              },
+              {
+                "id": "48167cd308b14ba891a13b1a476bba1b",
+                "type": "inventaire",
+                "date": "2026-03-09",
+                "qty": 0
+              },
+              {
+                "id": "36aa6b680e534ded8418e32ebfd29f40",
+                "type": "inventaire",
+                "date": "2026-03-16",
+                "qty": 0
+              },
+              {
+                "id": "948c29e9910e4147816cc33e8bdf6485",
+                "type": "inventaire",
+                "date": "2026-03-23",
+                "qty": 0
+              },
+              {
+                "id": "aaa7998077af43b6aaf7d17fefadd530",
+                "type": "inventaire",
+                "date": "2026-03-30",
+                "qty": 0
+              },
+              {
+                "id": "4084ef2bec0f48d4a9e2e3d1572e50ec",
+                "type": "inventaire",
+                "date": "2026-04-06",
+                "qty": 0
+              },
+              {
+                "id": "1441ddf784b540879a5bbba1a52351a3",
+                "type": "inventaire",
+                "date": "2026-04-13",
+                "qty": 0
+              },
+              {
+                "id": "1780930441a14a94b588f31a636b1320",
+                "type": "inventaire",
+                "date": "2026-04-20",
+                "qty": 0
+              },
+              {
+                "id": "182f08b3f9e94885b5e584c7f31e0bdb",
+                "type": "inventaire",
+                "date": "2026-04-27",
+                "qty": 0
+              }
+            ]
+          },
+          {
+            "id": "69e81a9b24984d1ca9c6bbc31bc016fd",
+            "name": "Climatube",
+            "category": "Entrepôt",
+            "qty": 0,
+            "unit": "palettes",
+            "seuil": 0,
+            "ordre": 15,
+            "history": [
+              {
+                "id": "02de79ecad324190ae83ca52e28b959c",
+                "type": "inventaire_base",
+                "date": "2026-03-02",
+                "qty": 0.8
+              },
+              {
+                "id": "3c0e0d5456c34bca9495f46d60765e65",
+                "type": "livraison",
+                "date": "2026-03-05",
+                "qty": 1
+              },
+              {
+                "id": "8510b28b06544a36a7c65585fefa6726",
+                "type": "inventaire",
+                "date": "2026-03-09",
+                "qty": 1.8
+              },
+              {
+                "id": "92b57577657a4213ac2a0cac2492c2c1",
+                "type": "inventaire",
+                "date": "2026-03-16",
+                "qty": 1.8
+              },
+              {
+                "id": "a5d45eeca4ca427b83d30a4780a41269",
+                "type": "inventaire",
+                "date": "2026-03-23",
+                "qty": 1.7
+              },
+              {
+                "id": "b27ad01dd9084b4ca853436e96c50a24",
+                "type": "inventaire",
+                "date": "2026-03-30",
+                "qty": 1.7
+              },
+              {
+                "id": "9ca8cefff8534f93b31a2da86cbb5729",
+                "type": "inventaire",
+                "date": "2026-04-06",
+                "qty": 1.7
+              },
+              {
+                "id": "2fc98da28a2742fa99eb4cc8a40198ce",
+                "type": "inventaire",
+                "date": "2026-04-13",
+                "qty": 1.7
+              },
+              {
+                "id": "49e9ea20154e49b5874214132aba6aba",
+                "type": "inventaire",
+                "date": "2026-04-20",
+                "qty": 0
+              },
+              {
+                "id": "1298cd1ee45249aa88191537ca3113ad",
+                "type": "inventaire",
+                "date": "2026-04-27",
+                "qty": 0
+              }
+            ]
+          },
+          {
+            "id": "ad518c168a584ac7a0fa631e1aaef60f",
+            "name": "Culligan",
+            "category": "Entrepôt",
+            "qty": 0,
+            "unit": "palettes",
+            "seuil": 0,
+            "ordre": 16,
+            "history": [
+              {
+                "id": "d31417fd2e2046819318dbf4492b691c",
+                "type": "inventaire_base",
+                "date": "2026-03-02",
+                "qty": 28
+              },
+              {
+                "id": "df78fd64d52d4776902b4f448967d7c6",
+                "type": "inventaire",
+                "date": "2026-03-09",
+                "qty": 26
+              },
+              {
+                "id": "39990919f100425cb204a11aa1245f12",
+                "type": "inventaire",
+                "date": "2026-03-16",
+                "qty": 24
+              },
+              {
+                "id": "8196811dabe84b50a88aa09dd1b8dce4",
+                "type": "inventaire",
+                "date": "2026-03-23",
+                "qty": 22
+              },
+              {
+                "id": "e59fdf652bd645b28b5dd81036032f92",
+                "type": "inventaire",
+                "date": "2026-03-30",
+                "qty": 20
+              },
+              {
+                "id": "4fa1051944514aaab90bec996f175913",
+                "type": "livraison",
+                "date": "2026-03-31",
+                "qty": 64
+              },
+              {
+                "id": "31e2d20a6a1346b389f3177d7bcf98b2",
+                "type": "inventaire",
+                "date": "2026-04-06",
+                "qty": 79
+              },
+              {
+                "id": "f338aad5366e4ec3adb808803d136939",
+                "type": "inventaire",
+                "date": "2026-04-13",
+                "qty": 0
+              },
+              {
+                "id": "c615660be5574d0aa8d319bec671cf3c",
+                "type": "inventaire",
+                "date": "2026-04-20",
+                "qty": 0
+              },
+              {
+                "id": "7702af29d8414d139cdbb9ed8b65b3f1",
+                "type": "inventaire",
+                "date": "2026-04-27",
+                "qty": 0
+              }
+            ]
+          },
+          {
+            "id": "78d6867814a2448f878737c69f82ad18",
+            "name": "Shrink machine",
+            "category": "Entrepôt",
+            "qty": 1,
+            "unit": "palettes",
+            "seuil": 0,
+            "ordre": 17,
+            "history": [
+              {
+                "id": "27e37f62583d45628938216e069b3232",
+                "type": "inventaire_base",
+                "date": "2026-04-29",
+                "qty": 1
+              },
+              {
+                "id": "cba65ac9f86d4409a4f592407a0c4e7c",
+                "type": "livraison",
+                "date": "2026-04-29",
+                "qty": 1
+              }
+            ]
+          }
+        ]
+      },
+      "vetements": {
+        "name": "Vêtements",
+        "icon": "👕",
+        "color": "vetements",
+        "products": [
+          {
+            "id": "2023253c1d3048e7bc27977aab524b52",
+            "name": "Pantalons cargo",
+            "category": "Pantalons",
+            "qty": 4,
+            "unit": "pièces",
+            "seuil": 0,
+            "ordre": 1,
+            "sized": true,
+            "sizes": {
+              "S": 0,
+              "M": 2,
+            "L": 2,
+              "XL": 0,
+              "2XL": 0,
+              "3XL": 0
+            },
+            "history": [
+              {
+                "id": "c8cc6152d01e4327879734c7c9b43c40",
+                "type": "inventaire_base",
+                "date": "2026-04-30",
+                "qty": 4
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}
