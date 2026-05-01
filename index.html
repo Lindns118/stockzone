@@ -2395,6 +2395,7 @@ function importJSON(e) {
           seuil: Math.max(0, parseInt(p.seuil)||0),
           sized: p.sized || false,
           sizes: p.sizes || undefined,
+          ...(p.groupe ? {groupe: String(p.groupe).slice(0,60)} : {}),
           history: Array.isArray(p.history) ? p.history.filter(h =>
             h && typeof h === 'object' &&
             ['inventaire','inventaire_base','livraison','attribution'].includes(h.type) &&
@@ -2431,6 +2432,7 @@ function importJSON(e) {
               added++;
             }
           });
+          if(Array.isArray(z.groups)) S.zones[k].groups = [...z.groups.filter(g=>typeof g==='string')];
           toast(`✅ Zone ${z.name} : ${added} ajouté(s), ${updated} mis à jour`, 'success');
         } else {
           // REPLACE zone products entirely
@@ -2438,7 +2440,8 @@ function importJSON(e) {
             name: z.name.slice(0,50),
             icon: z.icon || S.zones[k]?.icon || '📦',
             color: z.color || k,
-            products: incoming
+            products: incoming,
+            ...(Array.isArray(z.groups) ? {groups: [...z.groups.filter(g=>typeof g==='string')]} : {})
           };
         }
       }
