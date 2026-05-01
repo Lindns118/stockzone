@@ -1475,7 +1475,7 @@ function colorSaveAll(pid) {
   const snap = {...found.p.colors};
   found.p.qty = r2(Object.values(snap).reduce((s,v)=>s+v,0));
   if(existing) { existing.qty=found.p.qty; existing.colors=snap; }
-  else found.p.history.push({id:uid(),type:'inventaire',date:today,qty:found.p.qty,colors:snap});
+  else found.p.history.push({id:uid(),type:'inventaire',date:nowIso(),qty:found.p.qty,colors:snap});
   save();
   toast(`✅ ${esc(found.p.name)} sauvegardé — ${found.p.qty} packs`, 'success');
   renderProducts();
@@ -1526,7 +1526,7 @@ function cardSaveAskDonColor(pid, color, product) {
     colorStep(pid, color, -1);
     const today = new Date().toISOString().slice(0,10);
     if(!S.attributions) S.attributions=[];
-    S.attributions.push({id:uid(),person,productId:pid,productName:product.name,color,qty:1,date:today,zone:'office'});
+    S.attributions.push({id:uid(),person,productId:pid,productName:product.name,color,qty:1,date:nowIso(),zone:'office'});
     save();
     toast(`✅ 1 ${esc(color)} donné à ${person}`,'success');
   };
@@ -1562,12 +1562,13 @@ function cardSave(pid) {
 
 function cardSaveInventaire(pid, qty, product) {
   const today = new Date().toISOString().slice(0,10);
+  const nowTs = nowIso();
   // If there's already an entry today, update it instead of adding a new one
-  const todayEntry = product.history.find(h=>h.date===today&&(h.type==='inventaire'||h.type==='inventaire_base'));
+  const todayEntry = product.history.find(h=>h.date&&h.date.startsWith(today)&&(h.type==='inventaire'||h.type==='inventaire_base'));
   if(todayEntry) {
     todayEntry.qty = qty;
   } else {
-    product.history.push({id:uid(), type:'inventaire', date:today, qty});
+    product.history.push({id:uid(), type:'inventaire', date:nowTs, qty});
   }
   recalcQty(product);
   save();
@@ -1630,7 +1631,7 @@ function cardSaveAskPerson(pid, newQty, diff, product) {
 
     const today = new Date().toISOString().slice(0,10);
     // Save as inventaire in history
-    product.history.push({id:uid(), type:'inventaire', date:today, qty:newQty});
+    product.history.push({id:uid(), type:'inventaire', date:nowIso(), qty:newQty});
     recalcQty(product);
 
     // Save attribution record
@@ -1638,7 +1639,7 @@ function cardSaveAskPerson(pid, newQty, diff, product) {
     S.attributions.push({
       id:uid(), person, productId:pid,
       productName:product.name, productUnit:product.unit,
-      qty:diff, date:today,
+      qty:diff, date:nowIso(),
       notes:notes||undefined,
       zone:'vetements'
     });
@@ -1887,11 +1888,15 @@ async function deleteHistItem(hid, e) {
 }
 
 function recalcQty(product) {
-  // Sort by date DESC, then by array index DESC (last inserted wins on same date)
+  // Sort by full datetime DESC (last inserted wins)
   const invs = product.history
     .map((h,i)=>({...h,_i:i}))
     .filter(h=>h.type==='inventaire'||h.type==='inventaire_base')
-    .sort((a,b)=> new Date(b.date)-new Date(a.date) || b._i-a._i);
+    .sort((a,b)=> {
+      const da = new Date(a.date), db = new Date(b.date);
+      if(db-da !== 0) return db-da;
+      return b._i-a._i; // same date → last inserted wins
+    });
   if (!invs.length) {
     product.qty = product.history.filter(h=>h.type==='livraison').reduce((s,h)=>s+h.qty, 0);
     return;
@@ -2749,7 +2754,7 @@ function calcApplyInventaire() {
   if(!pid) { toast('Sélectionnez un produit', 'error'); return; }
   const found = findProduct(pid);
   if(!found) return;
-  found.p.history.push({id:uid(), type:'inventaire', date:today(), qty});
+  found.p.history.push({id:uid(), type:'inventaire', date:nowIso(), qty});
   recalcQty(found.p);
   save();
   hideModal('modal-calc');
@@ -3545,7 +3550,10 @@ function toast(msg,type='default') {
 
 // ===== UTILS =====
 function today(){return new Date().toISOString().split('T')[0];}
-function fmtDate(d){if(!d)return '';const[y,m,dd]=d.split('-');return `${dd}/${m}/${y}`;}
+function nowIso(){return new Date().toISOString();}
+function fmtDate(d){
+  if(d && d.length > 10) d = d.slice(0,10); // strip time part
+  if(!d)return '';const[y,m,dd]=d.split('-');return `${dd}/${m}/${y}`;}
 function fmtDateShort(d){if(!d)return '';try{return new Date(d).toLocaleDateString('fr-FR',{month:'short',year:'2-digit'});}catch{return d;}}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
