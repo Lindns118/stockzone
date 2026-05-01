@@ -1128,24 +1128,32 @@ async function gdLoad() {
   GD.status = 'syncing';
   renderReglages();
   try {
-    // Find file if no fileId
-    if(!GD.fileId) {
-      const res = await fetch(`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='${DRIVE_FILE_NAME}'`, {
-        headers: {'Authorization': 'Bearer ' + GD.token}
-      });
-      const json = await res.json();
-      if(!json.files || !json.files.length) throw new Error('Aucun fichier trouvé sur Drive');
-      GD.fileId = json.files[0].id;
-      gdSaveConfig();
-    }
-    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${GD.fileId}?alt=media`, {
+    // Always search by name first (works on new device)
+    GD.fileId = null;
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='${DRIVE_FILE_NAME}'&fields=files(id,name,modifiedTime,size)`, {
       headers: {'Authorization': 'Bearer ' + GD.token}
     });
-    if(!res.ok) throw new Error('HTTP ' + res.status);
-    const backup = await res.json();
-    if(!backup.data || !backup.data.zones) throw new Error('Format invalide');
+    const json = await res.json();
+    if(!json.files || !json.files.length) {
+      throw new Error('Aucune sauvegarde trouvée sur Drive.\n\nVérifiez que la sauvegarde a bien été effectuée depuis votre téléphone (Réglages → Drive → Sauvegarder maintenant).');
+    }
+    // Take most recent file
+    const files = json.files.sort((a,b) => new Date(b.modifiedTime) - new Date(a.modifiedTime));
+    GD.fileId = files[0].id;
+    gdSaveConfig();
+
+    const resFile = await fetch(`https://www.googleapis.com/drive/v3/files/${GD.fileId}?alt=media`, {
+      headers: {'Authorization': 'Bearer ' + GD.token}
+    });
+    if(!resFile.ok) throw new Error('Impossible de lire le fichier (HTTP ' + resFile.status + ')');
+    const backup = await resFile.json();
+    if(!backup.data || !backup.data.zones) throw new Error('Format de sauvegarde invalide');
+
+    const dateStr = backup.date ? new Date(backup.date).toLocaleString('fr-FR') : '?';
+    const nbProds = Object.values(backup.data.zones).reduce((s,z)=>s+(z.products?.length||0),0);
+
     await confirm2('Restaurer depuis Drive ?',
-      `Sauvegarde du ${backup.date ? new Date(backup.date).toLocaleString('fr-FR') : '?'}.<br>Vos données actuelles seront remplacées.`,
+      `Sauvegarde du ${dateStr}\n${nbProds} produits trouvés.\nVos données actuelles seront remplacées.`,
       () => {
         S = migrateData(backup.data);
         save();
@@ -1162,7 +1170,7 @@ async function gdLoad() {
   } catch(e) {
     GD.status = 'err';
     renderReglages();
-    toast('❌ Erreur Drive : ' + e.message, 'error');
+    toast('❌ ' + e.message, 'error');
   }
 }
 
