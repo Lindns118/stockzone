@@ -930,8 +930,10 @@ function migrateData(data) {
   // Migrate office products
   if (data.zones && data.zones.office) {
     data.zones.office.products.forEach(p => {
-      if (p.colored === undefined) p.colored = false;
       if (!p.colors) p.colors = {};
+      // Auto-enable colored if colors dict has entries
+      if (Object.keys(p.colors).length > 0) p.colored = true;
+      else if (p.colored === undefined) p.colored = false;
       if (!p.officialName) p.officialName = p.name;
     });
   }
@@ -1729,9 +1731,16 @@ function openDetail(id) {
   if(colSection) {
     const isOffice = found.zk === 'office';
     colSection.style.display = (isOffice || found.p.colored) ? 'block' : 'none';
-    if(toggle) toggle.checked = !!found.p.colored;
-    if(colBody) colBody.style.display = found.p.colored ? 'block' : 'none';
-    if(found.p.colored) psRenderColorsList(found.p);
+    if(toggle) {
+      toggle.checked = !!found.p.colored;
+      // Force trigger to update body visibility
+      if(colBody) colBody.style.display = found.p.colored ? 'block' : 'none';
+    }
+    if(found.p.colored && found.p.colors) psRenderColorsList(found.p);
+    else {
+      const list = document.getElementById('ps-colors-list');
+      if(list) list.innerHTML = '';
+    }
   }
   if(found.p.sized && sizeSection) {
     sizeSection.style.display = 'block';
