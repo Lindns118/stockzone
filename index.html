@@ -1271,9 +1271,10 @@ function switchZone(z) {
     // Show attribution button for vetements
     const attrBtn = document.getElementById('attr-zone-btn');
     if(attrBtn) attrBtn.style.display = z==='vetements' ? 'inline-flex' : 'none';
-    // Show add-group button for office
+    // Show add-group button for all product zones
     const addGroupBtn = document.getElementById('add-group-btn');
-    if(addGroupBtn) addGroupBtn.style.display = z==='office' ? 'inline-flex' : 'none';
+    const isProductZone = ['entrepot','office','vetements'].includes(z) || (S.zones[z] !== undefined && !['stats','prets','alertes','reglages','attributions'].includes(z));
+    if(addGroupBtn) addGroupBtn.style.display = isProductZone ? 'inline-flex' : 'none';
   } else if (z === 'attributions') {
     document.getElementById('zh-icon').textContent = '👕';
     document.getElementById('zh-name').textContent = 'Attributions';
@@ -1374,11 +1375,14 @@ function renderProducts() {
   };
 
   // Office zone: render with groupe collapsible sections
-  if (currentZone === 'office' && !q) {
+  // Groups rendering: any zone where products have a groupe or zone has groups registered
+  const _zd = S.zones[currentZone];
+  if (!q && _zd && ((_zd.groups && _zd.groups.length > 0) || prods.some(p=>p.groupe))) {
     const openGroups = JSON.parse(localStorage.getItem('sz_open_groups')||'{}');
-    // Build master group list: registered groups + any groupe on products not yet registered
-    if(!S.zones.office.groups) S.zones.office.groups = [];
-    const knownGroups = [...S.zones.office.groups];
+    const zoneGroupClass = {entrepot:'', office:'oc', vetements:'vc'}[currentZone] || '';
+    const zoneAccent = {entrepot:'var(--blue)', office:'var(--orange)', vetements:'#7c3aed'}[currentZone] || 'var(--blue)';
+    if(!_zd.groups) _zd.groups = [];
+    const knownGroups = [..._zd.groups];
     prods.forEach(p => { if(p.groupe && !knownGroups.includes(p.groupe)) knownGroups.push(p.groupe); });
 
     // Update datalist autocomplete
@@ -1405,7 +1409,7 @@ function renderProducts() {
         if (currentSort === 'desc')  return [-p.qty, p.name];
         if (currentSort === 'asc')   return [p.qty, p.name];
         if (currentSort === 'alert') return [p.seuil>0&&p.qty<=p.seuil ? 0 : 1, p.name];
-        return [0, p.name]; // az
+        return [0, p.name];
       } else {
         const gprods = grouped[item.gname] || [];
         const totalQty = gprods.reduce((s,p)=>s+p.qty,0);
@@ -1414,7 +1418,7 @@ function renderProducts() {
         if (currentSort === 'desc')  return [-totalQty, item.gname];
         if (currentSort === 'asc')   return [totalQty, item.gname];
         if (currentSort === 'alert') return [gprods.some(p=>p.seuil>0&&p.qty<=p.seuil) ? 0 : 1, item.gname];
-        return [0, item.gname]; // az
+        return [0, item.gname];
       }
     };
     items.sort((a,b) => {
@@ -1430,19 +1434,19 @@ function renderProducts() {
       } else {
         const gname = item.gname;
         const gprods = grouped[gname] || [];
-        const isOpen = !!openGroups['office:'+gname];
+        const isOpen = !!openGroups[currentZone+':'+gname];
         const hasAlert = gprods.some(p=>p.seuil>0&&p.qty<=p.seuil);
         const totalQty = gprods.reduce((s,p)=>s+p.qty,0);
         const isEmpty = gprods.length === 0;
-        html += `<div class="group-header oc${hasAlert?' group-alert':''}" onclick="toggleGroup('${esc(gname)}')">
+        html += `<div class="group-header ${zoneGroupClass}${hasAlert?' group-alert':''}" onclick="toggleGroup('${esc(gname)}')">
           <div style="display:flex;justify-content:space-between;align-items:center">
             <div>
               <div style="font-weight:700;font-size:15px">${esc(gname)}</div>
               <div style="font-size:12px;color:var(--text2)">${isEmpty ? 'Vide — aucun produit' : `${gprods.length} article${gprods.length>1?'s':''} · ${totalQty} en stock`}</div>
             </div>
             <div style="display:flex;align-items:center;gap:10px">
-              ${isEmpty ? `<button style="background:none;border:none;font-size:16px;color:#ef4444;cursor:pointer;padding:4px 8px;border-radius:8px" onclick="deleteOfficeGroup('${esc(gname)}',event)" title="Supprimer ce groupe">🗑</button>` : ''}
-              <div style="font-size:18px;color:var(--orange)">${isOpen?'▲':'▼'}</div>
+              ${isEmpty ? `<button style="background:none;border:none;font-size:16px;color:#ef4444;cursor:pointer;padding:4px 8px;border-radius:8px" onclick="deleteZoneGroup('${esc(gname)}',event)" title="Supprimer ce groupe">🗑</button>` : ''}
+              <div style="font-size:18px;color:${zoneAccent}">${isOpen?'▲':'▼'}</div>
             </div>
           </div>
         </div>`;
@@ -1455,10 +1459,11 @@ function renderProducts() {
     return;
   }
 
-  // For non-office zones: still update datalist if params panel is open
-  if(currentZone === 'office') {
+  // Update datalist autocomplete even when no group rendering
+  {
     const dl = document.getElementById('groupe-dl');
-    if(dl && S.zones.office.groups) dl.innerHTML = S.zones.office.groups.map(g=>`<option value="${esc(g)}">`).join('');
+    const zdl = S.zones[currentZone];
+    if(dl && zdl?.groups) dl.innerHTML = zdl.groups.map(g=>`<option value="${esc(g)}">`).join('');
   }
 
   el.innerHTML = prods.map(p=>{
@@ -1701,13 +1706,14 @@ function openAddGroupModal() {
     const name = inp.value.trim();
     if(!name) { inp.style.borderColor='#ef4444'; return; }
     document.body.removeChild(box);
-    if(!S.zones.office.groups) S.zones.office.groups = [];
-    if(!S.zones.office.groups.includes(name)) {
-      S.zones.office.groups.push(name);
+    const zk = currentZone;
+    if(!S.zones[zk].groups) S.zones[zk].groups = [];
+    if(!S.zones[zk].groups.includes(name)) {
+      S.zones[zk].groups.push(name);
       save();
     }
     const openGroups = JSON.parse(localStorage.getItem('sz_open_groups')||'{}');
-    openGroups['office:'+name] = true;
+    openGroups[zk+':'+name] = true;
     localStorage.setItem('sz_open_groups', JSON.stringify(openGroups));
     renderProducts();
     toast(`✅ Groupe "${name}" créé`, 'success');
@@ -1716,12 +1722,13 @@ function openAddGroupModal() {
   box.querySelector('#ag-cancel').onclick = () => document.body.removeChild(box);
 }
 
-function deleteOfficeGroup(gname, event) {
+function deleteZoneGroup(gname, event) {
   event.stopPropagation();
-  if(!S.zones.office.groups) return;
-  const hasProds = (S.zones.office.products||[]).some(p=>p.groupe===gname);
+  const zk = currentZone;
+  if(!S.zones[zk]?.groups) return;
+  const hasProds = (S.zones[zk].products||[]).some(p=>p.groupe===gname);
   if(hasProds) { toast('⚠ Retirez d\'abord tous les produits du groupe', 'error'); return; }
-  S.zones.office.groups = S.zones.office.groups.filter(g=>g!==gname);
+  S.zones[zk].groups = S.zones[zk].groups.filter(g=>g!==gname);
   save();
   renderProducts();
   toast(`🗑 Groupe "${gname}" supprimé`, 'success');
@@ -2077,10 +2084,11 @@ function saveParams() {
     const gval = groupeEl2.value.trim();
     if(gval) {
       currentProduct.groupe = gval;
-      // Register in office groups list if not already there
-      if(currentZone === 'office') {
-        if(!S.zones.office.groups) S.zones.office.groups = [];
-        if(!S.zones.office.groups.includes(gval)) S.zones.office.groups.push(gval);
+      // Register in zone groups list if not already there
+      const _zk = currentZone;
+      if(S.zones[_zk]) {
+        if(!S.zones[_zk].groups) S.zones[_zk].groups = [];
+        if(!S.zones[_zk].groups.includes(gval)) S.zones[_zk].groups.push(gval);
       }
     } else {
       delete currentProduct.groupe;
@@ -2754,6 +2762,7 @@ table.inv-tbl input.sz-inp:focus{border-color:var(--blue);background:#fff}
 .group-header{background:#fff;border-radius:13px;padding:14px 16px;margin-bottom:6px;box-shadow:var(--shadow);cursor:pointer;border-left:4px solid var(--blue)}
 .group-header:active{opacity:.8}
 .group-header.oc{border-left-color:var(--orange)}
+.group-header.vc{border-left-color:#7c3aed}
 .group-alert{border-left-color:#ef4444}
 .group-children{margin-left:12px;margin-bottom:8px}
 .group-children .product-card{border-radius:10px;margin-bottom:6px}
