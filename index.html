@@ -452,7 +452,7 @@ table.conso-tbl tfoot td.num{font-weight:700}
 <div class="modal-sheet">
   <div class="pd-header">
     <div style="flex:1"><div class="pd-name" id="pd-name"></div><div id="pd-official" style="font-size:11px;color:var(--text2);margin-top:2px;font-weight:400"></div><div class="pd-cat" id="pd-cat"></div></div>
-    <div class="pd-qty-block"><div class="pd-qty" id="pd-qty"></div><div class="pd-unit" id="pd-unit"></div></div>
+    <div class="pd-qty-block"><div class="pd-qty" id="pd-qty"></div><div class="pd-unit" id="pd-unit"></div><div id="pd-conv" style="font-size:10px;color:var(--text2);text-align:right;margin-top:2px"></div></div>
     <button class="m-close" onclick="hideModal('modal-detail')">✕</button>
   </div>
   <div class="tab-row">
@@ -479,6 +479,14 @@ table.conso-tbl tfoot td.num{font-weight:700}
         <button class="stepper-btn stepper-plus" onclick="quickStep(1)">+</button>
       </div>
       <div class="quick-unit-lbl" id="quick-unit-lbl"></div>
+      <div id="quick-extra-wrap" style="display:none;margin-top:10px;background:var(--gray);border-radius:10px;padding:10px">
+        <div style="font-size:12px;color:var(--text2);margin-bottom:6px">+ unités supplémentaires</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <input type="number" id="quick-extra-units" class="fi fi-sm" min="0" placeholder="0" oninput="quickUpdateConv()">
+          <span id="quick-extra-unit-lbl" style="font-size:13px;color:var(--text2)">unités</span>
+        </div>
+        <div id="quick-conv-preview" style="font-size:12px;color:var(--blue);margin-top:6px"></div>
+      </div>
       <div class="fg" id="quick-four-wrap" style="display:none">
         <label class="fl">Fournisseur</label>
         <input type="text" id="quick-four" class="fi" maxlength="100" placeholder="Optionnel" autocomplete="off">
@@ -510,6 +518,20 @@ table.conso-tbl tfoot td.num{font-weight:700}
       <label class="fl">Groupe <span style="font-size:11px;color:var(--text2)">(regroupe les variantes sous un parent)</span></label>
       <datalist id="groupe-dl"></datalist>
       <input type="text" id="ps-groupe" class="fi" maxlength="60" style="margin-bottom:14px" list="groupe-dl" placeholder="Ex: Aerosol, Classeur...">
+      <!-- Conversion d'unités -->
+      <label class="fl">Conversion d'unités <span style="font-size:11px;color:var(--text2)">(optionnel)</span></label>
+      <div style="background:var(--gray);border-radius:10px;padding:10px;margin-bottom:14px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span style="font-size:13px;color:var(--text2);white-space:nowrap">1 pack =</span>
+          <input type="number" id="ps-pack-qty" class="fi fi-sm" placeholder="ex: 200" min="1" style="flex:1">
+          <span style="font-size:13px;color:var(--text2)" id="ps-pack-unit-lbl">unités</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:13px;color:var(--text2);white-space:nowrap">1 palette =</span>
+          <input type="number" id="ps-palette-qty" class="fi fi-sm" placeholder="ex: 10" min="1" style="flex:1">
+          <span style="font-size:13px;color:var(--text2)">packs</span>
+        </div>
+      </div>
       <div id="ps-sizes-section" style="display:none;margin-bottom:14px">
         <label class="fl">Tailles actives</label>
         <div id="ps-sizes-list" style="display:flex;flex-wrap:wrap;gap:6px"></div>
@@ -1338,7 +1360,7 @@ function renderProducts() {
         ondragleave="dragLeave(event)">
       <div class="pc-top">
         <div><div class="pc-name">${esc(p.name)}</div><div class="pc-cat">${esc(p.category)}</div></div>
-        <div><div class="pc-qty${isLow?' low':''}">${p.qty}</div><div class="pc-unit">${esc(p.unit)}</div></div>
+        <div style="text-align:right"><div class="pc-qty${isLow?' low':''}">${p.qty}</div><div class="pc-unit">${esc(p.unit)}</div>${p.packQty?`<div style="font-size:10px;color:var(--text2);margin-top:1px">${Math.round(p.qty*p.packQty).toLocaleString('fr')} u.</div>`:''}</div>
       </div>
       ${isLow?`<div><span class="alert-tag">⚠ Seuil bas (≤ ${p.seuil})</span></div>`:''}
       <div class="card-stepper" onclick="event.stopPropagation()">
@@ -1500,8 +1522,8 @@ function sizeStep(pid, size, delta) {
 function cardStep(pid, delta) {
   const input = document.getElementById('cs-'+pid);
   if(!input) return;
-  const val = parseInt(input.value)||0;
-  input.value = Math.max(0, val+delta);
+  const val = parseFloat(input.value)||0;
+  input.value = Math.max(0, r2(val+delta));
 }
 
 function cardSave(pid) {
@@ -1509,7 +1531,7 @@ function cardSave(pid) {
   if(!found) return;
   const input = document.getElementById('cs-'+pid);
   if(!input) return;
-  const newQty = Math.max(0, parseInt(input.value) || 0);
+  const newQty = Math.max(0, parseFloat(input.value) || 0);
   const oldQty = found.p.qty;
 
   // For vetements or office: if qty decreased, ask if it's inventory or donation
@@ -1712,6 +1734,13 @@ function openDetail(id) {
   document.getElementById('pd-cat').textContent = found.p.category;
   document.getElementById('pd-qty').textContent = found.p.qty;
   document.getElementById('pd-unit').textContent = found.p.unit;
+  const convEl = document.getElementById('pd-conv');
+  if(convEl) {
+    const lines = [];
+    if(found.p.packQty) lines.push(`= ${Math.round(found.p.qty * found.p.packQty).toLocaleString('fr')} unités`);
+    if(found.p.paletteQty) lines.push(`/ ${r2(found.p.qty / found.p.paletteQty)} palettes`);
+    convEl.textContent = lines.join(' · ');
+  }
   // Reset tabs to hist
   document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('ta',i===0));
   ['tc-hist','tc-conso','tc-params'].forEach((tid,i)=>{const el=document.getElementById(tid);if(el)el.classList.toggle('hidden',i!==0);});
@@ -1725,6 +1754,10 @@ function openDetail(id) {
   document.getElementById('ps-official').value = found.p.officialName || '';
   const groupeEl = document.getElementById('ps-groupe');
   if(groupeEl) groupeEl.value = found.p.groupe || '';
+  const packQtyEl = document.getElementById('ps-pack-qty');
+  if(packQtyEl) packQtyEl.value = found.p.packQty || '';
+  const paletteQtyEl = document.getElementById('ps-palette-qty');
+  if(paletteQtyEl) paletteQtyEl.value = found.p.paletteQty || '';
   // Hide colors section (old system removed)
   const colSectionOld = document.getElementById('ps-colors-section');
   if(colSectionOld) colSectionOld.style.display='none';
@@ -1807,6 +1840,19 @@ function initQuickEntry() {
   document.getElementById('quick-qty').value = currentProduct.qty || 0;
   // Set today's date
   document.getElementById('quick-date').value = new Date().toISOString().slice(0,10);
+  // Show extra-units row if packQty is defined
+  const extraWrap = document.getElementById('quick-extra-wrap');
+  const extraUnitLbl = document.getElementById('quick-extra-unit-lbl');
+  if(extraWrap) {
+    if(currentProduct.packQty) {
+      extraWrap.style.display = 'block';
+      if(extraUnitLbl) extraUnitLbl.textContent = currentProduct.unit === 'packs' ? 'bouchons' : 'unités';
+      document.getElementById('quick-extra-units').value = '';
+      document.getElementById('quick-conv-preview').textContent = '';
+    } else {
+      extraWrap.style.display = 'none';
+    }
+  }
 }
 
 function quickSetType(type, btn) {
@@ -1821,20 +1867,37 @@ function quickSetType(type, btn) {
 
 function quickStep(delta) {
   const input = document.getElementById('quick-qty');
-  const val = parseInt(input.value) || 0;
-  input.value = Math.max(0, val + delta);
+  const val = parseFloat(input.value) || 0;
+  input.value = Math.max(0, r2(val + delta));
+  quickUpdateConv();
 }
 
 function quickClamp() {
   const input = document.getElementById('quick-qty');
-  const val = parseInt(input.value);
+  const val = parseFloat(input.value);
   if(isNaN(val) || val < 0) input.value = 0;
   if(val > 1e9) input.value = 1e9;
+  quickUpdateConv();
+}
+
+function quickUpdateConv() {
+  if(!currentProduct || !currentProduct.packQty) return;
+  const packs = parseFloat(document.getElementById('quick-qty').value) || 0;
+  const extraUnits = parseFloat(document.getElementById('quick-extra-units')?.value) || 0;
+  const total = r2(packs + extraUnits / currentProduct.packQty);
+  const totalUnits = Math.round(total * currentProduct.packQty);
+  const preview = document.getElementById('quick-conv-preview');
+  if(preview) preview.textContent = extraUnits > 0 ? `→ ${total} packs (${totalUnits.toLocaleString('fr')} unités au total)` : '';
+}
 }
 
 function saveQuickEntry() {
   if(!currentProduct) return;
-  const qty = Math.max(0, parseInt(document.getElementById('quick-qty').value) || 0);
+  let qty = Math.max(0, parseFloat(document.getElementById('quick-qty').value) || 0);
+  if(currentProduct.packQty) {
+    const extraUnits = parseFloat(document.getElementById('quick-extra-units')?.value) || 0;
+    qty = r2(qty + extraUnits / currentProduct.packQty);
+  }
   const date = document.getElementById('quick-date').value;
   const notes = document.getElementById('quick-notes').value.trim().slice(0,200);
   const four = document.getElementById('quick-four').value.trim().slice(0,100);
@@ -1985,6 +2048,12 @@ function saveParams() {
       delete currentProduct.groupe;
     }
   }
+
+  // Save pack/palette conversion
+  const packQtyVal = parseInt(document.getElementById('ps-pack-qty')?.value)||0;
+  if(packQtyVal > 0) currentProduct.packQty = packQtyVal; else delete currentProduct.packQty;
+  const paletteQtyVal = parseInt(document.getElementById('ps-palette-qty')?.value)||0;
+  if(paletteQtyVal > 0) currentProduct.paletteQty = paletteQtyVal; else delete currentProduct.paletteQty;
 
   // Handle ordre with shift
   const ordreVal = document.getElementById('ps-ordre').value;
@@ -2396,6 +2465,8 @@ function importJSON(e) {
           sized: p.sized || false,
           sizes: p.sizes || undefined,
           ...(p.groupe ? {groupe: String(p.groupe).slice(0,60)} : {}),
+          ...(p.packQty && p.packQty > 0 ? {packQty: parseInt(p.packQty)} : {}),
+          ...(p.paletteQty && p.paletteQty > 0 ? {paletteQty: parseInt(p.paletteQty)} : {}),
           history: Array.isArray(p.history) ? p.history.filter(h =>
             h && typeof h === 'object' &&
             ['inventaire','inventaire_base','livraison','attribution'].includes(h.type) &&
@@ -3205,8 +3276,51 @@ function renderConsoTable(){
     <td class="num">${r2(grandTotal)}</td>
   </tr></tfoot>`;
 
-  wrap.innerHTML=`<div class="tbl-wrap"><table class="conso-tbl">${thead}<tbody>${tbody}</tbody>${tfoot}</table></div>
+  wrap.innerHTML=`<div class="tbl-wrap"><table class="conso-tbl" id="conso-main-tbl">${thead}<tbody>${tbody}</tbody>${tfoot}</table></div>
   <p style="font-size:11px;color:var(--text2);margin-top:8px;text-align:right">🔴 consommation élevée &nbsp;🟡 moyenne &nbsp;— aucune</p>`;
+}
+
+function exportConsoCSV() {
+  const tbl = document.getElementById('conso-main-tbl');
+  if(!tbl) { toast('Aucun tableau à exporter', 'error'); return; }
+  const rows = [];
+  tbl.querySelectorAll('tr').forEach(tr => {
+    const cells = [...tr.querySelectorAll('th,td')].map(td => {
+      const text = td.textContent.trim().replace(/\s+/g,' ');
+      return '"' + text.replace(/"/g,'""') + '"';
+    });
+    rows.push(cells.join(';'));
+  });
+  const bom = '﻿';
+  const blob = new Blob([bom + rows.join('\n')], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'conso_stockzone_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function exportConsoPrint() {
+  const tbl = document.getElementById('conso-main-tbl');
+  if(!tbl) { toast('Aucun tableau à exporter', 'error'); return; }
+  const w = window.open('', '_blank');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Consommation StockZone</title>
+  <style>
+    body{font-family:Arial,sans-serif;font-size:11px;color:#111;padding:16px}
+    h2{font-size:14px;margin-bottom:8px}
+    table{border-collapse:collapse;width:100%}
+    th,td{border:1px solid #ccc;padding:4px 7px;text-align:left}
+    th{background:#1e2799;color:#fff;font-size:10px}
+    td.num{text-align:right}
+    tfoot td{font-weight:700;background:#f3f4f6}
+    .sum-badge,.mini-bar{display:none}
+    @media print{body{padding:0}}
+  </style></head><body>
+  <h2>Consommation StockZone — ${new Date().toLocaleDateString('fr')}</h2>
+  ${tbl.outerHTML}
+  </body></html>`);
+  w.document.close();
+  w.print();
 }
 
 function renderCompareTable(){
@@ -3382,6 +3496,10 @@ function renderStats() {
           </select>
         </div>
         <div id="conso-tbl-wrap"></div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button onclick="exportConsoCSV()" style="padding:8px 14px;border:1.5px solid var(--blue);background:var(--blue-light,#eef2ff);color:var(--blue);border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">📥 Export CSV / Excel</button>
+          <button onclick="exportConsoPrint()" style="padding:8px 14px;border:1.5px solid #6b7280;background:#f9fafb;color:#374151;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">🖨 Imprimer / PDF</button>
+        </div>
       </div>
     </div>
 
