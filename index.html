@@ -3318,13 +3318,14 @@ function renderConsoTable(){
 
   const tbody=rows.map(r=>{
     const rowVals=periods.map(pk=>r2(r.grouped[pk]||0)).filter(v=>v>0);
+    const rowAvg=rowVals.length?rowVals.reduce((a,v)=>a+v,0)/rowVals.length:1;
     const rowMax=rowVals.length?Math.max(...rowVals):1;
     const cells=periods.map(pk=>{
       const v=r2(r.grouped[pk]||0);
       if(!v) return `<td class="num zero">—</td>`;
-      const pct=v/rowMax;
-      const cls=pct>0.65?'hi':pct>0.35?'med':'';
-      const bw=Math.round(pct*36);
+      const ratio=rowAvg>0?v/rowAvg:0;
+      const cls=ratio>1.3?'hi':ratio>0.9?'med':'';
+      const bw=Math.round((v/rowMax)*36);
       return `<td class="num ${cls}">${v}<span class="mini-bar" style="width:${bw}px;background:${cls==='hi'?'#ef4444':cls==='med'?'#f59e0b':'#2d35a8'}"></span></td>`;
     }).join('');
     return `<tr>
@@ -3342,7 +3343,7 @@ function renderConsoTable(){
   </tr></tfoot>`;
 
   wrap.innerHTML=`<div class="tbl-wrap"><table class="conso-tbl" id="conso-main-tbl">${thead}<tbody>${tbody}</tbody>${tfoot}</table></div>
-  <p style="font-size:11px;color:var(--text2);margin-top:8px;text-align:right">🔴 consommation élevée &nbsp;🟡 moyenne &nbsp;— aucune</p>`;
+  <p style="font-size:11px;color:var(--text2);margin-top:8px;text-align:right">🔴 &gt;130% de la moyenne du produit &nbsp;🟡 dans la normale &nbsp;— aucune</p>`;
 }
 
 function exportConsoCSV() {
