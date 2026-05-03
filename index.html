@@ -524,12 +524,12 @@ table.conso-tbl tfoot td.num{font-weight:700}
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
           <span style="font-size:13px;color:var(--text2);white-space:nowrap">1 pack =</span>
           <input type="number" id="ps-pack-qty" class="fi fi-sm" placeholder="ex: 200" min="1" style="flex:1">
-          <span style="font-size:13px;color:var(--text2)" id="ps-pack-unit-lbl">unités</span>
+          <input type="text" id="ps-pack-unit" class="fi fi-sm" placeholder="unités" maxlength="30" style="flex:1;min-width:0">
         </div>
         <div style="display:flex;align-items:center;gap:8px">
           <span style="font-size:13px;color:var(--text2);white-space:nowrap">1 palette =</span>
           <input type="number" id="ps-palette-qty" class="fi fi-sm" placeholder="ex: 10" min="1" style="flex:1">
-          <span style="font-size:13px;color:var(--text2)">packs</span>
+          <input type="text" id="ps-palette-unit" class="fi fi-sm" placeholder="packs" maxlength="30" style="flex:1;min-width:0">
         </div>
       </div>
       <div id="ps-sizes-section" style="display:none;margin-bottom:14px">
@@ -1360,7 +1360,7 @@ function renderProducts() {
         ondragleave="dragLeave(event)">
       <div class="pc-top">
         <div><div class="pc-name">${esc(p.name)}</div><div class="pc-cat">${esc(p.category)}</div></div>
-        <div style="text-align:right"><div class="pc-qty${isLow?' low':''}">${p.qty}</div><div class="pc-unit">${esc(p.unit)}</div>${p.packQty?`<div style="font-size:10px;color:var(--text2);margin-top:1px">${Math.round(p.qty*p.packQty).toLocaleString('fr')} u.</div>`:''}</div>
+        <div style="text-align:right"><div class="pc-qty${isLow?' low':''}">${p.qty}</div><div class="pc-unit">${esc(p.unit)}</div>${p.packQty?`<div style="font-size:10px;color:var(--text2);margin-top:1px">${Math.round(p.qty*p.packQty).toLocaleString('fr')} ${esc(p.packUnit||'u.')}</div>`:''}</div>
       </div>
       ${isLow?`<div><span class="alert-tag">⚠ Seuil bas (≤ ${p.seuil})</span></div>`:''}
       <div class="card-stepper" onclick="event.stopPropagation()">
@@ -1534,13 +1534,19 @@ function cardSave(pid) {
   const newQty = Math.max(0, parseFloat(input.value) || 0);
   const oldQty = found.p.qty;
 
-  // For vetements or office: if qty decreased, ask if it's inventory or donation
+  // If increasing: ask livraison or inventaire
+  if(newQty > oldQty) {
+    const delta = r2(newQty - oldQty);
+    cardSaveAskLivOrInv(pid, newQty, delta, found.p);
+    return;
+  }
+  // If decreasing on vetements/office: ask inventaire or don
   if((currentZone === 'vetements' || currentZone === 'office') && newQty < oldQty) {
-    const diff = oldQty - newQty;
+    const diff = r2(oldQty - newQty);
     cardSaveAskDon(pid, newQty, diff, found.p);
     return;
   }
-  // For all other cases: straight inventory
+  // Same value or other zones: straight inventory
   cardSaveInventaire(pid, newQty, found.p);
 }
 
@@ -1558,6 +1564,34 @@ function cardSaveInventaire(pid, qty, product) {
   save();
   toast(`✅ ${esc(product.name)} → ${product.qty} ${esc(product.unit)}`, 'success');
   renderProducts();
+}
+
+function cardSaveAskLivOrInv(pid, newQty, delta, product) {
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-end;justify-content:center;padding:20px';
+  box.innerHTML = `<div style="background:#fff;border-radius:18px;padding:24px;width:100%;max-width:400px;box-shadow:0 8px 40px rgba(0,0,0,.2)">
+    <div style="font-size:16px;font-weight:700;margin-bottom:4px">${esc(product.name)}</div>
+    <div style="font-size:13px;color:#6b7280;margin-bottom:18px">Stock actuel : <b>${product.qty}</b> → valeur saisie : <b>${newQty}</b> ${esc(product.unit)}</div>
+    <div style="font-size:13px;font-weight:600;margin-bottom:12px">C'est quoi cette modification ?</div>
+    <button id="ask-liv" style="width:100%;padding:13px;border:none;border-radius:12px;background:#16a34a;color:#fff;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;margin-bottom:8px">🚚 Livraison (+${delta} ${esc(product.unit)}) → stock ${r2(product.qty+delta)}</button>
+    <button id="ask-inv2" style="width:100%;padding:13px;border:none;border-radius:12px;background:#2d35a8;color:#fff;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;margin-bottom:8px">📋 Inventaire (stock = ${newQty} ${esc(product.unit)})</button>
+    <button id="ask-cancel2" style="width:100%;padding:11px;border:1.5px solid #e5e7eb;border-radius:12px;background:#fff;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;color:#6b7280">Annuler</button>
+  </div>`;
+  document.body.appendChild(box);
+  box.querySelector('#ask-liv').onclick = () => {
+    document.body.removeChild(box);
+    const today = new Date().toISOString().slice(0,10);
+    product.history.push({id:uid(), type:'livraison', date:today, qty:delta});
+    recalcQty(product);
+    save();
+    toast(`✅ Livraison +${delta} ${esc(product.unit)} — stock : ${product.qty}`, 'success');
+    renderProducts();
+  };
+  box.querySelector('#ask-inv2').onclick = () => {
+    document.body.removeChild(box);
+    cardSaveInventaire(pid, newQty, product);
+  };
+  box.querySelector('#ask-cancel2').onclick = () => { document.body.removeChild(box); };
 }
 
 function cardSaveAskDon(pid, newQty, diff, product) {
@@ -1737,7 +1771,7 @@ function openDetail(id) {
   const convEl = document.getElementById('pd-conv');
   if(convEl) {
     const lines = [];
-    if(found.p.packQty) lines.push(`= ${Math.round(found.p.qty * found.p.packQty).toLocaleString('fr')} unités`);
+    if(found.p.packQty) lines.push(`= ${Math.round(found.p.qty * found.p.packQty).toLocaleString('fr')} ${found.p.packUnit||'unités'}`);
     if(found.p.paletteQty) lines.push(`/ ${r2(found.p.qty / found.p.paletteQty)} palettes`);
     convEl.textContent = lines.join(' · ');
   }
@@ -1756,8 +1790,12 @@ function openDetail(id) {
   if(groupeEl) groupeEl.value = found.p.groupe || '';
   const packQtyEl = document.getElementById('ps-pack-qty');
   if(packQtyEl) packQtyEl.value = found.p.packQty || '';
+  const packUnitEl = document.getElementById('ps-pack-unit');
+  if(packUnitEl) packUnitEl.value = found.p.packUnit || '';
   const paletteQtyEl = document.getElementById('ps-palette-qty');
   if(paletteQtyEl) paletteQtyEl.value = found.p.paletteQty || '';
+  const paletteUnitEl = document.getElementById('ps-palette-unit');
+  if(paletteUnitEl) paletteUnitEl.value = found.p.paletteUnit || '';
   // Hide colors section (old system removed)
   const colSectionOld = document.getElementById('ps-colors-section');
   if(colSectionOld) colSectionOld.style.display='none';
@@ -1846,7 +1884,7 @@ function initQuickEntry() {
   if(extraWrap) {
     if(currentProduct.packQty) {
       extraWrap.style.display = 'block';
-      if(extraUnitLbl) extraUnitLbl.textContent = currentProduct.unit === 'packs' ? 'bouchons' : 'unités';
+      if(extraUnitLbl) extraUnitLbl.textContent = currentProduct.packUnit || 'unités';
       document.getElementById('quick-extra-units').value = '';
       document.getElementById('quick-conv-preview').textContent = '';
     } else {
@@ -1887,7 +1925,8 @@ function quickUpdateConv() {
   const total = r2(packs + extraUnits / currentProduct.packQty);
   const totalUnits = Math.round(total * currentProduct.packQty);
   const preview = document.getElementById('quick-conv-preview');
-  if(preview) preview.textContent = extraUnits > 0 ? `→ ${total} packs (${totalUnits.toLocaleString('fr')} unités au total)` : '';
+  const uname = currentProduct.packUnit || 'unités';
+  if(preview) preview.textContent = extraUnits > 0 ? `→ ${total} ${currentProduct.unit} (${totalUnits.toLocaleString('fr')} ${uname} au total)` : '';
 }
 
 function saveQuickEntry() {
@@ -2051,8 +2090,12 @@ function saveParams() {
   // Save pack/palette conversion
   const packQtyVal = parseInt(document.getElementById('ps-pack-qty')?.value)||0;
   if(packQtyVal > 0) currentProduct.packQty = packQtyVal; else delete currentProduct.packQty;
+  const packUnitVal = (document.getElementById('ps-pack-unit')?.value||'').trim();
+  if(packUnitVal) currentProduct.packUnit = packUnitVal; else delete currentProduct.packUnit;
   const paletteQtyVal = parseInt(document.getElementById('ps-palette-qty')?.value)||0;
   if(paletteQtyVal > 0) currentProduct.paletteQty = paletteQtyVal; else delete currentProduct.paletteQty;
+  const paletteUnitVal = (document.getElementById('ps-palette-unit')?.value||'').trim();
+  if(paletteUnitVal) currentProduct.paletteUnit = paletteUnitVal; else delete currentProduct.paletteUnit;
 
   // Handle ordre with shift
   const ordreVal = document.getElementById('ps-ordre').value;
@@ -2219,7 +2262,7 @@ function addInvRow() {
   const div=document.createElement('div');
   div.className='prod-input-row';
   div.innerHTML=`
-    <datalist id="${dlId}">${zd.products.map(p=>`<option value="${esc(p.name)}">`).join('')}</datalist>
+    <datalist id="${dlId}">${zd.products.map(p=>`<option value="${esc(p.name)}">${esc(p.groupe ? p.groupe+' › '+p.name : p.name)}</option>`).join('')}</datalist>
     <input class="fi" style="flex:2;min-width:0" placeholder="Nom du produit" list="${dlId}" maxlength="100" autocomplete="off">
     <input class="fi" style="flex:1;min-width:0" placeholder="Catégorie" maxlength="60" autocomplete="off">
     <input type="number" class="fi fi-sm" placeholder="Qté" min="0">
@@ -2299,7 +2342,7 @@ function addLivRow() {
   const div=document.createElement('div');
   div.className='prod-input-row';
   div.innerHTML=`
-    <datalist id="${dlId}">${zd.products.map(p=>`<option value="${esc(p.name)}">`).join('')}</datalist>
+    <datalist id="${dlId}">${zd.products.map(p=>`<option value="${esc(p.name)}">${esc(p.groupe ? p.groupe+' › '+p.name : p.name)}</option>`).join('')}</datalist>
     <input class="fi" style="flex:2;min-width:0" placeholder="Nom du produit" list="${dlId}" maxlength="100" autocomplete="off">
     <input type="number" class="fi fi-sm" placeholder="Qté" min="1">
     <select class="fi fi-unit">
@@ -2465,7 +2508,9 @@ function importJSON(e) {
           sizes: p.sizes || undefined,
           ...(p.groupe ? {groupe: String(p.groupe).slice(0,60)} : {}),
           ...(p.packQty && p.packQty > 0 ? {packQty: parseInt(p.packQty)} : {}),
+          ...(p.packUnit ? {packUnit: String(p.packUnit).slice(0,30)} : {}),
           ...(p.paletteQty && p.paletteQty > 0 ? {paletteQty: parseInt(p.paletteQty)} : {}),
+          ...(p.paletteUnit ? {paletteUnit: String(p.paletteUnit).slice(0,30)} : {}),
           history: Array.isArray(p.history) ? p.history.filter(h =>
             h && typeof h === 'object' &&
             ['inventaire','inventaire_base','livraison','attribution'].includes(h.type) &&
