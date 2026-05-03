@@ -3154,7 +3154,7 @@ function printPersonFiche() {
 // Calcule la conso par mois pour un produit {ym:'2026-04', cons:N}
 function calcConso(product) {
   const invs=[...product.history]
-    .filter(h=>(h.type==='inventaire'||h.type==='inventaire_base') && h.date && /^\d{4}-\d{2}-\d{2}$/.test(h.date))
+    .filter(h=>(h.type==='inventaire'||h.type==='inventaire_base') && h.date && /^\d{4}-\d{2}-\d{2}/.test(h.date))
     .sort((a,b)=>new Date(a.date)-new Date(b.date));
   const r={};
   for(let i=1;i<invs.length;i++){
@@ -3223,13 +3223,19 @@ function populateCatFilter(catSel,zoneSel){
   const zk=document.getElementById(zoneSel)?.value||'all';
   const el=document.getElementById(catSel);if(!el)return;
   const cats=new Set();
+  const groups=new Set();
   Object.entries(S.zones).forEach(([k,z])=>{
     if(zk!=='all'&&k!==zk)return;
-    z.products.forEach(p=>cats.add(p.category));
+    z.products.forEach(p=>{
+      cats.add(p.category);
+      if(p.groupe) groups.add(p.groupe);
+    });
   });
   const prev=el.value;
-  el.innerHTML='<option value="all">Toutes les catégories</option>'+
-    [...cats].sort().map(c=>`<option value="${esc(c)}"${c===prev?' selected':''}>${esc(c)}</option>`).join('');
+  const catOpts=[...cats].sort().map(c=>`<option value="${esc(c)}"${c===prev?' selected':''}>${esc(c)}</option>`).join('');
+  const grpOpts=[...groups].sort().map(g=>`<option value="groupe:${esc(g)}"${'groupe:'+g===prev?' selected':''}>${esc(g)}</option>`).join('');
+  el.innerHTML='<option value="all">Toutes les catégories</option>'+catOpts+
+    (grpOpts?`<optgroup label="── Groupes ──">${grpOpts}</optgroup>`:'');
 }
 
 function populateProdFilter(){
@@ -3240,7 +3246,10 @@ function populateProdFilter(){
   Object.entries(S.zones).forEach(([k,z])=>{
     if(zk!=='all'&&k!==zk)return;
     z.products.forEach(p=>{
-      if(cat!=='all'&&p.category!==cat)return;
+      if(cat!=='all'){
+        if(cat.startsWith('groupe:')){if(p.groupe!==cat.slice(7))return;}
+        else{if(p.category!==cat)return;}
+      }
       prods.push({id:p.id,name:p.name,zone:z.name});
     });
   });
@@ -3261,7 +3270,10 @@ function renderConsoTable(){
   Object.entries(S.zones).forEach(([k,z])=>{
     if(zk!=='all'&&k!==zk)return;
     z.products.forEach(p=>{
-      if(cat!=='all'&&p.category!==cat)return;
+      if(cat!=='all'){
+        if(cat.startsWith('groupe:')){if(p.groupe!==cat.slice(7))return;}
+        else{if(p.category!==cat)return;}
+      }
       const raw=calcConso(p);
       const grouped={};
       Object.entries(raw).forEach(([ym,v])=>{
