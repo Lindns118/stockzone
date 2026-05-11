@@ -1221,9 +1221,10 @@ let currentZone = 'entrepot';
 let currentSort = 'az';
 let currentProduct = null;
 let currentPretType = 'pret';
-let editHistTarget = null; // {product, histId}
+let editHistTarget = null;
 let seuilTarget = null;
 let confirmCb = null;
+const pendingCardValues = {}; // pid → unsaved input value
 
 // ===== INIT =====
 window.addEventListener('DOMContentLoaded', () => {
@@ -1239,6 +1240,8 @@ window.addEventListener('DOMContentLoaded', () => {
 
 // ===== ZONE SWITCH =====
 function switchZone(z) {
+  // Clear unsaved card values from previous zone
+  Object.keys(pendingCardValues).forEach(k=>delete pendingCardValues[k]);
   currentZone = z;
   localStorage.setItem('sz_last_zone', z);
   // nav styling
@@ -1366,8 +1369,8 @@ function renderProducts() {
       ${isLow?`<div><span class="alert-tag">⚠ Seuil bas (≤ ${p.seuil})</span></div>`:''}
       <div class="card-stepper" onclick="event.stopPropagation()">
         <button class="cs-btn cs-minus" onclick="cardStep('${p.id}',-1)">−</button>
-        <input type="number" id="cs-${p.id}" class="cs-input" value="${p.qty}" min="0" max="999999"
-          oninput="event.stopPropagation()" onchange="event.stopPropagation()" onclick="event.stopPropagation()" onfocus="event.stopPropagation()">
+        <input type="number" id="cs-${p.id}" class="cs-input" value="${pendingCardValues[p.id]??p.qty}" min="0" max="999999"
+          oninput="pendingCardValues['${p.id}']=this.value;event.stopPropagation()" onchange="event.stopPropagation()" onclick="event.stopPropagation()" onfocus="event.stopPropagation()">
         <button class="cs-btn cs-plus" onclick="cardStep('${p.id}',1)">+</button>
         <button class="cs-save" onclick="cardSave('${p.id}')">💾</button>
       </div>
@@ -1528,7 +1531,9 @@ function cardStep(pid, delta) {
   const input = document.getElementById('cs-'+pid);
   if(!input) return;
   const val = parseFloat(input.value)||0;
-  input.value = Math.max(0, r2(val+delta));
+  const nv = Math.max(0, r2(val+delta));
+  input.value = nv;
+  pendingCardValues[pid] = nv;
 }
 
 function cardSave(pid) {
@@ -1567,6 +1572,7 @@ function cardSaveInventaire(pid, qty, product) {
   }
   recalcQty(product);
   save();
+  delete pendingCardValues[pid];
   toast(`✅ ${esc(product.name)} → ${product.qty} ${esc(product.unit)}`, 'success');
   renderProducts();
 }
@@ -1589,6 +1595,7 @@ function cardSaveAskLivOrInv(pid, newQty, delta, product) {
     product.history.push({id:uid(), type:'livraison', date:today, qty:delta});
     recalcQty(product);
     save();
+    delete pendingCardValues[pid];
     toast(`✅ Livraison +${delta} ${esc(product.unit)} — stock : ${product.qty}`, 'success');
     renderProducts();
   };
