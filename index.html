@@ -3188,7 +3188,10 @@ function calcConso(product) {
     const livs=product.history
       .filter(h=>h.type==='livraison'&&new Date(h.date)>new Date(prev.date)&&new Date(h.date)<=new Date(cur.date))
       .reduce((s,h)=>s+h.qty,0);
-    const c=Math.max(0,r2(prev.qty+livs-cur.qty));
+    const pretAdj=product.history
+      .filter(h=>['pret','emprunt','retour_pret','retour_emprunt'].includes(h.type)&&new Date(h.date)>new Date(prev.date)&&new Date(h.date)<=new Date(cur.date))
+      .reduce((s,h)=>s+h.qty,0);
+    const c=Math.max(0,r2(prev.qty+livs+pretAdj-cur.qty));
     const ym=cur.date.slice(0,7);
     if(ym && ym.match(/^\d{4}-\d{2}$/)) r[ym]=r2((r[ym]||0)+c);
   }
