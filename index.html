@@ -291,6 +291,12 @@ body{font-family:'DM Sans',sans-serif;background:#eef0f7;color:var(--text);min-h
 .ac-meta{font-size:11px;color:var(--text2);margin-top:2px}
 .ac-qty{font-size:20px;font-weight:700;color:var(--amber)}
 .ac-gear{width:30px;height:30px;border-radius:8px;border:none;background:var(--gray);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center}
+.ac-check{width:20px;height:20px;accent-color:var(--blue);cursor:pointer;flex-shrink:0}
+.alert-card.sel{border-left-color:var(--blue);background:#f0f4ff}
+.order-bar{position:sticky;bottom:0;left:0;right:0;background:var(--blue);color:#fff;padding:12px 16px;border-radius:13px 13px 0 0;display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px -14px -14px;box-shadow:0 -2px 12px rgba(0,0,0,.15)}
+.order-bar-info{font-size:13px;font-weight:600}
+.order-bar-info span{opacity:.75;font-weight:400;font-size:12px;display:block;margin-top:1px}
+.order-bar-btn{padding:9px 16px;border-radius:10px;border:none;background:#fff;color:var(--blue);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0}
 
 /* CONSO CHART */
 .conso-chart-box{background:var(--gray);border-radius:11px;padding:14px;margin-bottom:14px}
@@ -4060,7 +4066,10 @@ function migrateLegacyPrets() {
 }
 
 // ===== ALERTES VIEW =====
+let selectedAlerts = new Set();
+
 function renderAlertes(zoneFilter='all') {
+  selectedAlerts.clear();
   const ev=document.getElementById('extra-view');
   let alerts=[];
   Object.entries(S.zones).forEach(([k,z])=>{
@@ -4082,14 +4091,104 @@ function renderAlertes(zoneFilter='all') {
       <button class="f-btn${zoneFilter==='vetements'?' fa':''}" onclick="renderAlertes('vetements')">👕 Vêtements</button>
       <button class="f-btn${zoneFilter==='office'?' fa':''}" onclick="renderAlertes('office')">🏢 Office</button>
     </div>
-    ${alerts.length?`<div class="sec-title">STOCKS BAS</div>${alerts.map(p=>`
-      <div class="alert-card">
+    ${alerts.length?`
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div class="sec-title" style="margin-bottom:0">STOCKS BAS</div>
+        <button onclick="toggleAllAlerts()" style="font-size:12px;padding:4px 10px;border-radius:8px;border:1.5px solid var(--gray2);background:var(--gray);cursor:pointer;font-family:inherit">Tout sélectionner</button>
+      </div>
+      ${alerts.map(p=>`
+      <div class="alert-card" id="acard-${p.id}">
+        <input type="checkbox" class="ac-check" onchange="toggleAlertSel('${p.id}',this.checked)" title="Sélectionner pour commander">
         <div class="ac-icon">⚠️</div>
-        <div class="ac-info"><div class="ac-name">${esc(p.name)}</div><div class="ac-meta">${p.zoneIcon} ${p.zoneName} · seuil : ${p.seuil}</div></div>
+        <div class="ac-info">
+          <div class="ac-name">${esc(p.name)}</div>
+          <div class="ac-meta">${p.zoneIcon} ${p.zoneName} · seuil : ${p.seuil}${p.supplier?.mail?` · <span style="color:var(--blue)">✉ ${esc(p.supplier.mail)}</span>`:' · <em style="color:#9ca3af">pas d\'email</em>'}</div>
+        </div>
         <div class="ac-qty">${p.qty}</div>
         <button class="ac-gear" onclick="openSeuilModal('${p.id}')" title="Modifier le seuil">⚙</button>
-      </div>`).join('')}`:'<div class="empty-state"><div class="ei">✅</div><h3>Aucune alerte</h3><p>Tous les stocks sont au-dessus des seuils.</p></div>'}
+      </div>`).join('')}
+      <div id="order-bar-wrap"></div>`
+    :'<div class="empty-state"><div class="ei">✅</div><h3>Aucune alerte</h3><p>Tous les stocks sont au-dessus des seuils.</p></div>'}
   </div>`;
+}
+
+function toggleAlertSel(pid, checked) {
+  if(checked) selectedAlerts.add(pid); else selectedAlerts.delete(pid);
+  const card=document.getElementById('acard-'+pid);
+  if(card) card.classList.toggle('sel', checked);
+  updateOrderBar();
+}
+
+function toggleAllAlerts() {
+  const cards=document.querySelectorAll('.alert-card .ac-check');
+  const allChecked=[...cards].every(cb=>cb.checked);
+  cards.forEach(cb=>{
+    const pid=cb.closest('.alert-card')?.id?.replace('acard-','');
+    if(!pid)return;
+    if(allChecked){selectedAlerts.delete(pid);cb.checked=false;}
+    else{selectedAlerts.add(pid);cb.checked=true;}
+    cb.closest('.alert-card')?.classList.toggle('sel',!allChecked);
+  });
+  updateOrderBar();
+}
+
+function updateOrderBar() {
+  const wrap=document.getElementById('order-bar-wrap');
+  if(!wrap)return;
+  const n=selectedAlerts.size;
+  if(n===0){wrap.innerHTML='';return;}
+  // Count how many have email
+  let withMail=0;
+  selectedAlerts.forEach(pid=>{
+    const p=findProduct(pid)?.p;
+    if(p?.supplier?.mail) withMail++;
+  });
+  const noMail=n-withMail;
+  const hint=noMail>0?`<span>${noMail} sans email fournisseur</span>`:'';
+  wrap.innerHTML=`<div class="order-bar">
+    <div class="order-bar-info">${n} produit${n>1?'s':''} sélectionné${n>1?'s':''}${hint?'<br>'+hint:''}</div>
+    <button class="order-bar-btn" onclick="sendOrderEmails()">📧 Commander</button>
+  </div>`;
+}
+
+function sendOrderEmails() {
+  if(!selectedAlerts.size) return;
+  // Group by supplier email
+  const groups={};      // mail → [{p, found}]
+  const noEmail=[];
+  selectedAlerts.forEach(pid=>{
+    const found=findProduct(pid);
+    if(!found)return;
+    const p=found.p;
+    const mail=p.supplier?.mail||'';
+    if(!mail){noEmail.push(p.name);return;}
+    if(!groups[mail])groups[mail]=[];
+    groups[mail].push(p);
+  });
+
+  if(noEmail.length)
+    toast(`⚠ Sans email : ${noEmail.join(', ')}`, 'error');
+
+  const entries=Object.entries(groups);
+  if(!entries.length) return;
+
+  entries.forEach(([mail,prods],idx)=>{
+    const societe=prods[0].supplier?.societe||'';
+    const contact=prods[0].supplier?.contact||'';
+    const lignes=prods.map((p,i)=>{
+      const ref=p.supplier?.ref||p.officialName||p.name;
+      const prix=p.supplier?.prix?`\n   Prix unitaire : ${p.supplier.prix} ${p.supplier.devise||'EUR'}`:'';
+      return `${i+1}. ${p.name}\n   Référence : ${ref}\n   Stock actuel : ${p.qty} ${p.unit} · Seuil : ${p.seuil}${prix}`;
+    }).join('\n\n');
+    const dest=societe?`${societe}`:'fournisseur';
+    const subj=encodeURIComponent(`Commande — ${prods.length>1?prods.length+' produits':prods[0].supplier?.ref||prods[0].name}`);
+    const intro=contact?`Bonjour ${contact},`:'Bonjour,';
+    const body=encodeURIComponent(`${intro}\n\nNous souhaitons passer commande pour les produits suivants :\n\n${lignes}\n\nMerci de nous confirmer la disponibilité et les délais de livraison.\n\nCordialement`);
+    // Stagger openings slightly so browser doesn't block
+    setTimeout(()=>window.open(`mailto:${mail}?subject=${subj}&body=${body}`,'_blank'), idx*400);
+  });
+
+  toast(`📧 ${entries.length} email${entries.length>1?'s':''} ouvert${entries.length>1?'s':''}`, 'success');
 }
 
 // ===== SEUIL MODAL =====
