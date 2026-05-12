@@ -729,6 +729,23 @@ table.conso-tbl tfoot td.num{font-weight:700}
 </div>
 </div>
 
+<!-- RETOUR PRET/EMPRUNT -->
+<div id="modal-rendu" class="modal-overlay hidden" onclick="overlayClose(event,'modal-rendu')">
+<div class="modal-sheet">
+  <div class="mh-row">
+    <div><div class="m-title" id="rendu-title">Retour</div><div class="m-sub" id="rendu-sub"></div></div>
+    <button class="m-close" onclick="hideModal('modal-rendu')">✕</button>
+  </div>
+  <div class="fg">
+    <label class="fl">Quantité rendue</label>
+    <input type="number" id="rendu-qty" class="fi" min="0.01" step="any">
+    <div id="rendu-hint" style="font-size:11px;color:var(--text2);margin-top:4px"></div>
+  </div>
+  <div class="fg"><label class="fl">Notes (optionnel)</label><textarea id="rendu-notes" class="fi" rows="2" maxlength="300" placeholder="Remarques..." autocomplete="off"></textarea></div>
+  <button class="btn-primary" onclick="confirmRendu()">✅ Confirmer le retour</button>
+</div>
+</div>
+
 <!-- EXPORT -->
 <div id="modal-export" class="modal-overlay hidden" onclick="overlayClose(event,'modal-export')">
 <div class="modal-sheet">
@@ -3686,25 +3703,56 @@ function pretsList(filter) {
   </div>`).join('');
 }
 
+let _renduId = null;
+
 function markRendu(id) {
-  const pr=S.prets.find(p=>p.id===id);
-  if(!pr) return;
-  pr.status='rendu';
-  pr.dateRendu=today();
-  const retQty=pr.type==='pret'?pr.qty:-pr.qty;
-  const retType=pr.type==='pret'?'retour_pret':'retour_emprunt';
-  const retNote=pr.type==='pret'?`Rendu par ${pr.to}`:`Rendu à ${pr.to}`;
-  for(const z of Object.values(S.zones)){
-    const p=z.products.find(p=>p.name.toLowerCase()===pr.produit.toLowerCase());
-    if(p){
-      const alreadyReturned=p.history.some(h=>h.pretId===id&&(h.type==='retour_pret'||h.type==='retour_emprunt'));
-      if(!alreadyReturned) p.history.push({id:uid(),type:retType,date:today(),qty:retQty,notes:retNote,pretId:id});
-      recalcQty(p);break;
+  const pr = S.prets.find(p => p.id === id);
+  if (!pr) return;
+  _renduId = id;
+  const isPret = pr.type === 'pret';
+  document.getElementById('rendu-title').textContent = isPret ? 'Retour de prêt' : 'Retour d\'emprunt';
+  document.getElementById('rendu-sub').textContent = `${pr.produit} × ${pr.qty}  —  ${isPret ? 'Prêté à' : 'Emprunté à'} ${pr.to}`;
+  document.getElementById('rendu-qty').value = pr.qty;
+  document.getElementById('rendu-qty').max = pr.qty;
+  document.getElementById('rendu-hint').textContent = `Quantité encore en cours : ${pr.qty}`;
+  document.getElementById('rendu-notes').value = '';
+  showModal('rendu');
+}
+
+function confirmRendu() {
+  const pr = S.prets.find(p => p.id === _renduId);
+  if (!pr) return;
+  const qty = parseFloat(document.getElementById('rendu-qty').value) || 0;
+  const notes = document.getElementById('rendu-notes').value.trim();
+  if (qty <= 0) { toast('⚠ Quantité invalide', 'error'); return; }
+
+  const partial = r2(qty) < r2(pr.qty);
+  const retQty = pr.type === 'pret' ? qty : -qty;
+  const retType = pr.type === 'pret' ? 'retour_pret' : 'retour_emprunt';
+  const retNote = notes || (pr.type === 'pret' ? `Rendu par ${pr.to}` : `Rendu à ${pr.to}`);
+
+  for (const z of Object.values(S.zones)) {
+    const p = z.products.find(p => p.name.toLowerCase() === pr.produit.toLowerCase());
+    if (p) {
+      p.history.push({ id: uid(), type: retType, date: today(), qty: retQty, notes: retNote, pretId: pr.id });
+      recalcQty(p);
+      break;
     }
   }
+
+  if (partial) {
+    pr.qty = r2(pr.qty - qty);
+    document.getElementById('rendu-hint').textContent = `Quantité encore en cours : ${pr.qty}`;
+    toast(`✅ Retour partiel (${qty}) enregistré — reste ${pr.qty} en cours`, 'success');
+  } else {
+    pr.status = 'rendu';
+    pr.dateRendu = today();
+    toast('✅ Marqué comme rendu', 'success');
+  }
+
   save();
+  hideModal('modal-rendu');
   renderPrets('encours');
-  toast('✅ Marqué comme rendu','success');
 }
 
 function deletePret(id) {
