@@ -555,7 +555,10 @@ table.conso-tbl tfoot td.num{font-weight:700}
       <label class="fl">Personne de contact</label>
       <input type="text" id="sup-contact" class="fi" maxlength="100" style="margin-bottom:11px" autocomplete="off" placeholder="Prénom Nom">
       <label class="fl">Téléphone</label>
-      <input type="tel" id="sup-tel" class="fi" maxlength="30" style="margin-bottom:11px" autocomplete="off" placeholder="+33 6 00 00 00 00">
+      <div style="display:flex;gap:8px;margin-bottom:11px">
+        <input type="tel" id="sup-tel" class="fi" maxlength="30" autocomplete="off" placeholder="+33 6 00 00 00 00" style="flex:1">
+        <button onclick="callFournisseur()" style="flex-shrink:0;padding:10px 13px;border-radius:10px;border:none;background:var(--green);color:#fff;font-size:18px;cursor:pointer" title="Appeler">📞</button>
+      </div>
       <div class="form-row" style="margin-bottom:11px">
         <div class="fg">
           <label class="fl">Prix unitaire</label>
@@ -2228,6 +2231,12 @@ function saveFournisseur() {
   if(Object.keys(sup).length) currentProduct.supplier=sup; else delete currentProduct.supplier;
   save();
   toast('✅ Fournisseur enregistré','success');
+}
+
+function callFournisseur() {
+  const tel=(document.getElementById('sup-tel')?.value||'').trim()||(currentProduct?.supplier?.tel||'');
+  if(!tel){toast('⚠ Aucun numéro enregistré — sauvegardez d\'abord','error');return;}
+  window.open('tel:'+tel.replace(/\s/g,''),'_self');
 }
 
 function sendFournisseurMail() {
