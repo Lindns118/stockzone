@@ -1922,6 +1922,12 @@ function openDetail(id) {
   showModal('detail');
 }
 
+function openDetailFournisseur(id) {
+  openDetail(id);
+  const btn = document.querySelectorAll('.tab-btn')[4];
+  showTab('fournisseur', btn);
+}
+
 function renderHistory() {
   if (!currentProduct) return;
   const el = document.getElementById('tc-hist');
@@ -4117,6 +4123,7 @@ function renderAlertes(zoneFilter='all') {
           <div class="ac-meta">${p.zoneIcon} ${p.zoneName} · seuil : ${p.seuil}${p.supplier?.mail?` · <span style="color:var(--blue)">✉ ${esc(p.supplier.mail)}</span>`:' · <em style="color:#9ca3af">pas d\'email</em>'}</div>
         </div>
         <div class="ac-qty">${p.qty}</div>
+        <button class="ac-gear" onclick="openDetailFournisseur('${p.id}')" title="Modifier le fournisseur">🏭</button>
         <button class="ac-gear" onclick="openSeuilModal('${p.id}')" title="Modifier le seuil">⚙</button>
       </div>`).join('')}
       <div id="order-bar-wrap"></div>`
