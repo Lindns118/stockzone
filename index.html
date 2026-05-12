@@ -462,6 +462,7 @@ table.conso-tbl tfoot td.num{font-weight:700}
     <button class="tab-btn" onclick="showTab('quick',this)">⚡ Saisie</button>
     <button class="tab-btn" onclick="showTab('conso',this)">📉 Conso</button>
     <button class="tab-btn" onclick="showTab('params',this)">⚙ Params</button>
+    <button class="tab-btn" onclick="showTab('fournisseur',this)">🏭 Fourn.</button>
   </div>
   <div id="tc-hist"></div>
   <div id="tc-quick" class="hidden">
@@ -540,6 +541,39 @@ table.conso-tbl tfoot td.num{font-weight:700}
       </div>
       <button class="btn-primary" onclick="saveParams()">💾 Sauvegarder</button>
       <button class="btn-danger" style="margin-top:9px" onclick="confirmDeleteProduct()">🗑 Supprimer ce produit</button>
+    </div>
+  </div>
+  <div id="tc-fournisseur" class="hidden">
+    <div class="param-section">
+      <label class="fl">Société</label>
+      <input type="text" id="sup-societe" class="fi" maxlength="150" style="margin-bottom:11px" autocomplete="off" placeholder="Nom du fournisseur">
+      <label class="fl">Email</label>
+      <div style="display:flex;gap:8px;margin-bottom:11px">
+        <input type="email" id="sup-mail" class="fi" maxlength="200" autocomplete="off" placeholder="contact@fournisseur.com" style="flex:1">
+        <button onclick="sendFournisseurMail()" style="flex-shrink:0;padding:10px 13px;border-radius:10px;border:none;background:var(--blue);color:#fff;font-size:18px;cursor:pointer" title="Envoyer un email pré-rempli">✉️</button>
+      </div>
+      <label class="fl">Personne de contact</label>
+      <input type="text" id="sup-contact" class="fi" maxlength="100" style="margin-bottom:11px" autocomplete="off" placeholder="Prénom Nom">
+      <label class="fl">Téléphone</label>
+      <input type="tel" id="sup-tel" class="fi" maxlength="30" style="margin-bottom:11px" autocomplete="off" placeholder="+33 6 00 00 00 00">
+      <div class="form-row" style="margin-bottom:11px">
+        <div class="fg">
+          <label class="fl">Prix unitaire</label>
+          <input type="number" id="sup-prix" class="fi" min="0" step="any" placeholder="0.00">
+        </div>
+        <div class="fg">
+          <label class="fl">Devise</label>
+          <select id="sup-devise" class="fi">
+            <option value="EUR">€ EUR</option>
+            <option value="USD">$ USD</option>
+            <option value="GBP">£ GBP</option>
+            <option value="CHF">CHF</option>
+          </select>
+        </div>
+      </div>
+      <label class="fl">Référence produit</label>
+      <input type="text" id="sup-ref" class="fi" maxlength="100" style="margin-bottom:16px" autocomplete="off" placeholder="REF-12345">
+      <button class="btn-primary" onclick="saveFournisseur()">💾 Sauvegarder</button>
     </div>
   </div>
 </div>
@@ -1812,7 +1846,7 @@ function openDetail(id) {
   }
   // Reset tabs to hist
   document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('ta',i===0));
-  ['tc-hist','tc-conso','tc-params'].forEach((tid,i)=>{const el=document.getElementById(tid);if(el)el.classList.toggle('hidden',i!==0);});
+  ['tc-hist','tc-quick','tc-conso','tc-params','tc-fournisseur'].forEach((tid,i)=>{const el=document.getElementById(tid);if(el)el.classList.toggle('hidden',i!==0);});
   renderHistory();
   // Prefill params
   document.getElementById('ps-seuil').value = found.p.seuil||'';
@@ -1831,6 +1865,13 @@ function openDetail(id) {
   if(paletteQtyEl) paletteQtyEl.value = found.p.paletteQty || '';
   const paletteUnitEl = document.getElementById('ps-palette-unit');
   if(paletteUnitEl) paletteUnitEl.value = found.p.paletteUnit || '';
+  // Prefill fournisseur fields
+  const sup = found.p.supplier || {};
+  const supFields = ['societe','mail','contact','tel','ref'];
+  supFields.forEach(f=>{const el=document.getElementById('sup-'+f);if(el)el.value=sup[f]||'';});
+  const supPrixEl=document.getElementById('sup-prix');if(supPrixEl)supPrixEl.value=sup.prix||'';
+  const supDeviseEl=document.getElementById('sup-devise');if(supDeviseEl)supDeviseEl.value=sup.devise||'EUR';
+
   // Hide colors section (old system removed)
   const colSectionOld = document.getElementById('ps-colors-section');
   if(colSectionOld) colSectionOld.style.display='none';
@@ -1896,7 +1937,7 @@ function renderHistory() {
 function showTab(tab, btn) {
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('ta'));
   if(btn) btn.classList.add('ta');
-  ['hist','quick','conso','params'].forEach(t=>{
+  ['hist','quick','conso','params','fournisseur'].forEach(t=>{
     const el=document.getElementById('tc-'+t);
     if(el) el.classList.toggle('hidden', t!==tab);
   });
@@ -2173,6 +2214,34 @@ function saveParams() {
   switchZone(currentZone);
   hideModal('modal-detail');
   toast('✅ Produit mis à jour','success');
+}
+
+function saveFournisseur() {
+  if (!currentProduct) return;
+  const sup = {};
+  const txt = ['societe','mail','contact','tel','ref'];
+  txt.forEach(f=>{const v=(document.getElementById('sup-'+f)?.value||'').trim();if(v)sup[f]=v;});
+  const prix=parseFloat(document.getElementById('sup-prix')?.value)||0;
+  if(prix>0) sup.prix=prix;
+  const devise=document.getElementById('sup-devise')?.value||'EUR';
+  if(devise!=='EUR'||prix>0) sup.devise=devise;
+  if(Object.keys(sup).length) currentProduct.supplier=sup; else delete currentProduct.supplier;
+  save();
+  toast('✅ Fournisseur enregistré','success');
+}
+
+function sendFournisseurMail() {
+  const p=currentProduct;
+  if(!p) return;
+  const sup=p.supplier||{};
+  if(!sup.mail){toast('⚠ Aucun email enregistré — sauvegardez d\'abord l\'adresse','error');return;}
+  const ref=sup.ref||p.officialName||p.name;
+  const societe=sup.societe?`\nSociété : ${sup.societe}`:'';
+  const contact=sup.contact?`\nÀ l'attention de : ${sup.contact}`:'';
+  const prix=sup.prix?`\nPrix unitaire connu : ${sup.prix} ${sup.devise||'EUR'}`:'';
+  const subject=encodeURIComponent(`Commande — ${ref}`);
+  const body=encodeURIComponent(`Bonjour,${contact}\n\nNous souhaitons passer commande pour le produit suivant :${societe}\n\nRéférence : ${ref}\nProduit : ${p.officialName||p.name}${prix}\n\nMerci de nous confirmer la disponibilité et le délai de livraison.\n\nCordialement`);
+  window.open(`mailto:${sup.mail}?subject=${subject}&body=${body}`,'_blank');
 }
 
 async function confirmDeleteProduct() {
@@ -2572,6 +2641,15 @@ function importJSON(e) {
           ...(p.packUnit ? {packUnit: String(p.packUnit).slice(0,30)} : {}),
           ...(p.paletteQty && p.paletteQty > 0 ? {paletteQty: parseInt(p.paletteQty)} : {}),
           ...(p.paletteUnit ? {paletteUnit: String(p.paletteUnit).slice(0,30)} : {}),
+          ...(p.supplier && typeof p.supplier==='object' ? {supplier: {
+            ...(p.supplier.societe ? {societe:String(p.supplier.societe).slice(0,150)} : {}),
+            ...(p.supplier.mail ? {mail:String(p.supplier.mail).slice(0,200)} : {}),
+            ...(p.supplier.contact ? {contact:String(p.supplier.contact).slice(0,100)} : {}),
+            ...(p.supplier.tel ? {tel:String(p.supplier.tel).slice(0,30)} : {}),
+            ...(p.supplier.prix ? {prix:parseFloat(p.supplier.prix)} : {}),
+            ...(p.supplier.devise ? {devise:String(p.supplier.devise).slice(0,5)} : {}),
+            ...(p.supplier.ref ? {ref:String(p.supplier.ref).slice(0,100)} : {}),
+          }} : {}),
           history: Array.isArray(p.history) ? p.history.filter(h =>
             h && typeof h === 'object' &&
             ['inventaire','inventaire_base','livraison','attribution','pret','emprunt','retour_pret','retour_emprunt','vente'].includes(h.type) &&
