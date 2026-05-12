@@ -792,6 +792,18 @@ table.conso-tbl tfoot td.num{font-weight:700}
 </div>
 </div>
 
+<!-- COMMANDE PAR EMAIL -->
+<div id="modal-order" class="modal-overlay hidden" onclick="overlayClose(event,'modal-order')">
+<div class="modal-sheet">
+  <div class="mh-row">
+    <div><div class="m-title">Commander par email</div><div class="m-sub">Saisissez les quantités souhaitées</div></div>
+    <button class="m-close" onclick="hideModal('modal-order')">✕</button>
+  </div>
+  <div id="order-modal-body"></div>
+  <button class="btn-primary" style="margin-top:14px" onclick="confirmOrderEmails()">📧 Envoyer les emails</button>
+</div>
+</div>
+
 <!-- EXPORT -->
 <div id="modal-export" class="modal-overlay hidden" onclick="overlayClose(event,'modal-export')">
 <div class="modal-sheet">
@@ -4147,47 +4159,75 @@ function updateOrderBar() {
   const hint=noMail>0?`<span>${noMail} sans email fournisseur</span>`:'';
   wrap.innerHTML=`<div class="order-bar">
     <div class="order-bar-info">${n} produit${n>1?'s':''} sélectionné${n>1?'s':''}${hint?'<br>'+hint:''}</div>
-    <button class="order-bar-btn" onclick="sendOrderEmails()">📧 Commander</button>
+    <button class="order-bar-btn" onclick="openOrderModal()">📧 Commander</button>
   </div>`;
 }
 
-function sendOrderEmails() {
+function openOrderModal() {
   if(!selectedAlerts.size) return;
-  // Group by supplier email
-  const groups={};      // mail → [{p, found}]
-  const noEmail=[];
+  const body=document.getElementById('order-modal-body');
+  if(!body) return;
+  const rows=[];
   selectedAlerts.forEach(pid=>{
-    const found=findProduct(pid);
-    if(!found)return;
-    const p=found.p;
+    const p=findProduct(pid)?.p;
+    if(!p) return;
+    const ref=p.supplier?.ref||p.officialName||p.name;
+    const mail=p.supplier?.mail||'';
+    rows.push({pid, p, ref, mail});
+  });
+  rows.sort((a,b)=>a.p.name.localeCompare(b.p.name,'fr'));
+  body.innerHTML=rows.map(({pid,p,ref,mail})=>`
+    <div style="padding:10px 0;border-bottom:1px solid var(--gray2)">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div>
+          <div style="font-weight:600;font-size:14px">${esc(p.name)}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">Réf : ${esc(ref)} · Stock : ${p.qty} ${p.unit}${mail?` · ✉ ${esc(mail)}`:' · <em style="color:#f59e0b">pas d\'email</em>'}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+          <input type="number" id="oqty-${pid}" class="fi fi-sm" min="1" step="any" placeholder="Qté" style="width:75px;text-align:center" value="">
+          <span style="font-size:12px;color:var(--text2)">${esc(p.unit)}</span>
+        </div>
+      </div>
+    </div>`).join('');
+  showModal('order');
+}
+
+function confirmOrderEmails() {
+  const groups={};
+  const noEmail=[];
+  const noQty=[];
+  selectedAlerts.forEach(pid=>{
+    const p=findProduct(pid)?.p;
+    if(!p) return;
+    const qty=parseFloat(document.getElementById('oqty-'+pid)?.value)||0;
+    if(qty<=0){noQty.push(p.name);return;}
     const mail=p.supplier?.mail||'';
     if(!mail){noEmail.push(p.name);return;}
     if(!groups[mail])groups[mail]=[];
-    groups[mail].push(p);
+    groups[mail].push({p,qty});
   });
 
-  if(noEmail.length)
-    toast(`⚠ Sans email : ${noEmail.join(', ')}`, 'error');
+  if(noQty.length) toast(`⚠ Quantité manquante : ${noQty.join(', ')}`, 'error');
+  if(noEmail.length) toast(`⚠ Sans email : ${noEmail.join(', ')}`, 'error');
 
   const entries=Object.entries(groups);
   if(!entries.length) return;
 
-  entries.forEach(([mail,prods],idx)=>{
-    const societe=prods[0].supplier?.societe||'';
-    const contact=prods[0].supplier?.contact||'';
-    const lignes=prods.map((p,i)=>{
+  entries.forEach(([mail,items],idx)=>{
+    const p0=items[0].p;
+    const contact=p0.supplier?.contact||'';
+    const societe=p0.supplier?.societe||'';
+    const lignes=items.map(({p,qty},i)=>{
       const ref=p.supplier?.ref||p.officialName||p.name;
-      const prix=p.supplier?.prix?`\n   Prix unitaire : ${p.supplier.prix} ${p.supplier.devise||'EUR'}`:'';
-      return `${i+1}. ${p.name}\n   Référence : ${ref}\n   Stock actuel : ${p.qty} ${p.unit} · Seuil : ${p.seuil}${prix}`;
+      return `${i+1}. ${p.name}\n   Référence : ${ref}\n   Quantité souhaitée : ${qty} ${p.unit}`;
     }).join('\n\n');
-    const dest=societe?`${societe}`:'fournisseur';
-    const subj=encodeURIComponent(`Commande — ${prods.length>1?prods.length+' produits':prods[0].supplier?.ref||prods[0].name}`);
-    const intro=contact?`Bonjour ${contact},`:'Bonjour,';
+    const subj=encodeURIComponent(`Commande — ${items.length>1?items.length+' produits':items[0].p.supplier?.ref||items[0].p.name}`);
+    const intro=contact?`Bonjour ${contact},`:`Bonjour${societe?' '+societe:''},`;
     const body=encodeURIComponent(`${intro}\n\nNous souhaitons passer commande pour les produits suivants :\n\n${lignes}\n\nMerci de nous confirmer la disponibilité et les délais de livraison.\n\nCordialement`);
-    // Stagger openings slightly so browser doesn't block
     setTimeout(()=>window.open(`mailto:${mail}?subject=${subj}&body=${body}`,'_blank'), idx*400);
   });
 
+  hideModal('modal-order');
   toast(`📧 ${entries.length} email${entries.length>1?'s':''} ouvert${entries.length>1?'s':''}`, 'success');
 }
 
