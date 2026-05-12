@@ -505,7 +505,7 @@ table.conso-tbl tfoot td.num{font-weight:700}
     <div class="param-section">
       <label class="fl">Seuil d'alerte</label>
       <div class="form-row" style="margin-bottom:11px">
-        <input type="number" id="ps-seuil" class="fi fi-sm" placeholder="0" min="0">
+        <input type="number" id="ps-seuil" class="fi fi-sm" placeholder="0" min="0" step="any">
         <select id="ps-unit" class="fi fi-unit"></select>
       </div>
       <label class="fl">Nom affiché <span style="font-size:11px;color:var(--text2)">(usage quotidien)</span></label>
@@ -2110,7 +2110,7 @@ function psToggleSize(size) {
 
 function saveParams() {
   if (!currentProduct) return;
-  currentProduct.seuil = parseInt(document.getElementById('ps-seuil').value)||0;
+  currentProduct.seuil = parseFloat(document.getElementById('ps-seuil').value)||0;
   currentProduct.unit = document.getElementById('ps-unit').value;
   const newName = document.getElementById('ps-name').value.trim();
   const newCat = document.getElementById('ps-cat').value.trim();
@@ -2693,9 +2693,15 @@ function genHTMLReport(prods) {
 .stats-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
 .stats-filters select{padding:8px 10px;border-radius:10px;border:1.5px solid var(--gray2);background:var(--gray);font-size:13px;font-family:inherit;outline:none;color:var(--text);transition:border-color .18s;cursor:pointer}
 .stats-filters select:focus{border-color:var(--blue);background:#fff}
-.prod-chip{flex-shrink:0;padding:5px 11px;border-radius:20px;border:1.5px solid var(--gray2);background:var(--gray);color:var(--text2);font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;transition:all .15s}
-.prod-chip.sel{background:var(--blue);border-color:var(--blue);color:#fff}
-.prod-chips-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+.prod-filter-details{margin-bottom:12px}
+.prod-filter-summary{list-style:none;padding:8px 14px;border-radius:10px;border:1.5px solid var(--gray2);background:var(--gray);font-size:13px;font-weight:500;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none}
+.prod-filter-summary::-webkit-details-marker{display:none}
+.prod-filter-panel{border:1.5px solid var(--gray2);border-radius:10px;margin-top:4px;background:#fff;max-height:220px;overflow-y:auto}
+.pfp-header{display:flex;gap:8px;padding:8px 12px;border-bottom:1px solid var(--gray2);position:sticky;top:0;background:#fff;z-index:1}
+.pfp-header button{flex:1;padding:5px 8px;border-radius:8px;border:1.5px solid var(--gray2);background:var(--gray);font-size:12px;cursor:pointer;font-family:inherit}
+.pfp-item{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--gray2,#f3f4f6);font-size:13px;cursor:pointer}
+.pfp-item:last-child{border-bottom:none}
+.pfp-item input[type=checkbox]{width:16px;height:16px;accent-color:var(--blue);flex-shrink:0;cursor:pointer}
 .date-range-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
 .date-range-row label{font-size:12px;color:var(--text2);flex-shrink:0}
 .date-range-row input[type=date]{padding:6px 10px;border-radius:10px;border:1.5px solid var(--gray2);background:var(--gray);font-size:12px;font-family:inherit;color:var(--text);outline:none}
@@ -3308,34 +3314,61 @@ function statsTab(id,btn){
   if(id==='compare'){populateProdFilter();renderCompareTable();}
 }
 
-function renderProdChips(){
-  const el=document.getElementById('prod-chips-row');if(!el)return;
+function renderProdFilter(){
+  const panel=document.getElementById('prod-filter-panel');
+  if(!panel) return;
   const zk=document.getElementById('tbl-zone')?.value||'all';
   const cat=document.getElementById('tbl-cat')?.value||'all';
   const prods=[];
   Object.entries(S.zones).forEach(([k,z])=>{
-    if(zk!=='all'&&k!==zk)return;
+    if(zk!=='all'&&k!==zk) return;
     z.products.forEach(p=>{
       if(cat!=='all'){
         if(cat.startsWith('groupe:')){if(p.groupe!==cat.slice(7))return;}
         else{if(p.category!==cat)return;}
       }
-      if(calcConso(p,'month')&&Object.keys(calcConso(p,'month')).length>0) prods.push(p.name);
+      prods.push(p.name);
     });
   });
   prods.sort((a,b)=>a.localeCompare(b,'fr'));
-  // Remove stale selections
   for(const n of [...selectedProds]) if(!prods.includes(n)) selectedProds.delete(n);
-  const allSel=selectedProds.size===0;
-  el.innerHTML=`<span style="font-size:12px;color:var(--text2);flex-shrink:0">Produits :</span>`+
-    `<button class="prod-chip${allSel?' sel':''}" onclick="selectedProds.clear();renderProdChips();renderConsoTable()">Tous</button>`+
-    prods.map(n=>`<button class="prod-chip${!allSel&&selectedProds.has(n)?' sel':''}" onclick="toggleProdSel('${n.replace(/'/g,'\\\'')}')">${esc(n)}</button>`).join('');
+  panel.innerHTML=`<div class="pfp-header">
+    <button onclick="selectedProds.clear();renderProdFilter();renderConsoTable()">✓ Tous</button>
+    <button onclick="prodFilterNone()">✗ Aucun</button>
+  </div>`+
+  prods.map(n=>{
+    const chk=selectedProds.size===0||selectedProds.has(n);
+    return `<label class="pfp-item"><input type="checkbox" ${chk?'checked':''} onchange="onProdChk('${n.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;')}',this.checked)"><span>${esc(n)}</span></label>`;
+  }).join('');
+  updateProdFilterSummary(prods.length);
 }
-function toggleProdSel(name){
-  if(selectedProds.has(name)) selectedProds.delete(name);
-  else selectedProds.add(name);
-  if(selectedProds.size===0||selectedProds.size===document.querySelectorAll('#prod-chips-row .prod-chip').length-1) selectedProds.clear();
-  renderProdChips();renderConsoTable();
+function prodFilterNone(){
+  const panel=document.getElementById('prod-filter-panel');
+  if(!panel)return;
+  const prods=[];
+  panel.querySelectorAll('.pfp-item input').forEach(cb=>{
+    cb.checked=false;
+    prods.push(cb.nextElementSibling.textContent);
+  });
+  // Select all so that unchecking means "filter to nothing"
+  // Instead, keep all unchecked = show all (reset)
+  selectedProds.clear();
+  renderProdFilter();renderConsoTable();
+}
+function onProdChk(name,checked){
+  // Build full list from checkboxes
+  const panel=document.getElementById('prod-filter-panel');
+  const total=panel?panel.querySelectorAll('.pfp-item input').length:0;
+  if(checked) selectedProds.add(name); else selectedProds.delete(name);
+  if(selectedProds.size>=total) selectedProds.clear();
+  updateProdFilterSummary(total);
+  renderConsoTable();
+}
+function updateProdFilterSummary(total){
+  const el=document.getElementById('prod-filter-summary');
+  if(!el)return;
+  const n=selectedProds.size;
+  el.textContent=n===0?'📦 Tous les produits ▾':`📦 ${n} produit${n>1?'s':''} sélectionné${n>1?'s':''} ▾`;
 }
 
 function populateCatFilter(catSel,zoneSel){
@@ -3405,7 +3438,8 @@ function renderConsoTable(){
         grouped[pk]=r2((grouped[pk]||0)+v);
       });
       const total=r2(Object.values(grouped).reduce((a,v)=>a+v,0));
-      rows.push({name:p.name,cat:p.category,unit:p.unit,zone:z.name,groupe:p.ordre,ordre:p.ordre,grouped,total});
+      const displayName=p.groupe?`${p.groupe} › ${p.name}`:p.name;
+      rows.push({name:p.name,displayName,cat:p.category,unit:p.unit,zone:z.name,groupe:p.ordre,ordre:p.ordre,grouped,total});
     });
   });
 
@@ -3458,7 +3492,7 @@ function renderConsoTable(){
       return `<td class="num ${cls}">${v}<span class="mini-bar" style="width:${bw}px;background:${cls==='hi'?'#ef4444':cls==='med'?'#f59e0b':'#2d35a8'}"></span></td>`;
     }).join('');
     return `<tr>
-      <td><div class="prod-cell"><span class="prod-cell-name">${esc(r.name)}</span><span class="prod-cell-cat">${esc(r.cat)} · ${esc(r.unit)}</span></div></td>
+      <td><div class="prod-cell"><span class="prod-cell-name">${esc(r.displayName)}</span><span class="prod-cell-cat">${esc(r.cat)} · ${esc(r.unit)}</span></div></td>
       <td style="font-size:12px;color:var(--text2)">${esc(r.zone)}</td>
       ${cells}
       <td class="num"><span class="sum-badge">${r2(r.total)}</span></td>
@@ -3672,10 +3706,10 @@ function renderStats() {
       <div class="chart-card" style="padding:14px">
         <div class="cc-title" style="margin-bottom:12px">Consommation par produit et période</div>
         <div class="stats-filters">
-          <select id="tbl-zone" onchange="populateCatFilter('tbl-cat','tbl-zone');selectedProds.clear();renderProdChips();renderConsoTable()">
+          <select id="tbl-zone" onchange="populateCatFilter('tbl-cat','tbl-zone');selectedProds.clear();renderProdFilter();renderConsoTable()">
             <option value="all">Toutes les zones</option>${zoneOpts}
           </select>
-          <select id="tbl-cat" onchange="selectedProds.clear();renderProdChips();renderConsoTable()">
+          <select id="tbl-cat" onchange="selectedProds.clear();renderProdFilter();renderConsoTable()">
             <option value="all">Toutes les catégories</option>
           </select>
           <select id="tbl-period" onchange="renderConsoTable()">
@@ -3698,7 +3732,10 @@ function renderStats() {
           <input type="date" id="tbl-to" onchange="renderConsoTable()">
           <button onclick="document.getElementById('tbl-from').value='';document.getElementById('tbl-to').value='';renderConsoTable()" style="padding:5px 10px;border-radius:8px;border:1.5px solid var(--gray2);background:var(--gray);color:var(--text2);font-size:12px;cursor:pointer">✕ Effacer</button>
         </div>
-        <div class="prod-chips-row" id="prod-chips-row"></div>
+        <details class="prod-filter-details" id="prod-filter-details">
+          <summary class="prod-filter-summary" id="prod-filter-summary">📦 Tous les produits ▾</summary>
+          <div class="prod-filter-panel" id="prod-filter-panel"></div>
+        </details>
         <div id="conso-tbl-wrap"></div>
         <div style="display:flex;gap:8px;margin-top:10px">
           <button onclick="exportConsoCSV()" style="padding:8px 14px;border:1.5px solid var(--blue);background:var(--blue-light,#eef2ff);color:var(--blue);border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">📥 Export CSV / Excel</button>
@@ -3731,7 +3768,7 @@ function renderStats() {
   setTimeout(()=>{
     drawDonut('donut-c',donutData);
     populateCatFilter('tbl-cat','tbl-zone');
-    renderProdChips();
+    renderProdFilter();
     renderConsoTable();
     populateCatFilter('cmp-cat','cmp-zone');
     populateProdFilter();
