@@ -291,6 +291,8 @@ body{font-family:'DM Sans',sans-serif;background:#eef0f7;color:var(--text);min-h
 .ac-meta{font-size:11px;color:var(--text2);margin-top:2px}
 .ac-qty{font-size:20px;font-weight:700;color:var(--amber)}
 .ac-gear{width:30px;height:30px;border-radius:8px;border:none;background:var(--gray);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center}
+.sup-tab-btn{padding:6px 16px;border-radius:8px;border:1.5px solid var(--gray2);background:var(--gray);cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;transition:background .15s}
+.sup-tab-btn.sta{background:var(--blue);color:#fff;border-color:var(--blue)}
 .ac-check{width:20px;height:20px;accent-color:var(--blue);cursor:pointer;flex-shrink:0}
 .alert-card.sel{border-left-color:var(--blue);background:#f0f4ff}
 .order-bar{position:sticky;bottom:0;left:0;right:0;background:var(--blue);color:#fff;padding:12px 16px;border-radius:13px 13px 0 0;display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px -14px -14px;box-shadow:0 -2px 12px rgba(0,0,0,.15)}
@@ -551,13 +553,21 @@ table.conso-tbl tfoot td.num{font-weight:700}
   </div>
   <div id="tc-fournisseur" class="hidden">
     <div class="param-section">
+      <div style="display:flex;gap:6px;margin-bottom:14px">
+        <button class="sup-tab-btn sta" onclick="switchSupTab(0)">1</button>
+        <button class="sup-tab-btn" onclick="switchSupTab(1)">2</button>
+        <button class="sup-tab-btn" onclick="switchSupTab(2)">3</button>
+        <button class="sup-tab-btn" onclick="switchSupTab(3)">4</button>
+      </div>
       <label class="fl">Société</label>
       <input type="text" id="sup-societe" class="fi" maxlength="150" style="margin-bottom:11px" autocomplete="off" placeholder="Nom du fournisseur">
-      <label class="fl">Email</label>
+      <label class="fl">Email principal</label>
       <div style="display:flex;gap:8px;margin-bottom:11px">
         <input type="email" id="sup-mail" class="fi" maxlength="200" autocomplete="off" placeholder="contact@fournisseur.com" style="flex:1">
         <button onclick="sendFournisseurMail()" style="flex-shrink:0;padding:10px 13px;border-radius:10px;border:none;background:var(--blue);color:#fff;font-size:18px;cursor:pointer" title="Envoyer un email pré-rempli">✉️</button>
       </div>
+      <label class="fl">Email CC <span style="font-size:11px;color:var(--text2);font-weight:400">(optionnel)</span></label>
+      <input type="email" id="sup-mailcc" class="fi" maxlength="200" style="margin-bottom:11px" autocomplete="off" placeholder="cc@fournisseur.com">
       <label class="fl">Personne de contact</label>
       <input type="text" id="sup-contact" class="fi" maxlength="100" style="margin-bottom:11px" autocomplete="off" placeholder="Prénom Nom">
       <label class="fl">Téléphone</label>
@@ -1295,6 +1305,7 @@ function save() {
 let currentZone = 'entrepot';
 let currentSort = 'az';
 let currentProduct = null;
+let _supIdx = 0;
 let currentPretType = 'pret';
 let selectedProds = new Set(); // empty = all products
 let editHistTarget = null;
@@ -1886,12 +1897,10 @@ function openDetail(id) {
   if(paletteQtyEl) paletteQtyEl.value = found.p.paletteQty || '';
   const paletteUnitEl = document.getElementById('ps-palette-unit');
   if(paletteUnitEl) paletteUnitEl.value = found.p.paletteUnit || '';
-  // Prefill fournisseur fields
-  const sup = found.p.supplier || {};
-  const supFields = ['societe','mail','contact','tel','ref'];
-  supFields.forEach(f=>{const el=document.getElementById('sup-'+f);if(el)el.value=sup[f]||'';});
-  const supPrixEl=document.getElementById('sup-prix');if(supPrixEl)supPrixEl.value=sup.prix||'';
-  const supDeviseEl=document.getElementById('sup-devise');if(supDeviseEl)supDeviseEl.value=sup.devise||'EUR';
+  // Prefill fournisseur fields — reset to tab 1
+  _supIdx = 0;
+  document.querySelectorAll('.sup-tab-btn').forEach((b,i)=>b.classList.toggle('sta',i===0));
+  loadSupFields(found.p, 0);
 
   // Hide colors section (old system removed)
   const colSectionOld = document.getElementById('ps-colors-section');
@@ -2243,22 +2252,49 @@ function saveParams() {
   toast('✅ Produit mis à jour','success');
 }
 
+function getProductSuppliers(p) {
+  if (p.suppliers && p.suppliers.length) return p.suppliers;
+  if (p.supplier && Object.keys(p.supplier).length) return [p.supplier];
+  return [];
+}
+
+function loadSupFields(p, idx) {
+  const sups = getProductSuppliers(p);
+  const sup = sups[idx] || {};
+  ['societe','mail','mailcc','contact','tel','ref'].forEach(f=>{const el=document.getElementById('sup-'+f);if(el)el.value=sup[f]||'';});
+  const prixEl=document.getElementById('sup-prix');if(prixEl)prixEl.value=sup.prix||'';
+  const deviseEl=document.getElementById('sup-devise');if(deviseEl)deviseEl.value=sup.devise||'EUR';
+}
+
+function switchSupTab(idx) {
+  _supIdx=idx;
+  document.querySelectorAll('.sup-tab-btn').forEach((b,i)=>b.classList.toggle('sta',i===idx));
+  if(currentProduct) loadSupFields(currentProduct, idx);
+}
+
 function saveFournisseur() {
   if (!currentProduct) return;
+  // migrate old single-supplier format
+  if (!currentProduct.suppliers) {
+    currentProduct.suppliers = currentProduct.supplier ? [currentProduct.supplier] : [];
+    delete currentProduct.supplier;
+  }
+  while (currentProduct.suppliers.length <= _supIdx) currentProduct.suppliers.push({});
   const sup = {};
-  const txt = ['societe','mail','contact','tel','ref'];
-  txt.forEach(f=>{const v=(document.getElementById('sup-'+f)?.value||'').trim();if(v)sup[f]=v;});
+  ['societe','mail','mailcc','contact','tel','ref'].forEach(f=>{const v=(document.getElementById('sup-'+f)?.value||'').trim();if(v)sup[f]=v;});
   const prix=parseFloat(document.getElementById('sup-prix')?.value)||0;
   if(prix>0) sup.prix=prix;
   const devise=document.getElementById('sup-devise')?.value||'EUR';
   if(devise!=='EUR'||prix>0) sup.devise=devise;
-  if(Object.keys(sup).length) currentProduct.supplier=sup; else delete currentProduct.supplier;
+  currentProduct.suppliers[_supIdx]=sup;
   save();
-  toast('✅ Fournisseur enregistré','success');
+  toast('✅ Fournisseur '+(_supIdx+1)+' enregistré','success');
 }
 
 function callFournisseur() {
-  const tel=(document.getElementById('sup-tel')?.value||'').trim()||(currentProduct?.supplier?.tel||'');
+  const sups=currentProduct?getProductSuppliers(currentProduct):[];
+  const sup=sups[_supIdx]||{};
+  const tel=(document.getElementById('sup-tel')?.value||'').trim()||sup.tel||'';
   if(!tel){toast('⚠ Aucun numéro enregistré — sauvegardez d\'abord','error');return;}
   window.open('tel:'+tel.replace(/\s/g,''),'_self');
 }
@@ -2266,15 +2302,18 @@ function callFournisseur() {
 function sendFournisseurMail() {
   const p=currentProduct;
   if(!p) return;
-  const sup=p.supplier||{};
-  if(!sup.mail){toast('⚠ Aucun email enregistré — sauvegardez d\'abord l\'adresse','error');return;}
+  const sups=getProductSuppliers(p);
+  const sup=sups[_supIdx]||{};
+  const mail=(document.getElementById('sup-mail')?.value||'').trim()||sup.mail||'';
+  if(!mail){toast('⚠ Aucun email enregistré — sauvegardez d\'abord l\'adresse','error');return;}
+  const mailcc=(document.getElementById('sup-mailcc')?.value||'').trim()||sup.mailcc||'';
   const ref=sup.ref||p.officialName||p.name;
   const societe=sup.societe?`\nSociété : ${sup.societe}`:'';
   const contact=sup.contact?`\nÀ l'attention de : ${sup.contact}`:'';
-  const prix=sup.prix?`\nPrix unitaire connu : ${sup.prix} ${sup.devise||'EUR'}`:'';
   const subject=encodeURIComponent(`Commande — ${ref}`);
-  const body=encodeURIComponent(`Bonjour,${contact}\n\nNous souhaitons passer commande pour le produit suivant :${societe}\n\nRéférence : ${ref}\nProduit : ${p.officialName||p.name}${prix}\n\nMerci de nous confirmer la disponibilité et le délai de livraison.\n\nCordialement`);
-  window.open(`mailto:${sup.mail}?subject=${subject}&body=${body}`,'_blank');
+  const body=encodeURIComponent(`Bonjour,${contact}\n\nNous souhaitons passer commande pour le produit suivant :${societe}\n\nRéférence : ${ref}\nProduit : ${p.officialName||p.name}\n\nMerci de nous confirmer la disponibilité et le délai de livraison.\n\nCordialement`);
+  const cc=mailcc?`&cc=${encodeURIComponent(mailcc)}`:'';
+  window.open(`mailto:${mail}?subject=${subject}${cc}&body=${body}`,'_blank');
 }
 
 async function confirmDeleteProduct() {
@@ -4120,7 +4159,7 @@ function renderAlertes(zoneFilter='all') {
         <div class="ac-icon">⚠️</div>
         <div class="ac-info">
           <div class="ac-name">${esc(p.name)}</div>
-          <div class="ac-meta">${p.zoneIcon} ${p.zoneName} · seuil : ${p.seuil}${p.supplier?.mail?` · <span style="color:var(--blue)">✉ ${esc(p.supplier.mail)}</span>`:' · <em style="color:#9ca3af">pas d\'email</em>'}</div>
+          <div class="ac-meta">${p.zoneIcon} ${p.zoneName} · seuil : ${p.seuil}${(()=>{const sups=(p.suppliers||[]).filter(s=>s&&s.mail);const m=sups[0]?.mail||p.supplier?.mail||'';return m?` · <span style="color:var(--blue)">✉ ${esc(m)}</span>`+((p.suppliers||[]).filter(s=>s&&s.mail).length>1?` <span style="color:var(--text2);font-size:10px">+${(p.suppliers||[]).filter(s=>s&&s.mail).length-1}</span>`:''):' · <em style="color:#9ca3af">pas d\'email</em>';})()}</div>
         </div>
         <div class="ac-qty">${p.qty}</div>
         <button class="ac-gear" onclick="openDetailFournisseur('${p.id}')" title="Modifier le fournisseur">🏭</button>
@@ -4178,24 +4217,34 @@ function openOrderModal() {
   selectedAlerts.forEach(pid=>{
     const p=findProduct(pid)?.p;
     if(!p) return;
-    const ref=p.supplier?.ref||p.officialName||p.name;
-    const mail=p.supplier?.mail||'';
-    rows.push({pid, p, ref, mail});
+    const sups=getProductSuppliers(p);
+    rows.push({pid, p, sups});
   });
   rows.sort((a,b)=>a.p.name.localeCompare(b.p.name,'fr'));
-  body.innerHTML=rows.map(({pid,p,ref,mail})=>`
-    <div style="padding:10px 0;border-bottom:1px solid var(--gray2)">
+  body.innerHTML=rows.map(({pid,p,sups})=>{
+    const activeSups=sups.filter(s=>s&&Object.keys(s).length);
+    const firstSup=activeSups[0]||{};
+    const mail=firstSup.mail||'';
+    const ref=firstSup.ref||p.officialName||p.name;
+    const supSelect=activeSups.length>1
+      ?`<select id="osup-${pid}" style="font-size:12px;padding:5px 8px;border-radius:7px;border:1.5px solid var(--gray2);background:var(--gray);margin-top:5px;width:100%;font-family:inherit">
+          ${activeSups.map((s,i)=>`<option value="${i}">${i+1}. ${esc(s.societe||s.mail||('Fournisseur '+(i+1)))}</option>`).join('')}
+        </select>`
+      :'';
+    return `<div style="padding:10px 0;border-bottom:1px solid var(--gray2)">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
-        <div>
+        <div style="flex:1;min-width:0">
           <div style="font-weight:600;font-size:14px">${esc(p.name)}</div>
           <div style="font-size:11px;color:var(--text2);margin-top:2px">Réf : ${esc(ref)} · Stock : ${p.qty} ${p.unit}${mail?` · ✉ ${esc(mail)}`:' · <em style="color:#f59e0b">pas d\'email</em>'}</div>
+          ${supSelect}
         </div>
         <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
           <input type="number" id="oqty-${pid}" class="fi fi-sm" min="1" step="any" placeholder="Qté" style="width:75px;text-align:center" value="">
           <span style="font-size:12px;color:var(--text2)">${esc(p.unit)}</span>
         </div>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   showModal('order');
 }
 
@@ -4208,10 +4257,17 @@ function confirmOrderEmails() {
     if(!p) return;
     const qty=parseFloat(document.getElementById('oqty-'+pid)?.value)||0;
     if(qty<=0){noQty.push(p.name);return;}
-    const mail=p.supplier?.mail||'';
+    const sups=getProductSuppliers(p);
+    const activeSups=sups.filter(s=>s&&Object.keys(s).length);
+    const supIdxEl=document.getElementById('osup-'+pid);
+    const supIdx=supIdxEl?parseInt(supIdxEl.value)||0:0;
+    const sup=activeSups[supIdx]||activeSups[0]||{};
+    const mail=sup.mail||'';
     if(!mail){noEmail.push(p.name);return;}
-    if(!groups[mail])groups[mail]=[];
-    groups[mail].push({p,qty});
+    const mailcc=sup.mailcc||'';
+    const key=mail+'|'+mailcc;
+    if(!groups[key]) groups[key]={mail,mailcc,sup,items:[]};
+    groups[key].items.push({p,qty,sup});
   });
 
   if(noQty.length) toast(`⚠ Quantité manquante : ${noQty.join(', ')}`, 'error');
@@ -4220,18 +4276,19 @@ function confirmOrderEmails() {
   const entries=Object.entries(groups);
   if(!entries.length) return;
 
-  entries.forEach(([mail,items],idx)=>{
-    const p0=items[0].p;
-    const contact=p0.supplier?.contact||'';
-    const societe=p0.supplier?.societe||'';
-    const lignes=items.map(({p,qty},i)=>{
-      const ref=p.supplier?.ref||p.officialName||p.name;
+  entries.forEach(([,group],idx)=>{
+    const {mail,mailcc,sup:sup0,items}=group;
+    const contact=sup0.contact||'';
+    const societe=sup0.societe||'';
+    const lignes=items.map(({p,qty,sup},i)=>{
+      const ref=sup.ref||p.officialName||p.name;
       return `${i+1}. ${p.name}\n   Référence : ${ref}\n   Quantité souhaitée : ${qty} ${p.unit}`;
     }).join('\n\n');
-    const subj=encodeURIComponent(`Commande — ${items.length>1?items.length+' produits':items[0].p.supplier?.ref||items[0].p.name}`);
+    const subj=encodeURIComponent(`Commande — ${items.length>1?items.length+' produits':items[0].sup?.ref||items[0].p.name}`);
     const intro=contact?`Bonjour ${contact},`:`Bonjour${societe?' '+societe:''},`;
     const body=encodeURIComponent(`${intro}\n\nNous souhaitons passer commande pour les produits suivants :\n\n${lignes}\n\nMerci de nous confirmer la disponibilité et les délais de livraison.\n\nCordialement`);
-    setTimeout(()=>window.open(`mailto:${mail}?subject=${subj}&body=${body}`,'_blank'), idx*400);
+    const cc=mailcc?`&cc=${encodeURIComponent(mailcc)}`:'';
+    setTimeout(()=>window.open(`mailto:${mail}?subject=${subj}${cc}&body=${body}`,'_blank'), idx*400);
   });
 
   hideModal('modal-order');
