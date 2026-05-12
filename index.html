@@ -1845,16 +1845,24 @@ function renderHistory() {
   const h = currentProduct.history||[];
   if (!h.length) { el.innerHTML='<div class="empty-state" style="padding:28px 0"><div class="ei">📋</div><p>Aucun historique</p></div>'; return; }
   el.innerHTML = [...h].reverse().map(item=>{
-    const isLiv = item.type==='livraison';
-    const label = item.type==='inventaire'?'Inventaire':item.type==='livraison'?'Livraison':'Inventaire de base';
+    const typeMap = {
+      inventaire:       {icon:'📋', label:'Inventaire',        cls:'',      sign:''},
+      inventaire_base:  {icon:'📋', label:'Inventaire de base',cls:'',      sign:''},
+      livraison:        {icon:'🚚', label:'Livraison',          cls:' h-liv',sign:'+'},
+      pret:             {icon:'🔄', label:'Prêt (sortie)',      cls:' h-pret',sign:''},
+      emprunt:          {icon:'🔄', label:'Emprunt (entrée)',   cls:' h-emp', sign:'+'},
+      retour_pret:      {icon:'✅', label:'Retour prêt',        cls:' h-liv',sign:'+'},
+      retour_emprunt:   {icon:'↩️', label:'Retour emprunt',     cls:'',      sign:''},
+    };
+    const t = typeMap[item.type] || {icon:'📋', label:item.type, cls:'', sign:''};
     const sub = item.fournisseur?` · ${esc(item.fournisseur)}`:(item.notes?` · ${esc(item.notes)}`:'');
-    return `<div class="hist-item${isLiv?' h-liv':''}">
-      <div class="hist-icon">${isLiv?'🚚':'📋'}</div>
+    return `<div class="hist-item${t.cls}">
+      <div class="hist-icon">${t.icon}</div>
       <div style="flex:1;min-width:0">
-        <div class="hist-type">${label}</div>
+        <div class="hist-type">${t.label}</div>
         <div class="hist-date">${fmtDate(item.date)}${sub}</div>
       </div>
-      <div class="hist-qty${isLiv?' pos':''}">${isLiv?'+':''}${item.qty}</div>
+      <div class="hist-qty${t.sign?' pos':''}">${t.sign}${item.qty}</div>
       <div class="hist-actions">
         <button class="hist-btn hist-edit" onclick="editHistItem('${item.id}',event)">✏️</button>
         <button class="hist-btn hist-del" onclick="deleteHistItem('${item.id}',event)">🗑</button>
@@ -2046,7 +2054,10 @@ function recalcQty(product) {
   }
   let qty = invs[0].qty;
   const refDate = new Date(invs[0].date);
-  product.history.filter(h=>h.type==='livraison'&&new Date(h.date)>refDate).forEach(h=>qty+=h.qty);
+  product.history.filter(h=>
+    (h.type==='livraison'||h.type==='pret'||h.type==='emprunt'||h.type==='retour_pret'||h.type==='retour_emprunt')
+    &&new Date(h.date)>refDate
+  ).forEach(h=>qty+=h.qty);
   product.qty = r2(qty);
 }
 
@@ -2428,7 +2439,16 @@ function savePret() {
     });
     toast(`✨ Produit "${prod}" créé dans ${S.zones[zk].name}`,'success');
   }
-  S.prets.push({id:uid(),type:currentPretType,produit:prod,qty,to,date,retour:retour||null,notes,status:'encours'});
+  const pretId = uid();
+  S.prets.push({id:pretId,type:currentPretType,produit:prod,qty,to,date,retour:retour||null,notes,status:'encours'});
+  // Adjust stock: pret = -qty (sortie), emprunt = +qty (entrée)
+  const histQty = currentPretType==='pret' ? -qty : qty;
+  const histType = currentPretType==='pret' ? 'pret' : 'emprunt';
+  const histNote = currentPretType==='pret' ? `Prêté à ${to}` : `Emprunté à ${to}`;
+  for(const z of Object.values(S.zones)){
+    const p=z.products.find(p=>p.name.toLowerCase()===prod.toLowerCase());
+    if(p){p.history.push({id:uid(),type:histType,date,qty:histQty,notes:histNote,pretId});recalcQty(p);break;}
+  }
   save();hideModal('modal-pret');
   toast('✅ Enregistré','success');
 }
@@ -2528,7 +2548,7 @@ function importJSON(e) {
           ...(p.paletteUnit ? {paletteUnit: String(p.paletteUnit).slice(0,30)} : {}),
           history: Array.isArray(p.history) ? p.history.filter(h =>
             h && typeof h === 'object' &&
-            ['inventaire','inventaire_base','livraison','attribution'].includes(h.type) &&
+            ['inventaire','inventaire_base','livraison','attribution','pret','emprunt','retour_pret','retour_emprunt'].includes(h.type) &&
             typeof h.qty === 'number' && isFinite(h.qty)
           ).map(h => ({
             id: h.id || uid(),
@@ -3662,8 +3682,20 @@ function pretsList(filter) {
 }
 
 function markRendu(id) {
-  const p=S.prets.find(p=>p.id===id);
-  if(p){p.status='rendu';save();}
+  const pr=S.prets.find(p=>p.id===id);
+  if(pr){
+    pr.status='rendu';
+    pr.dateRendu=today();
+    // Adjust stock back: retour_pret = +qty, retour_emprunt = -qty
+    const histQty = pr.type==='pret' ? pr.qty : -pr.qty;
+    const histType = pr.type==='pret' ? 'retour_pret' : 'retour_emprunt';
+    const histNote = pr.type==='pret' ? `Rendu par ${pr.to}` : `Rendu à ${pr.to}`;
+    for(const z of Object.values(S.zones)){
+      const p=z.products.find(p=>p.name.toLowerCase()===pr.produit.toLowerCase());
+      if(p){p.history.push({id:uid(),type:histType,date:today(),qty:histQty,notes:histNote,pretId:id});recalcQty(p);break;}
+    }
+    save();
+  }
   renderPrets('encours');
   toast('✅ Marqué comme rendu','success');
 }
