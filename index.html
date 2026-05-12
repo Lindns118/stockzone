@@ -1241,6 +1241,7 @@ let currentZone = 'entrepot';
 let currentSort = 'az';
 let currentProduct = null;
 let currentPretType = 'pret';
+let selectedProds = new Set(); // empty = all products
 let editHistTarget = null;
 let seuilTarget = null;
 let confirmCb = null;
@@ -2692,6 +2693,13 @@ function genHTMLReport(prods) {
 .stats-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
 .stats-filters select{padding:8px 10px;border-radius:10px;border:1.5px solid var(--gray2);background:var(--gray);font-size:13px;font-family:inherit;outline:none;color:var(--text);transition:border-color .18s;cursor:pointer}
 .stats-filters select:focus{border-color:var(--blue);background:#fff}
+.prod-chip{flex-shrink:0;padding:5px 11px;border-radius:20px;border:1.5px solid var(--gray2);background:var(--gray);color:var(--text2);font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;transition:all .15s}
+.prod-chip.sel{background:var(--blue);border-color:var(--blue);color:#fff}
+.prod-chips-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+.date-range-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.date-range-row label{font-size:12px;color:var(--text2);flex-shrink:0}
+.date-range-row input[type=date]{padding:6px 10px;border-radius:10px;border:1.5px solid var(--gray2);background:var(--gray);font-size:12px;font-family:inherit;color:var(--text);outline:none}
+.date-range-row input[type=date]:focus{border-color:var(--blue);background:#fff}
 .tbl-wrap{overflow-x:auto;border-radius:12px;box-shadow:var(--shadow)}
 table.conso-tbl{width:100%;border-collapse:collapse;font-size:12px;background:#fff}
 table.conso-tbl thead tr{background:var(--blue);color:#fff}
@@ -3204,7 +3212,7 @@ function printPersonFiche() {
 // ===== STATS =====
 
 // Calcule la conso par mois pour un produit {ym:'2026-04', cons:N}
-function calcConso(product) {
+function calcConso(product, period='month') {
   const invs=[...product.history]
     .filter(h=>(h.type==='inventaire'||h.type==='inventaire_base') && h.date && /^\d{4}-\d{2}-\d{2}/.test(h.date))
     .sort((a,b)=>new Date(a.date)-new Date(b.date));
@@ -3218,8 +3226,8 @@ function calcConso(product) {
       .filter(h=>['pret','emprunt','retour_pret','retour_emprunt','vente'].includes(h.type)&&new Date(h.date)>new Date(prev.date)&&new Date(h.date)<=new Date(cur.date))
       .reduce((s,h)=>s+h.qty,0);
     const c=Math.max(0,r2(prev.qty+livs+pretAdj-cur.qty));
-    const ym=cur.date.slice(0,7);
-    if(ym && ym.match(/^\d{4}-\d{2}$/)) r[ym]=r2((r[ym]||0)+c);
+    const key=period==='week'?getWeekKey(cur.date):cur.date.slice(0,7);
+    if(key) r[key]=r2((r[key]||0)+c);
   }
   return r;
 }
@@ -3228,22 +3236,48 @@ function ymLabel(ym,period){
   if(!ym) return '?';
   if(period==='year') return ym.slice(0,4);
   if(period==='quarter'){
-    // key format: 2026-Q1
-    const parts = ym.split('-Q');
+    const parts=ym.split('-Q');
     if(parts.length===2) return parts[0]+' T'+parts[1];
     const m=parseInt(ym.slice(5,7));
     return ym.slice(0,4)+' T'+Math.ceil(m/3);
   }
-  // month: YYYY-MM
+  if(period==='week'){
+    const parts=ym.split('-W');
+    if(parts.length===2) return 'S'+parseInt(parts[1])+' '+parts[0];
+    return ym;
+  }
   const mn=['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
-  const m = parseInt(ym.slice(5,7));
-  if(isNaN(m) || m<1 || m>12) return ym;
+  const m=parseInt(ym.slice(5,7));
+  if(isNaN(m)||m<1||m>12) return ym;
   return mn[m-1]+' '+ym.slice(0,4);
 }
 function ymPeriod(ym,period){
   if(period==='year') return ym.slice(0,4);
   if(period==='quarter'){const m=parseInt(ym.slice(5,7));return ym.slice(0,4)+'-Q'+Math.ceil(m/3);}
+  if(period==='week') return ym;
   return ym;
+}
+function getWeekKey(dateStr) {
+  const d=new Date((dateStr.slice(0,10))+'T12:00:00');
+  const day=d.getDay()||7;
+  d.setDate(d.getDate()+4-day);
+  const yr=d.getFullYear();
+  const yr1=new Date(yr,0,1);
+  const wk=Math.ceil(((d-yr1)/86400000+1)/7);
+  return `${yr}-W${String(wk).padStart(2,'0')}`;
+}
+function weekKeyToDate(wk) {
+  const [yr,w]=wk.split('-W').map(Number);
+  const d=new Date(yr,0,1+(w-1)*7);
+  const dow=d.getDay();
+  if(dow<=4) d.setDate(d.getDate()-dow+1); else d.setDate(d.getDate()+8-dow);
+  return d;
+}
+function periodToDate(pk,period) {
+  if(period==='week') return weekKeyToDate(pk);
+  if(period==='quarter'){const[yr,q]=pk.split('-Q');return new Date(parseInt(yr),(parseInt(q)-1)*3,1);}
+  if(period==='year') return new Date(parseInt(pk),0,1);
+  return new Date(pk+'-01');
 }
 
 
@@ -3272,6 +3306,36 @@ function statsTab(id,btn){
   if(el) el.classList.add('active');
   if(id==='table') renderConsoTable();
   if(id==='compare'){populateProdFilter();renderCompareTable();}
+}
+
+function renderProdChips(){
+  const el=document.getElementById('prod-chips-row');if(!el)return;
+  const zk=document.getElementById('tbl-zone')?.value||'all';
+  const cat=document.getElementById('tbl-cat')?.value||'all';
+  const prods=[];
+  Object.entries(S.zones).forEach(([k,z])=>{
+    if(zk!=='all'&&k!==zk)return;
+    z.products.forEach(p=>{
+      if(cat!=='all'){
+        if(cat.startsWith('groupe:')){if(p.groupe!==cat.slice(7))return;}
+        else{if(p.category!==cat)return;}
+      }
+      if(calcConso(p,'month')&&Object.keys(calcConso(p,'month')).length>0) prods.push(p.name);
+    });
+  });
+  prods.sort((a,b)=>a.localeCompare(b,'fr'));
+  // Remove stale selections
+  for(const n of [...selectedProds]) if(!prods.includes(n)) selectedProds.delete(n);
+  const allSel=selectedProds.size===0;
+  el.innerHTML=`<span style="font-size:12px;color:var(--text2);flex-shrink:0">Produits :</span>`+
+    `<button class="prod-chip${allSel?' sel':''}" onclick="selectedProds.clear();renderProdChips();renderConsoTable()">Tous</button>`+
+    prods.map(n=>`<button class="prod-chip${!allSel&&selectedProds.has(n)?' sel':''}" onclick="toggleProdSel('${n.replace(/'/g,'\\\'')}')">${esc(n)}</button>`).join('');
+}
+function toggleProdSel(name){
+  if(selectedProds.has(name)) selectedProds.delete(name);
+  else selectedProds.add(name);
+  if(selectedProds.size===0||selectedProds.size===document.querySelectorAll('#prod-chips-row .prod-chip').length-1) selectedProds.clear();
+  renderProdChips();renderConsoTable();
 }
 
 function populateCatFilter(catSel,zoneSel){
@@ -3321,6 +3385,9 @@ function renderConsoTable(){
   const period=document.getElementById('tbl-period')?.value||'month';
   const sort=document.getElementById('tbl-sort')?.value||'alpha';
 
+  const fromDate=document.getElementById('tbl-from')?.value;
+  const toDate=document.getElementById('tbl-to')?.value;
+
   let rows=[];
   Object.entries(S.zones).forEach(([k,z])=>{
     if(zk!=='all'&&k!==zk)return;
@@ -3329,11 +3396,12 @@ function renderConsoTable(){
         if(cat.startsWith('groupe:')){if(p.groupe!==cat.slice(7))return;}
         else{if(p.category!==cat)return;}
       }
-      const raw=calcConso(p);
+      if(selectedProds.size>0&&!selectedProds.has(p.name))return;
+      const raw=calcConso(p,period);
       const grouped={};
       Object.entries(raw).forEach(([ym,v])=>{
-        if(!/^\d{4}-\d{2}$/.test(ym)) return; // skip invalid keys
-        const pk=ymPeriod(ym,period);
+        if(!/^\d{4}-\d{2}$/.test(ym)&&!/^\d{4}-W\d{2}$/.test(ym)) return;
+        const pk=period==='week'?ym:ymPeriod(ym,period);
         grouped[pk]=r2((grouped[pk]||0)+v);
       });
       const total=r2(Object.values(grouped).reduce((a,v)=>a+v,0));
@@ -3348,10 +3416,16 @@ function renderConsoTable(){
   else if(sort==='desc') rows.sort((a,b)=>b.total-a.total);
   else rows.sort((a,b)=>a.total-b.total);
 
-  // Collect all period keys sorted
+  // Collect all period keys sorted + filter by date range
   const allPk=new Set();
   rows.forEach(r=>Object.keys(r.grouped).forEach(k=>allPk.add(k)));
-  const periods=[...allPk].sort();
+  const periods=[...allPk].sort().filter(pk=>{
+    if(!fromDate&&!toDate)return true;
+    const d=periodToDate(pk,period);
+    if(fromDate&&d<new Date(fromDate))return false;
+    if(toDate&&d>new Date(toDate+'T23:59:59'))return false;
+    return true;
+  });
 
   if(!periods.length){
     wrap.innerHTML='<p class="tbl-empty">Pas assez de données. Ajoutez plusieurs inventaires à des dates différentes.</p>';
@@ -3598,14 +3672,15 @@ function renderStats() {
       <div class="chart-card" style="padding:14px">
         <div class="cc-title" style="margin-bottom:12px">Consommation par produit et période</div>
         <div class="stats-filters">
-          <select id="tbl-zone" onchange="populateCatFilter('tbl-cat','tbl-zone');renderConsoTable()">
+          <select id="tbl-zone" onchange="populateCatFilter('tbl-cat','tbl-zone');selectedProds.clear();renderProdChips();renderConsoTable()">
             <option value="all">Toutes les zones</option>${zoneOpts}
           </select>
-          <select id="tbl-cat" onchange="renderConsoTable()">
+          <select id="tbl-cat" onchange="selectedProds.clear();renderProdChips();renderConsoTable()">
             <option value="all">Toutes les catégories</option>
           </select>
           <select id="tbl-period" onchange="renderConsoTable()">
             <option value="month">Par mois</option>
+            <option value="week">Par semaine</option>
             <option value="quarter">Par trimestre</option>
             <option value="year">Par année</option>
           </select>
@@ -3616,6 +3691,14 @@ function renderStats() {
             <option value="asc">Total ↑</option>
           </select>
         </div>
+        <div class="date-range-row">
+          <label>Du</label>
+          <input type="date" id="tbl-from" onchange="renderConsoTable()">
+          <label>au</label>
+          <input type="date" id="tbl-to" onchange="renderConsoTable()">
+          <button onclick="document.getElementById('tbl-from').value='';document.getElementById('tbl-to').value='';renderConsoTable()" style="padding:5px 10px;border-radius:8px;border:1.5px solid var(--gray2);background:var(--gray);color:var(--text2);font-size:12px;cursor:pointer">✕ Effacer</button>
+        </div>
+        <div class="prod-chips-row" id="prod-chips-row"></div>
         <div id="conso-tbl-wrap"></div>
         <div style="display:flex;gap:8px;margin-top:10px">
           <button onclick="exportConsoCSV()" style="padding:8px 14px;border:1.5px solid var(--blue);background:var(--blue-light,#eef2ff);color:var(--blue);border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">📥 Export CSV / Excel</button>
@@ -3648,6 +3731,7 @@ function renderStats() {
   setTimeout(()=>{
     drawDonut('donut-c',donutData);
     populateCatFilter('tbl-cat','tbl-zone');
+    renderProdChips();
     renderConsoTable();
     populateCatFilter('cmp-cat','cmp-zone');
     populateProdFilter();
