@@ -225,6 +225,8 @@ body{font-family:'DM Sans',sans-serif;background:#eef0f7;color:var(--text);min-h
 .pt-btn{flex:1;padding:11px;border:none;background:none;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;border-radius:10px;color:var(--text2);transition:all .18s}
 .pt-btn.pt-active-p{background:var(--blue);color:#fff}
 .pt-btn.pt-active-e{background:var(--orange);color:#fff}
+.pt-btn.pt-active-v{background:var(--green);color:#fff}
+.pb-v{background:var(--green-light);color:var(--green)}
 .pret-desc{text-align:center;padding:9px 14px;background:var(--gray);border-radius:10px;font-size:13px;color:var(--text2);margin-bottom:14px}
 
 /* EXPORT */
@@ -708,6 +710,7 @@ table.conso-tbl tfoot td.num{font-weight:700}
   <div class="pret-toggle">
     <button class="pt-btn pt-active-p" id="pt-p" onclick="setPretType('pret')">⬆ Prêt</button>
     <button class="pt-btn" id="pt-e" onclick="setPretType('emprunt')">⬇ Emprunt</button>
+    <button class="pt-btn" id="pt-v" onclick="setPretType('vente')">💰 Vente</button>
   </div>
   <div class="pret-desc" id="pret-desc">🎁 Vous prêtez un article à quelqu'un</div>
   <div class="fg">
@@ -722,7 +725,7 @@ table.conso-tbl tfoot td.num{font-weight:700}
   </div>
   <div class="form-row">
     <div class="fg"><label class="fl">Date</label><input type="date" id="pr-date" class="fi"></div>
-    <div class="fg"><label class="fl">Retour prévu</label><input type="date" id="pr-retour" class="fi"></div>
+    <div class="fg" id="pr-retour-row"><label class="fl">Retour prévu</label><input type="date" id="pr-retour" class="fi"></div>
   </div>
   <div class="fg"><label class="fl">Notes</label><textarea id="pr-notes" class="fi" rows="2" maxlength="500" placeholder="Remarques..." autocomplete="off"></textarea></div>
   <button class="btn-primary" onclick="savePret()">✅ Enregistrer</button>
@@ -1870,6 +1873,7 @@ function renderHistory() {
       emprunt:          {icon:'🔄', label:'Emprunt (entrée)',   cls:' h-emp', sign:'+'},
       retour_pret:      {icon:'✅', label:'Retour prêt',        cls:' h-liv',sign:'+'},
       retour_emprunt:   {icon:'↩️', label:'Retour emprunt',     cls:'',      sign:''},
+      vente:            {icon:'💰', label:'Vente',               cls:'',      sign:''},
     };
     const t = typeMap[item.type] || {icon:'📋', label:item.type, cls:'', sign:''};
     const sub = item.fournisseur?` · ${esc(item.fournisseur)}`:(item.notes?` · ${esc(item.notes)}`:'');
@@ -2072,7 +2076,7 @@ function recalcQty(product) {
   let qty = invs[0].qty;
   const refDate = new Date(invs[0].date);
   product.history.filter(h=>
-    (h.type==='livraison'||h.type==='pret'||h.type==='emprunt'||h.type==='retour_pret'||h.type==='retour_emprunt')
+    (h.type==='livraison'||h.type==='pret'||h.type==='emprunt'||h.type==='retour_pret'||h.type==='retour_emprunt'||h.type==='vente')
     &&new Date(h.date)>refDate
   ).forEach(h=>qty+=h.qty);
   product.qty = r2(qty);
@@ -2426,8 +2430,12 @@ function setPretType(t) {
   currentPretType=t;
   document.getElementById('pt-p').className='pt-btn'+(t==='pret'?' pt-active-p':'');
   document.getElementById('pt-e').className='pt-btn'+(t==='emprunt'?' pt-active-e':'');
-  document.getElementById('pret-desc').textContent=t==='pret'?'🎁 Vous prêtez un article à quelqu\'un':'📥 Vous empruntez un article à quelqu\'un';
-  document.getElementById('pr-to-lbl').textContent=t==='pret'?'Prêté à':'Emprunté à';
+  document.getElementById('pt-v').className='pt-btn'+(t==='vente'?' pt-active-v':'');
+  const descs={pret:'🎁 Vous prêtez un article à quelqu\'un',emprunt:'📥 Vous empruntez un article à quelqu\'un',vente:'💰 Sortie définitive — ne compte pas en consommation'};
+  document.getElementById('pret-desc').textContent=descs[t]||descs.pret;
+  document.getElementById('pr-to-lbl').textContent=t==='pret'?'Prêté à':t==='vente'?'Vendu à':'Emprunté à';
+  const retourRow=document.getElementById('pr-retour-row');
+  if(retourRow) retourRow.style.display=t==='vente'?'none':'';
 }
 
 
@@ -2457,10 +2465,11 @@ function savePret() {
     toast(`✨ Produit "${prod}" créé dans ${S.zones[zk].name}`,'success');
   }
   const pretId=uid();
-  S.prets.push({id:pretId,type:currentPretType,produit:prod,qty,to,date,retour:retour||null,notes,status:'encours'});
-  const histQty=currentPretType==='pret'?-qty:qty;
-  const histType=currentPretType==='pret'?'pret':'emprunt';
-  const histNote=currentPretType==='pret'?`Prêté à ${to}`:`Emprunté à ${to}`;
+  const isVente=currentPretType==='vente';
+  S.prets.push({id:pretId,type:currentPretType,produit:prod,qty,to,date,retour:isVente?null:retour||null,notes,status:isVente?'vendu':'encours'});
+  const histQty=currentPretType==='emprunt'?qty:-qty;
+  const histType=currentPretType==='emprunt'?'emprunt':currentPretType==='vente'?'vente':'pret';
+  const histNote=currentPretType==='emprunt'?`Emprunté à ${to}`:currentPretType==='vente'?`Vendu à ${to}`:`Prêté à ${to}`;
   for(const z of Object.values(S.zones)){
     const p=z.products.find(p=>p.name.toLowerCase()===prod.toLowerCase());
     if(p){p.history.push({id:uid(),type:histType,date,qty:histQty,notes:histNote,pretId});recalcQty(p);break;}
@@ -2564,7 +2573,7 @@ function importJSON(e) {
           ...(p.paletteUnit ? {paletteUnit: String(p.paletteUnit).slice(0,30)} : {}),
           history: Array.isArray(p.history) ? p.history.filter(h =>
             h && typeof h === 'object' &&
-            ['inventaire','inventaire_base','livraison','attribution','pret','emprunt','retour_pret','retour_emprunt'].includes(h.type) &&
+            ['inventaire','inventaire_base','livraison','attribution','pret','emprunt','retour_pret','retour_emprunt','vente'].includes(h.type) &&
             typeof h.qty === 'number' && isFinite(h.qty)
           ).map(h => ({
             id: h.id || uid(),
@@ -3206,7 +3215,7 @@ function calcConso(product) {
       .filter(h=>h.type==='livraison'&&new Date(h.date)>new Date(prev.date)&&new Date(h.date)<=new Date(cur.date))
       .reduce((s,h)=>s+h.qty,0);
     const pretAdj=product.history
-      .filter(h=>['pret','emprunt','retour_pret','retour_emprunt'].includes(h.type)&&new Date(h.date)>new Date(prev.date)&&new Date(h.date)<=new Date(cur.date))
+      .filter(h=>['pret','emprunt','retour_pret','retour_emprunt','vente'].includes(h.type)&&new Date(h.date)>new Date(prev.date)&&new Date(h.date)<=new Date(cur.date))
       .reduce((s,h)=>s+h.qty,0);
     const c=Math.max(0,r2(prev.qty+livs+pretAdj-cur.qty));
     const ym=cur.date.slice(0,7);
@@ -3665,12 +3674,14 @@ function renderPrets(filter='encours') {
   const encours=all.filter(p=>p.status==='encours');
   const pretes=encours.filter(p=>p.type==='pret').length;
   const empruntes=encours.filter(p=>p.type==='emprunt').length;
+  const ventes=all.filter(p=>p.type==='vente').length;
 
   ev.innerHTML=`<div class="prets-wrap">
     <div class="prets-hd">
       <div class="ps-card"><div class="ps-num">${encours.length}</div><div class="ps-lbl">en cours</div></div>
       <div class="ps-card" style="background:rgba(45,53,168,.3)"><div class="ps-num">${pretes}</div><div class="ps-lbl">prêtés</div></div>
       <div class="ps-card" style="background:rgba(234,88,12,.3)"><div class="ps-num">${empruntes}</div><div class="ps-lbl">empruntés</div></div>
+      <div class="ps-card" style="background:rgba(22,163,74,.3)"><div class="ps-num">${ventes}</div><div class="ps-lbl">vendus</div></div>
     </div>
     <div class="filter-bar">
       <button class="f-btn${filter==='encours'?' fa':''}" onclick="renderPrets('encours')">⏳ En cours</button>
@@ -3686,21 +3697,32 @@ function pretsList(filter) {
   let list=S.prets;
   if(filter==='encours') list=list.filter(p=>p.status==='encours');
   if(filter==='rendu') list=list.filter(p=>p.status==='rendu');
-  if(!list.length) return `<div class="empty-state"><div class="ei">🔄</div><h3>Aucun prêt/emprunt</h3><p>Utilisez le bouton ci-dessous pour en créer un.</p></div>`;
-  return list.map(p=>`<div class="pret-card">
-    <div class="pret-card-top">
-      <span class="pret-badge ${p.type==='pret'?'pb-p':'pb-e'}">${p.type==='pret'?'⬆ Prêt':'⬇ Emprunt'}</span>
-      <span style="font-size:11px;color:var(--text2)">${fmtDate(p.date)}</span>
-    </div>
-    <div class="pret-name">${esc(p.produit)} <strong>×${p.qty}</strong></div>
-    <div class="pret-meta">${p.type==='pret'?'Prêté à':'Emprunté à'} <strong>${esc(p.to)}</strong></div>
-    ${p.retour?`<div class="pret-retour">📅 Retour prévu : ${fmtDate(p.retour)}</div>`:''}
-    ${p.notes?`<div style="font-size:12px;color:var(--text2);margin-top:4px;font-style:italic">${esc(p.notes)}</div>`:''}
-    <div style="display:flex;gap:8px;align-items:center;margin-top:10px">
-      ${p.status==='encours'?`<button class="btn-rendu" style="margin-top:0;flex:1" onclick="markRendu('${p.id}')">✓ Marquer comme rendu</button>`:'<div style="font-size:12px;color:var(--green);font-weight:500;flex:1">✓ Rendu</div>'}
-      <button onclick="deletePret('${p.id}')" style="padding:7px 10px;border-radius:9px;border:none;background:var(--red-light);color:var(--red);cursor:pointer;font-size:15px;flex-shrink:0" title="Supprimer">🗑</button>
-    </div>
-  </div>`).join('');
+  if(!list.length) return `<div class="empty-state"><div class="ei">🔄</div><h3>Aucun prêt/emprunt/vente</h3><p>Utilisez le bouton ci-dessous pour en créer un.</p></div>`;
+  return list.map(p=>{
+    const isVente=p.type==='vente';
+    const badge=isVente?'pb-v':p.type==='pret'?'pb-p':'pb-e';
+    const badgeLabel=isVente?'💰 Vente':p.type==='pret'?'⬆ Prêt':'⬇ Emprunt';
+    const metaLabel=isVente?'Vendu à':p.type==='pret'?'Prêté à':'Emprunté à';
+    const statusEl=isVente
+      ?`<div style="font-size:12px;color:var(--green);font-weight:500;flex:1">💰 Vendu</div>`
+      :p.status==='encours'
+        ?`<button class="btn-rendu" style="margin-top:0;flex:1" onclick="markRendu('${p.id}')">✓ Marquer comme rendu</button>`
+        :`<div style="font-size:12px;color:var(--green);font-weight:500;flex:1">✓ Rendu</div>`;
+    return `<div class="pret-card">
+      <div class="pret-card-top">
+        <span class="pret-badge ${badge}">${badgeLabel}</span>
+        <span style="font-size:11px;color:var(--text2)">${fmtDate(p.date)}</span>
+      </div>
+      <div class="pret-name">${esc(p.produit)} <strong>×${p.qty}</strong></div>
+      <div class="pret-meta">${metaLabel} <strong>${esc(p.to)}</strong></div>
+      ${p.retour?`<div class="pret-retour">📅 Retour prévu : ${fmtDate(p.retour)}</div>`:''}
+      ${p.notes?`<div style="font-size:12px;color:var(--text2);margin-top:4px;font-style:italic">${esc(p.notes)}</div>`:''}
+      <div style="display:flex;gap:8px;align-items:center;margin-top:10px">
+        ${statusEl}
+        <button onclick="deletePret('${p.id}')" style="padding:7px 10px;border-radius:9px;border:none;background:var(--red-light);color:var(--red);cursor:pointer;font-size:15px;flex-shrink:0" title="Supprimer">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 let _renduId = null;
