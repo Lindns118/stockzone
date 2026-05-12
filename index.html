@@ -3700,6 +3700,62 @@ function markRendu(id) {
   toast('✅ Marqué comme rendu','success');
 }
 
+// ===== LEGACY PRETS MIGRATION =====
+function migrateLegacyPrets() {
+  let migrated = 0;
+  let skipped = 0;
+
+  for (const pr of S.prets) {
+    // Find the product across all zones
+    let targetProd = null;
+    for (const z of Object.values(S.zones)) {
+      const found = z.products.find(p => p.name.toLowerCase() === pr.produit.toLowerCase());
+      if (found) { targetProd = found; break; }
+    }
+    if (!targetProd) { skipped++; continue; }
+
+    // Check if a history entry with this pretId already exists
+    const alreadyHasPret = targetProd.history.some(h => h.pretId === pr.id);
+    if (alreadyHasPret) { skipped++; continue; }
+
+    // Save current qty before any changes
+    const qtyBefore = targetProd.qty;
+
+    // Add the outgoing/incoming entry
+    const histQty = pr.type === 'pret' ? -pr.qty : pr.qty;
+    const histType = pr.type === 'pret' ? 'pret' : 'emprunt';
+    const histNote = pr.type === 'pret' ? `Prêté à ${pr.to}` : `Emprunté à ${pr.to}`;
+    targetProd.history.push({ id: uid(), type: histType, date: pr.date, qty: histQty, notes: histNote, pretId: pr.id });
+
+    // If already returned, also add the return entry
+    if (pr.status === 'rendu' && pr.dateRendu) {
+      const retQty = pr.type === 'pret' ? pr.qty : -pr.qty;
+      const retType = pr.type === 'pret' ? 'retour_pret' : 'retour_emprunt';
+      const retNote = pr.type === 'pret' ? `Rendu par ${pr.to}` : `Rendu à ${pr.to}`;
+      targetProd.history.push({ id: uid(), type: retType, date: pr.dateRendu, qty: retQty, notes: retNote, pretId: pr.id });
+    }
+
+    recalcQty(targetProd);
+
+    // Safety net: if qty changed, add a compensating inventaire entry
+    if (Math.abs(targetProd.qty - qtyBefore) > 0.001) {
+      const diff = r2(qtyBefore - targetProd.qty);
+      targetProd.history.push({ id: uid(), type: 'inventaire', date: pr.date, qty: qtyBefore, notes: 'Correction automatique migration prêts' });
+      recalcQty(targetProd);
+    }
+
+    migrated++;
+  }
+
+  save();
+  if (migrated > 0) {
+    toast(`✅ ${migrated} prêt${migrated > 1 ? 's' : ''} migré${migrated > 1 ? 's' : ''} dans l'historique`, 'success');
+  } else {
+    toast('ℹ️ Aucun prêt à migrer (déjà à jour)', 'info');
+  }
+  if (skipped > 0) console.log(`[migration] ${skipped} prêt(s) ignorés (produit introuvable ou déjà migré)`);
+}
+
 // ===== ALERTES VIEW =====
 function renderAlertes(zoneFilter='all') {
   const ev=document.getElementById('extra-view');
@@ -3834,6 +3890,11 @@ function renderReglages() {
         <div class="settings-row" onclick="document.getElementById('import-file').click()">
           <div class="sr-icon" style="background:var(--purple-light)">📥</div>
           <div class="sr-label">Importer une sauvegarde</div>
+          <div class="sr-arrow">›</div>
+        </div>
+        <div class="settings-row" onclick="migrateLegacyPrets()">
+          <div class="sr-icon" style="background:#fef3c7">🔄</div>
+          <div class="sr-label">Migrer prêts/emprunts dans l'historique</div>
           <div class="sr-arrow">›</div>
         </div>
         <div class="settings-row" onclick="confirmResetAll()" style="color:var(--red)">
