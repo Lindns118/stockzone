@@ -2439,12 +2439,11 @@ function savePret() {
     });
     toast(`✨ Produit "${prod}" créé dans ${S.zones[zk].name}`,'success');
   }
-  const pretId = uid();
+  const pretId=uid();
   S.prets.push({id:pretId,type:currentPretType,produit:prod,qty,to,date,retour:retour||null,notes,status:'encours'});
-  // Adjust stock: pret = -qty (sortie), emprunt = +qty (entrée)
-  const histQty = currentPretType==='pret' ? -qty : qty;
-  const histType = currentPretType==='pret' ? 'pret' : 'emprunt';
-  const histNote = currentPretType==='pret' ? `Prêté à ${to}` : `Emprunté à ${to}`;
+  const histQty=currentPretType==='pret'?-qty:qty;
+  const histType=currentPretType==='pret'?'pret':'emprunt';
+  const histNote=currentPretType==='pret'?`Prêté à ${to}`:`Emprunté à ${to}`;
   for(const z of Object.values(S.zones)){
     const p=z.products.find(p=>p.name.toLowerCase()===prod.toLowerCase());
     if(p){p.history.push({id:uid(),type:histType,date,qty:histQty,notes:histNote,pretId});recalcQty(p);break;}
@@ -3677,27 +3676,50 @@ function pretsList(filter) {
     <div class="pret-meta">${p.type==='pret'?'Prêté à':'Emprunté à'} <strong>${esc(p.to)}</strong></div>
     ${p.retour?`<div class="pret-retour">📅 Retour prévu : ${fmtDate(p.retour)}</div>`:''}
     ${p.notes?`<div style="font-size:12px;color:var(--text2);margin-top:4px;font-style:italic">${esc(p.notes)}</div>`:''}
-    ${p.status==='encours'?`<button class="btn-rendu" onclick="markRendu('${p.id}')">✓ Marquer comme rendu</button>`:'<div style="font-size:12px;color:var(--green);margin-top:8px;font-weight:500">✓ Rendu</div>'}
+    <div style="display:flex;gap:8px;align-items:center;margin-top:10px">
+      ${p.status==='encours'?`<button class="btn-rendu" style="margin-top:0;flex:1" onclick="markRendu('${p.id}')">✓ Marquer comme rendu</button>`:'<div style="font-size:12px;color:var(--green);font-weight:500;flex:1">✓ Rendu</div>'}
+      <button onclick="deletePret('${p.id}')" style="padding:7px 10px;border-radius:9px;border:none;background:var(--red-light);color:var(--red);cursor:pointer;font-size:15px;flex-shrink:0" title="Supprimer">🗑</button>
+    </div>
   </div>`).join('');
 }
 
 function markRendu(id) {
   const pr=S.prets.find(p=>p.id===id);
-  if(pr){
-    pr.status='rendu';
-    pr.dateRendu=today();
-    // Adjust stock back: retour_pret = +qty, retour_emprunt = -qty
-    const histQty = pr.type==='pret' ? pr.qty : -pr.qty;
-    const histType = pr.type==='pret' ? 'retour_pret' : 'retour_emprunt';
-    const histNote = pr.type==='pret' ? `Rendu par ${pr.to}` : `Rendu à ${pr.to}`;
-    for(const z of Object.values(S.zones)){
-      const p=z.products.find(p=>p.name.toLowerCase()===pr.produit.toLowerCase());
-      if(p){p.history.push({id:uid(),type:histType,date:today(),qty:histQty,notes:histNote,pretId:id});recalcQty(p);break;}
+  if(!pr) return;
+  pr.status='rendu';
+  pr.dateRendu=today();
+  const retQty=pr.type==='pret'?pr.qty:-pr.qty;
+  const retType=pr.type==='pret'?'retour_pret':'retour_emprunt';
+  const retNote=pr.type==='pret'?`Rendu par ${pr.to}`:`Rendu à ${pr.to}`;
+  for(const z of Object.values(S.zones)){
+    const p=z.products.find(p=>p.name.toLowerCase()===pr.produit.toLowerCase());
+    if(p){
+      const alreadyReturned=p.history.some(h=>h.pretId===id&&(h.type==='retour_pret'||h.type==='retour_emprunt'));
+      if(!alreadyReturned) p.history.push({id:uid(),type:retType,date:today(),qty:retQty,notes:retNote,pretId:id});
+      recalcQty(p);break;
     }
-    save();
   }
+  save();
   renderPrets('encours');
   toast('✅ Marqué comme rendu','success');
+}
+
+function deletePret(id) {
+  if(!confirm('Supprimer ce prêt/emprunt ? Les entrées d\'historique associées seront aussi supprimées.')) return;
+  const pr=S.prets.find(p=>p.id===id);
+  if(!pr) return;
+  S.prets=S.prets.filter(p=>p.id!==id);
+  for(const z of Object.values(S.zones)){
+    const p=z.products.find(p=>p.name.toLowerCase()===pr.produit.toLowerCase());
+    if(p){
+      p.history=p.history.filter(h=>h.pretId!==id);
+      recalcQty(p);break;
+    }
+  }
+  save();
+  renderPrets(document.querySelector('.f-btn.fa')?.textContent?.includes('cours')?'encours':
+              document.querySelector('.f-btn.fa')?.textContent?.includes('Rendu')?'rendu':'all');
+  toast('🗑 Supprimé','success');
 }
 
 // ===== LEGACY PRETS MIGRATION =====
