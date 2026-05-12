@@ -1861,7 +1861,7 @@ function renderHistory() {
   const el = document.getElementById('tc-hist');
   const h = currentProduct.history||[];
   if (!h.length) { el.innerHTML='<div class="empty-state" style="padding:28px 0"><div class="ei">📋</div><p>Aucun historique</p></div>'; return; }
-  el.innerHTML = [...h].reverse().map(item=>{
+  el.innerHTML = [...h].map((h,i)=>({...h,_i:i})).sort((a,b)=>{const d=new Date(b.date)-new Date(a.date);return d!==0?d:b._i-a._i;}).map(item=>{
     const typeMap = {
       inventaire:       {icon:'📋', label:'Inventaire',        cls:'',      sign:''},
       inventaire_base:  {icon:'📋', label:'Inventaire de base',cls:'',      sign:''},
