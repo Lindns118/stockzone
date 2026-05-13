@@ -469,6 +469,7 @@ table.conso-tbl tfoot td.num{font-weight:700}
     <button class="tab-btn ta" onclick="showTab('hist',this)">📋 Historique</button>
     <button class="tab-btn" onclick="showTab('quick',this)">⚡ Saisie</button>
     <button class="tab-btn" onclick="showTab('conso',this)">📉 Conso</button>
+    <button class="tab-btn" onclick="showTab('cmd',this)">✉️ Cmd</button>
     <button class="tab-btn" onclick="showTab('params',this)">⚙ Params</button>
     <button class="tab-btn" onclick="showTab('fournisseur',this)">🏭 Fourn.</button>
   </div>
@@ -510,6 +511,7 @@ table.conso-tbl tfoot td.num{font-weight:700}
     </div>
   </div>
   <div id="tc-conso" class="hidden"></div>
+  <div id="tc-cmd" class="hidden"></div>
   <div id="tc-params" class="hidden">
     <div class="param-section">
       <label class="fl">Seuil d'alerte</label>
@@ -553,6 +555,12 @@ table.conso-tbl tfoot td.num{font-weight:700}
   </div>
   <div id="tc-fournisseur" class="hidden">
     <div class="param-section">
+      <div style="margin-bottom:14px">
+        <label class="fl">Choisir depuis le répertoire</label>
+        <select id="sup-dir-select" class="fi" onchange="applyFournisseurFromDir(this.value)">
+          <option value="">— Saisie manuelle —</option>
+        </select>
+      </div>
       <div style="display:flex;gap:6px;margin-bottom:14px">
         <button class="sup-tab-btn sta" onclick="switchSupTab(0)">1</button>
         <button class="sup-tab-btn" onclick="switchSupTab(1)">2</button>
@@ -872,6 +880,28 @@ table.conso-tbl tfoot td.num{font-weight:700}
 </div>
 </div>
 
+<!-- FOURNISSEUR DIR MODAL -->
+<div id="modal-fournisseur-dir" class="modal-overlay hidden" onclick="overlayClose(event,'modal-fournisseur-dir')">
+<div class="modal-sheet">
+  <div class="mh-row">
+    <div class="mh-icon" style="background:#e8f4fd">🏭</div>
+    <div><div class="m-title" id="fdir-modal-title">Ajouter un fournisseur</div></div>
+    <button class="m-close" onclick="hideModal('modal-fournisseur-dir')">✕</button>
+  </div>
+  <label class="fl">Nom / Société</label>
+  <input type="text" id="fdir-nom" class="fi" maxlength="150" style="margin-bottom:11px" placeholder="Acme Corp">
+  <label class="fl">Email principal</label>
+  <input type="email" id="fdir-mail" class="fi" maxlength="200" style="margin-bottom:11px" placeholder="contact@acme.com">
+  <label class="fl">Email CC <span style="font-size:11px;color:var(--text2)">(optionnel)</span></label>
+  <input type="email" id="fdir-mailcc" class="fi" maxlength="200" style="margin-bottom:11px" placeholder="cc@acme.com">
+  <label class="fl">Personne de contact</label>
+  <input type="text" id="fdir-contact" class="fi" maxlength="100" style="margin-bottom:11px" placeholder="Prénom Nom">
+  <label class="fl">Téléphone</label>
+  <input type="tel" id="fdir-tel" class="fi" maxlength="30" style="margin-bottom:16px" placeholder="+33 6 00 00 00 00">
+  <button class="btn-primary" onclick="saveFournisseurDir()">💾 Enregistrer</button>
+</div>
+</div>
+
 <!-- SEUIL MODAL -->
 <div id="modal-seuil" class="modal-overlay hidden" onclick="overlayClose(event,'modal-seuil')">
 <div class="modal-sheet">
@@ -1007,6 +1037,7 @@ const DEF = {
   prets: [],
   attributions: [],
   palettes: {},
+  fournisseurs: [],
   units: [...DEFAULT_UNITS]
 };
 
@@ -1043,6 +1074,7 @@ function migrateData(data) {
   if (!data.prets) data.prets = [];
   if (!data.attributions) data.attributions = [];
   if (!data.palettes) data.palettes = {};
+  if (!data.fournisseurs) data.fournisseurs = [];
   if (!data.units) data.units = [...DEFAULT_UNITS];
   // Migrate office products
   if (data.zones && data.zones.office) {
@@ -2021,7 +2053,7 @@ function openDetail(id) {
   }
   // Reset tabs to hist
   document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('ta',i===0));
-  ['tc-hist','tc-quick','tc-conso','tc-params','tc-fournisseur'].forEach((tid,i)=>{const el=document.getElementById(tid);if(el)el.classList.toggle('hidden',i!==0);});
+  ['tc-hist','tc-quick','tc-conso','tc-cmd','tc-params','tc-fournisseur'].forEach((tid,i)=>{const el=document.getElementById(tid);if(el)el.classList.toggle('hidden',i!==0);});
   renderHistory();
   // Prefill params
   document.getElementById('ps-seuil').value = found.p.seuil||'';
@@ -2116,12 +2148,14 @@ function renderHistory() {
 function showTab(tab, btn) {
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('ta'));
   if(btn) btn.classList.add('ta');
-  ['hist','quick','conso','params','fournisseur'].forEach(t=>{
+  ['hist','quick','conso','cmd','params','fournisseur'].forEach(t=>{
     const el=document.getElementById('tc-'+t);
     if(el) el.classList.toggle('hidden', t!==tab);
   });
   if(tab==='quick') initQuickEntry();
   if(tab==='conso') renderConsoTab();
+  if(tab==='cmd') initCmdTab();
+  if(tab==='fournisseur') populateSupDirSelect();
 }
 
 // ===== QUICK ENTRY =====
@@ -2407,6 +2441,7 @@ function loadSupFields(p, idx) {
   ['societe','mail','mailcc','contact','tel','ref'].forEach(f=>{const el=document.getElementById('sup-'+f);if(el)el.value=sup[f]||'';});
   const prixEl=document.getElementById('sup-prix');if(prixEl)prixEl.value=sup.prix||'';
   const deviseEl=document.getElementById('sup-devise');if(deviseEl)deviseEl.value=sup.devise||'EUR';
+  populateSupDirSelect();
 }
 
 function switchSupTab(idx) {
