@@ -4575,8 +4575,10 @@ function sendWithApp(appType) {
       if(mailcc) p.set('cc',mailcc);
       url='https://mail.google.com/mail/?'+p.toString();
     } else if(appType==='outlook'){
-      const cc2=mailcc?`&cc=${encodeURIComponent(mailcc)}`:'';
-      url=`mailto:${mail}?subject=${encodeURIComponent(subject)}${cc2}&body=${encodeURIComponent(body)}`;
+      // Outlook Office 365 web compose — works with corporate accounts
+      const p=new URLSearchParams({to:mail,subject,body});
+      if(mailcc) p.set('cc',mailcc);
+      url='https://outlook.office.com/mail/deeplink/compose?'+p.toString();
     } else {
       const cc=mailcc?`&cc=${encodeURIComponent(mailcc)}`:'';
       url=`mailto:${mail}?subject=${encodeURIComponent(subject)}${cc}&body=${encodeURIComponent(body)}`;
