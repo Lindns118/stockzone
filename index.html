@@ -4451,9 +4451,10 @@ function sendWithApp(appType) {
       if(mailcc) p.set('cc',mailcc);
       url='https://mail.google.com/mail/?'+p.toString();
     } else if(appType==='outlook'){
-      const p=new URLSearchParams({to:mail,subject,body});
-      if(mailcc) p.set('cc',mailcc);
-      url='ms-outlook://compose?'+p.toString();
+      // Android intent URL — forces Outlook app regardless of default app setting
+      const intentParams = new URLSearchParams({to:mail,subject,body});
+      if(mailcc) intentParams.set('cc',mailcc);
+      url='intent://compose?'+intentParams.toString()+'#Intent;scheme=mailto;package=com.microsoft.office.outlook;end';
     } else {
       const cc=mailcc?`&cc=${encodeURIComponent(mailcc)}`:'';
       url=`mailto:${mail}?subject=${encodeURIComponent(subject)}${cc}&body=${encodeURIComponent(body)}`;
