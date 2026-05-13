@@ -1147,6 +1147,7 @@ function gdConnect() {
           renderReglages();
           toast('✅ Connecté à Google Drive', 'success');
           if(GD.autoSync) gdSave(false);
+          checkDailyBackup();
         }
       }
     } catch(e) {
@@ -1276,6 +1277,96 @@ function gdSetAuto(val) {
   GD.autoSync = val;
   gdSaveConfig();
   toast(val ? '☁️ Sauvegarde auto activée' : 'Sauvegarde auto désactivée', val ? 'success' : 'info');
+}
+
+// ===== SAUVEGARDES JOURNALIÈRES =====
+const DAILY_PFX = 'StockZone_daily_';
+const DAILY_KEEP_DAYS = 7;
+
+async function checkDailyBackup() {
+  if (!GD.token) return;
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+  const slot = now.getHours() < 14 ? 'matin' : 'soir';
+  if (localStorage.getItem('sz_daily_' + slot) === today) return;
+  await gdDailyBackup(today, slot);
+}
+
+async function gdDailyBackup(dateStr, slot) {
+  try {
+    const fileName = DAILY_PFX + dateStr + '_' + slot + '.json';
+    const payload = JSON.stringify({version:1, date:new Date().toISOString(), slot, dateStr, data:S});
+    const meta = {name: fileName, parents: ['appDataFolder']};
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(meta)], {type:'application/json'}));
+    form.append('file', new Blob([payload], {type:'application/json'}));
+    const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+      method:'POST', headers:{'Authorization':'Bearer ' + GD.token}, body:form
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    localStorage.setItem('sz_daily_' + slot, dateStr);
+    toast('☁️ Sauvegarde ' + (slot==='matin'?'🌅 matin':'☀️ après-midi') + ' enregistrée', 'success');
+    gdCleanupOldBackups();
+    gdLoadDailyList();
+  } catch(e) {
+    console.warn('Daily backup failed:', e.message);
+  }
+}
+
+async function gdCleanupOldBackups() {
+  try {
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name+contains+'${DAILY_PFX}'&fields=files(id,name)&orderBy=createdTime+desc&pageSize=100`,
+      {headers:{'Authorization':'Bearer ' + GD.token}}
+    );
+    const json = await res.json();
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - DAILY_KEEP_DAYS);
+    (json.files||[]).forEach(f => {
+      const m = f.name.match(/StockZone_daily_(\d{4}-\d{2}-\d{2})_/);
+      if (!m || new Date(m[1]) < cutoff)
+        fetch(`https://www.googleapis.com/drive/v3/files/${f.id}`, {method:'DELETE', headers:{'Authorization':'Bearer ' + GD.token}}).catch(()=>{});
+    });
+  } catch(e) {}
+}
+
+async function gdLoadDailyList() {
+  const el = document.getElementById('drive-daily-list');
+  if (!el || !GD.token) return;
+  el.innerHTML = '<div style="font-size:12px;color:var(--text2);padding:6px 0">Chargement…</div>';
+  try {
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name+contains+'${DAILY_PFX}'&fields=files(id,name,createdTime)&orderBy=createdTime+desc&pageSize=20`,
+      {headers:{'Authorization':'Bearer ' + GD.token}}
+    );
+    const json = await res.json();
+    const files = (json.files||[]).filter(f=>/StockZone_daily_\d{4}-\d{2}-\d{2}_/.test(f.name));
+    if (!files.length) { el.innerHTML='<div style="font-size:12px;color:var(--text2);padding:6px 0">Aucune sauvegarde journalière.</div>'; return; }
+    el.innerHTML = files.map(f=>{
+      const m = f.name.match(/StockZone_daily_(\d{4}-\d{2}-\d{2})_(matin|soir)/);
+      const date = m ? m[1].split('-').reverse().join('/') : '?';
+      const slotLbl = m ? (m[2]==='matin'?'🌅 Matin':'☀️ Après-midi') : '?';
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--gray2)">
+        <div><div style="font-size:13px;font-weight:600">${date}</div><div style="font-size:11px;color:var(--text2)">${slotLbl}</div></div>
+        <button onclick="gdRestoreDaily('${f.id}','${date} ${slotLbl}')" style="font-size:11px;padding:5px 11px;border-radius:7px;border:1.5px solid var(--blue);background:#fff;color:var(--blue);cursor:pointer;font-family:inherit">Restaurer</button>
+      </div>`;
+    }).join('');
+  } catch(e) { el.innerHTML='<div style="font-size:12px;color:var(--red)">Erreur de chargement</div>'; }
+}
+
+async function gdRestoreDaily(fileId, label) {
+  if (!GD.token) return;
+  const ok = await confirm2('Restaurer cette sauvegarde ?', label + '\nVos données actuelles seront remplacées.', 'Restaurer');
+  if (!ok) return;
+  try {
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {headers:{'Authorization':'Bearer ' + GD.token}});
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const backup = await res.json();
+    if (!backup.data || !backup.data.zones) throw new Error('Format invalide');
+    S = migrateData(backup.data);
+    save(); switchZone(currentZone);
+    toast('☁️ Données restaurées depuis la sauvegarde', 'success');
+  } catch(e) { toast('❌ Erreur : ' + e.message, 'error'); }
 }
 
 function gdSetClientId(v) {
@@ -4464,6 +4555,8 @@ function renderDriveBody() {
   if(GD.token) {
     const stCls = GD.status==='syncing'?'ds-sync':GD.status==='err'?'ds-err':'ds-ok';
     const stTxt = GD.status==='syncing'?'⟳ Synchronisation…':GD.status==='err'?'⚠ Dernière sync échouée':'✓ Connecté à Google Drive';
+    const matinDone = localStorage.getItem('sz_daily_matin')===new Date().toISOString().slice(0,10);
+    const soirDone  = localStorage.getItem('sz_daily_soir') ===new Date().toISOString().slice(0,10);
     el.innerHTML =
       '<div class="drive-status '+stCls+'"><span class="drive-dot"></span>'+stTxt+'</div>'+
       '<button class="drive-btn drive-btn-save" onclick="gdSave()">☁️ Sauvegarder maintenant</button>'+
@@ -4471,7 +4564,14 @@ function renderDriveBody() {
       '<div class="drive-auto"><span class="drive-auto-lbl">Sauvegarde automatique</span>'+
       '<label class="toggle-sw"><input type="checkbox"'+(GD.autoSync?' checked':'')+' onchange="gdSetAuto(this.checked)"><span class="toggle-slider"></span></label></div>'+
       (GD.lastSync?'<div class="drive-last">Dernière sync : '+GD.lastSync+'</div>':'')+
+      '<div style="margin:12px 0 6px;font-size:12px;font-weight:700;color:var(--text2);letter-spacing:.04em">SAUVEGARDES JOURNALIÈRES</div>'+
+      '<div style="font-size:12px;color:var(--text2);margin-bottom:8px">Aujourd\'hui : '+
+      '<span style="color:'+(matinDone?'var(--green)':'var(--amber)')+'">🌅 Matin '+(matinDone?'✓':'—')+'</span>  '+
+      '<span style="color:'+(soirDone?'var(--green)':'var(--amber)')+'">☀️ 14h '+(soirDone?'✓':'—')+'</span></div>'+
+      '<div id="drive-daily-list" style="margin-bottom:10px"></div>'+
+      '<button class="drive-btn" style="margin-bottom:8px;background:var(--gray);color:var(--text)" onclick="gdDailyBackup(new Date().toISOString().slice(0,10),new Date().getHours()<14?\'matin\':\'soir\')">📅 Forcer sauvegarde maintenant</button>'+
       '<button class="drive-btn drive-btn-disconnect" onclick="gdDisconnect()">Se déconnecter</button>';
+    gdLoadDailyList();
   } else if(GD.clientId) {
     el.innerHTML =
       '<div class="drive-status ds-off"><span class="drive-dot"></span>Non connecté</div>'+
