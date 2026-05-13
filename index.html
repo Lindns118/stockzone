@@ -4575,10 +4575,10 @@ function sendWithApp(appType) {
       if(mailcc) p.set('cc',mailcc);
       url='https://mail.google.com/mail/?'+p.toString();
     } else if(appType==='outlook'){
-      // Outlook Office 365 web compose — works with corporate accounts
-      const p=new URLSearchParams({to:mail,subject,body});
-      if(mailcc) p.set('cc',mailcc);
-      url='https://outlook.office.com/mail/deeplink/compose?'+p.toString();
+      // intent:// with scheme=ms-outlook forces the Outlook app directly on Android
+      const params=`to=${encodeURIComponent(mail)}&subject=${encodeURIComponent(subject)}${mailcc?'&cc='+encodeURIComponent(mailcc):''}&body=${encodeURIComponent(body)}`;
+      const fallback=encodeURIComponent('https://outlook.office.com/mail/deeplink/compose?'+params);
+      url=`intent://compose?${params}#Intent;scheme=ms-outlook;package=com.microsoft.office.outlook;S.browser_fallback_url=${fallback};end`;
     } else {
       const cc=mailcc?`&cc=${encodeURIComponent(mailcc)}`:'';
       url=`mailto:${mail}?subject=${encodeURIComponent(subject)}${cc}&body=${encodeURIComponent(body)}`;
