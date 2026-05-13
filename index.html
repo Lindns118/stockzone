@@ -469,6 +469,7 @@ table.conso-tbl tfoot td.num{font-weight:700}
     <button class="tab-btn ta" onclick="showTab('hist',this)">📋 Historique</button>
     <button class="tab-btn" onclick="showTab('quick',this)">⚡ Saisie</button>
     <button class="tab-btn" onclick="showTab('conso',this)">📉 Conso</button>
+    <button class="tab-btn" onclick="showTab('cmd',this)">✉️ Cmd</button>
     <button class="tab-btn" onclick="showTab('params',this)">⚙ Params</button>
     <button class="tab-btn" onclick="showTab('fournisseur',this)">🏭 Fourn.</button>
   </div>
@@ -510,6 +511,7 @@ table.conso-tbl tfoot td.num{font-weight:700}
     </div>
   </div>
   <div id="tc-conso" class="hidden"></div>
+  <div id="tc-cmd" class="hidden"></div>
   <div id="tc-params" class="hidden">
     <div class="param-section">
       <label class="fl">Seuil d'alerte</label>
@@ -553,6 +555,12 @@ table.conso-tbl tfoot td.num{font-weight:700}
   </div>
   <div id="tc-fournisseur" class="hidden">
     <div class="param-section">
+      <div style="margin-bottom:14px">
+        <label class="fl">Choisir depuis le répertoire</label>
+        <select id="sup-dir-select" class="fi" onchange="applyFournisseurFromDir(this.value)">
+          <option value="">— Saisie manuelle —</option>
+        </select>
+      </div>
       <div style="display:flex;gap:6px;margin-bottom:14px">
         <button class="sup-tab-btn sta" onclick="switchSupTab(0)">1</button>
         <button class="sup-tab-btn" onclick="switchSupTab(1)">2</button>
@@ -872,6 +880,28 @@ table.conso-tbl tfoot td.num{font-weight:700}
 </div>
 </div>
 
+<!-- FOURNISSEUR DIR MODAL -->
+<div id="modal-fournisseur-dir" class="modal-overlay hidden" onclick="overlayClose(event,'modal-fournisseur-dir')">
+<div class="modal-sheet">
+  <div class="mh-row">
+    <div class="mh-icon" style="background:#e8f4fd">🏭</div>
+    <div><div class="m-title" id="fdir-modal-title">Ajouter un fournisseur</div></div>
+    <button class="m-close" onclick="hideModal('modal-fournisseur-dir')">✕</button>
+  </div>
+  <label class="fl">Nom / Société</label>
+  <input type="text" id="fdir-nom" class="fi" maxlength="150" style="margin-bottom:11px" placeholder="Acme Corp">
+  <label class="fl">Email principal</label>
+  <input type="email" id="fdir-mail" class="fi" maxlength="200" style="margin-bottom:11px" placeholder="contact@acme.com">
+  <label class="fl">Email CC <span style="font-size:11px;color:var(--text2)">(optionnel)</span></label>
+  <input type="email" id="fdir-mailcc" class="fi" maxlength="200" style="margin-bottom:11px" placeholder="cc@acme.com">
+  <label class="fl">Personne de contact</label>
+  <input type="text" id="fdir-contact" class="fi" maxlength="100" style="margin-bottom:11px" placeholder="Prénom Nom">
+  <label class="fl">Téléphone</label>
+  <input type="tel" id="fdir-tel" class="fi" maxlength="30" style="margin-bottom:16px" placeholder="+33 6 00 00 00 00">
+  <button class="btn-primary" onclick="saveFournisseurDir()">💾 Enregistrer</button>
+</div>
+</div>
+
 <!-- SEUIL MODAL -->
 <div id="modal-seuil" class="modal-overlay hidden" onclick="overlayClose(event,'modal-seuil')">
 <div class="modal-sheet">
@@ -1007,6 +1037,7 @@ const DEF = {
   prets: [],
   attributions: [],
   palettes: {},
+  fournisseurs: [],
   units: [...DEFAULT_UNITS]
 };
 
@@ -1043,6 +1074,7 @@ function migrateData(data) {
   if (!data.prets) data.prets = [];
   if (!data.attributions) data.attributions = [];
   if (!data.palettes) data.palettes = {};
+  if (!data.fournisseurs) data.fournisseurs = [];
   if (!data.units) data.units = [...DEFAULT_UNITS];
   // Migrate office products
   if (data.zones && data.zones.office) {
@@ -2021,7 +2053,7 @@ function openDetail(id) {
   }
   // Reset tabs to hist
   document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('ta',i===0));
-  ['tc-hist','tc-quick','tc-conso','tc-params','tc-fournisseur'].forEach((tid,i)=>{const el=document.getElementById(tid);if(el)el.classList.toggle('hidden',i!==0);});
+  ['tc-hist','tc-quick','tc-conso','tc-cmd','tc-params','tc-fournisseur'].forEach((tid,i)=>{const el=document.getElementById(tid);if(el)el.classList.toggle('hidden',i!==0);});
   renderHistory();
   // Prefill params
   document.getElementById('ps-seuil').value = found.p.seuil||'';
@@ -2116,12 +2148,14 @@ function renderHistory() {
 function showTab(tab, btn) {
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('ta'));
   if(btn) btn.classList.add('ta');
-  ['hist','quick','conso','params','fournisseur'].forEach(t=>{
+  ['hist','quick','conso','cmd','params','fournisseur'].forEach(t=>{
     const el=document.getElementById('tc-'+t);
     if(el) el.classList.toggle('hidden', t!==tab);
   });
   if(tab==='quick') initQuickEntry();
   if(tab==='conso') renderConsoTab();
+  if(tab==='cmd') initCmdTab();
+  if(tab==='fournisseur') populateSupDirSelect();
 }
 
 // ===== QUICK ENTRY =====
@@ -2407,6 +2441,7 @@ function loadSupFields(p, idx) {
   ['societe','mail','mailcc','contact','tel','ref'].forEach(f=>{const el=document.getElementById('sup-'+f);if(el)el.value=sup[f]||'';});
   const prixEl=document.getElementById('sup-prix');if(prixEl)prixEl.value=sup.prix||'';
   const deviseEl=document.getElementById('sup-devise');if(deviseEl)deviseEl.value=sup.devise||'EUR';
+  populateSupDirSelect();
 }
 
 function switchSupTab(idx) {
@@ -2432,6 +2467,37 @@ function saveFournisseur() {
   currentProduct.suppliers[_supIdx]=sup;
   save();
   toast('✅ Fournisseur '+(_supIdx+1)+' enregistré','success');
+}
+
+function populateSupDirSelect() {
+  const sel = document.getElementById('sup-dir-select');
+  if (!sel) return;
+  const fours = S.fournisseurs || [];
+  // Keep first placeholder option, rebuild the rest
+  sel.innerHTML = '<option value="">— Saisie manuelle —</option>'
+    + fours.map(f => `<option value="${f.id}">${esc(f.nom)}</option>`).join('');
+  // Pre-select if current slot has a dirId
+  if (currentProduct) {
+    const sups = getProductSuppliers(currentProduct);
+    const sup = sups[_supIdx] || {};
+    if (sup.dirId) sel.value = sup.dirId;
+  }
+}
+
+function applyFournisseurFromDir(id) {
+  if (!id) return;
+  const f = (S.fournisseurs || []).find(x => x.id === id);
+  if (!f) return;
+  const fields = {societe: f.nom, mail: f.mail, mailcc: f.mailcc, contact: f.contact, tel: f.tel};
+  Object.entries(fields).forEach(([k,v]) => {
+    const el = document.getElementById('sup-' + k); if (el) el.value = v || '';
+  });
+  // Save dirId so the right entry is pre-selected on re-open
+  if (currentProduct) {
+    if (!currentProduct.suppliers) currentProduct.suppliers = [];
+    while (currentProduct.suppliers.length <= _supIdx) currentProduct.suppliers.push({});
+    currentProduct.suppliers[_supIdx].dirId = id;
+  }
 }
 
 function callFournisseur() {
@@ -2537,6 +2603,51 @@ function drawBarChart(ctx, W, H, data) {
     ctx.fillStyle='#9ca3af';ctx.font='9px DM Sans';ctx.textAlign='center';
     ctx.fillText(d.label,x+bw/2,chartH+16);
   });
+}
+
+// ===== CMD TAB =====
+function initCmdTab() {
+  if (!currentProduct) return;
+  const el = document.getElementById('tc-cmd');
+  if (!el) return;
+  const sups = getProductSuppliers(currentProduct);
+  const activeSups = sups.map((s,i) => ({s,i})).filter(({s}) => s && Object.keys(s).length > 0);
+  if (!activeSups.length) {
+    el.innerHTML = '<div class="empty-state" style="padding:28px 0"><div class="ei">🏭</div><p>Aucun fournisseur configuré — renseignez l\'onglet 🏭 Fourn.</p></div>';
+    return;
+  }
+  const cards = activeSups.map(({s,i}) => `
+    <div style="background:var(--gray);border-radius:12px;padding:14px;margin-bottom:10px">
+      <div style="font-weight:600;font-size:13px;margin-bottom:4px">${esc(s.societe||'Fournisseur '+(i+1))}</div>
+      ${s.mail ? '<div style="font-size:12px;color:var(--text2);margin-bottom:8px">'+esc(s.mail)+'</div>' : ''}
+      <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+        <input type="number" id="cmd-qty-${i}" class="fi fi-sm" min="1" placeholder="Qté" style="width:80px">
+        <span style="font-size:12px;color:var(--text2)">${esc(currentProduct.unit||'')}</span>
+        <button class="btn-primary" style="flex:1" onclick="sendQuickOrder(${i}, document.getElementById('cmd-qty-${i}').value)">✉️ Commander</button>
+      </div>
+    </div>`).join('');
+  el.innerHTML = `<div style="padding:4px 0">${cards}</div>`;
+}
+
+function sendQuickOrder(supIdx, qty) {
+  if (!currentProduct) return;
+  const q = parseFloat(qty);
+  if (!q || q <= 0) { toast('⚠ Veuillez saisir une quantité', 'error'); return; }
+  const sups = getProductSuppliers(currentProduct);
+  const sup = sups[supIdx] || {};
+  const mail = sup.mail || '';
+  if (!mail) { toast('⚠ Aucun email configuré pour ce fournisseur', 'error'); return; }
+  const mailcc = sup.mailcc || '';
+  const ref = sup.ref || currentProduct.officialName || currentProduct.name;
+  const contact = sup.contact || '';
+  const societe = sup.societe || '';
+  const intro = contact ? `Bonjour ${contact},` : `Bonjour${societe ? ' ' + societe : ''},`;
+  const subject = `Commande — ${ref}`;
+  const body = `${intro}\n\nNous souhaitons passer commande pour le produit suivant :${societe ? '\nSociété : ' + societe : ''}\n\nRéférence : ${ref}\nProduit : ${currentProduct.officialName || currentProduct.name}\nQuantité souhaitée : ${q} ${currentProduct.unit || ''}\n\nMerci de nous confirmer la disponibilité et le délai de livraison.\n\nCordialement`;
+  _pendingEmails = [{mail, mailcc, subject, body}];
+  const sub = document.getElementById('mailapp-sub');
+  if (sub) sub.textContent = '1 email à envoyer';
+  showModal('mailapp');
 }
 
 // ===== INVENTAIRE =====
@@ -4530,6 +4641,11 @@ function renderReglages() {
   ev.innerHTML = `<div class="settings-wrap">
 
     <div class="settings-section">
+      <div class="settings-section-title">📋 Répertoire fournisseurs</div>
+      <div class="settings-card" id="fournisseurs-dir-list"></div>
+    </div>
+
+    <div class="settings-section">
       <div class="settings-section-title">Zones de stock</div>
       <div class="settings-card">
         ${zonesHTML}
@@ -4622,6 +4738,87 @@ function renderReglages() {
 
   </div>`;
   renderDriveBody();
+  renderFournisseursDir();
+}
+
+// ── FOURNISSEURS DIRECTORY ──
+let _fournisseurDirEditId = null;
+
+function renderFournisseursDir() {
+  const el = document.getElementById('fournisseurs-dir-list');
+  if (!el) return;
+  const fours = S.fournisseurs || [];
+  if (!fours.length) {
+    el.innerHTML = '<div style="padding:12px;color:var(--text2);font-size:13px">Aucun fournisseur enregistré</div>'
+      + '<div class="zone-edit-row" style="cursor:pointer" onclick="openFournisseurDirModal(null)">'
+      + '<div class="ze-icon">➕</div><div class="ze-name" style="color:var(--blue)">Ajouter un fournisseur</div></div>';
+    return;
+  }
+  const rows = fours.map(f => `
+    <div class="zone-edit-row">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:13px">${esc(f.nom)}</div>
+        <div style="font-size:12px;color:var(--text2)">${esc(f.mail||'')}${f.tel?' · '+esc(f.tel):''}</div>
+      </div>
+      <button class="ze-edit" onclick="openFournisseurDirModal('${f.id}')">✏️</button>
+      <button class="ze-edit" style="color:var(--red)" onclick="deleteFournisseurDir('${f.id}')">🗑</button>
+    </div>`).join('');
+  el.innerHTML = rows + '<div class="zone-edit-row" style="cursor:pointer" onclick="openFournisseurDirModal(null)">'
+    + '<div class="ze-icon">➕</div><div class="ze-name" style="color:var(--blue)">Ajouter un fournisseur</div></div>';
+}
+
+function openFournisseurDirModal(id) {
+  _fournisseurDirEditId = id;
+  const titleEl = document.getElementById('fdir-modal-title');
+  if (id) {
+    const f = (S.fournisseurs || []).find(x => x.id === id);
+    if (!f) return;
+    if (titleEl) titleEl.textContent = 'Modifier le fournisseur';
+    document.getElementById('fdir-nom').value = f.nom || '';
+    document.getElementById('fdir-mail').value = f.mail || '';
+    document.getElementById('fdir-mailcc').value = f.mailcc || '';
+    document.getElementById('fdir-contact').value = f.contact || '';
+    document.getElementById('fdir-tel').value = f.tel || '';
+  } else {
+    if (titleEl) titleEl.textContent = 'Ajouter un fournisseur';
+    ['fdir-nom','fdir-mail','fdir-mailcc','fdir-contact','fdir-tel'].forEach(fid => {
+      const el = document.getElementById(fid); if (el) el.value = '';
+    });
+  }
+  showModal('fournisseur-dir');
+}
+
+function saveFournisseurDir() {
+  if (!S.fournisseurs) S.fournisseurs = [];
+  const nom = (document.getElementById('fdir-nom')?.value || '').trim();
+  if (!nom) { toast('⚠ Le nom est obligatoire', 'error'); return; }
+  const entry = {
+    id: _fournisseurDirEditId || uid(),
+    nom,
+    mail: (document.getElementById('fdir-mail')?.value || '').trim(),
+    mailcc: (document.getElementById('fdir-mailcc')?.value || '').trim(),
+    contact: (document.getElementById('fdir-contact')?.value || '').trim(),
+    tel: (document.getElementById('fdir-tel')?.value || '').trim()
+  };
+  if (_fournisseurDirEditId) {
+    const idx = S.fournisseurs.findIndex(f => f.id === _fournisseurDirEditId);
+    if (idx !== -1) S.fournisseurs[idx] = entry; else S.fournisseurs.push(entry);
+  } else {
+    S.fournisseurs.push(entry);
+  }
+  save();
+  hideModal('modal-fournisseur-dir');
+  renderFournisseursDir();
+  toast('✅ Fournisseur enregistré', 'success');
+}
+
+async function deleteFournisseurDir(id) {
+  const ok = await confirm2('Supprimer ce fournisseur ?', 'Cette action est irréversible.', 'Supprimer');
+  if (!ok) return;
+  S.fournisseurs = (S.fournisseurs || []).filter(f => f.id !== id);
+  save();
+  renderFournisseursDir();
+  toast('🗑 Fournisseur supprimé');
 }
 
 // ── UNITS ──
