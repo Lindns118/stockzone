@@ -886,6 +886,19 @@ table.conso-tbl tfoot td.num{font-weight:700}
   <div class="mh-row">
     <div class="mh-icon" style="background:#e8f4fd">🏭</div>
     <div><div class="m-title" id="fdir-modal-title">Ajouter un fournisseur</div></div>
+
+<!-- COMMANDE FOURNISSEUR RÉPERTOIRE -->
+<div id="modal-dir-order" class="modal-overlay hidden" onclick="overlayClose(event,'modal-dir-order')">
+<div class="modal-sheet">
+  <div class="mh-row">
+    <div class="mh-icon" style="background:#e8f4fd">✉️</div>
+    <div><div class="m-title">Commander</div><div class="m-sub" id="dir-order-sub"></div></div>
+    <button class="m-close" onclick="hideModal('modal-dir-order')">✕</button>
+  </div>
+  <div id="dir-order-body"></div>
+  <button class="btn-primary" style="margin-top:14px" onclick="confirmDirOrder()">📧 Envoyer la commande</button>
+</div>
+</div>
     <button class="m-close" onclick="hideModal('modal-fournisseur-dir')">✕</button>
   </div>
   <label class="fl">Nom / Société</label>
@@ -4760,11 +4773,88 @@ function renderFournisseursDir() {
         <div style="font-weight:600;font-size:13px">${esc(f.nom)}</div>
         <div style="font-size:12px;color:var(--text2)">${esc(f.mail||'')}${f.tel?' · '+esc(f.tel):''}</div>
       </div>
+      <button class="ze-edit" style="color:var(--blue)" onclick="openDirOrderModal('${f.id}')" title="Commander">✉️</button>
       <button class="ze-edit" onclick="openFournisseurDirModal('${f.id}')">✏️</button>
       <button class="ze-edit" style="color:var(--red)" onclick="deleteFournisseurDir('${f.id}')">🗑</button>
     </div>`).join('');
   el.innerHTML = rows + '<div class="zone-edit-row" style="cursor:pointer" onclick="openFournisseurDirModal(null)">'
     + '<div class="ze-icon">➕</div><div class="ze-name" style="color:var(--blue)">Ajouter un fournisseur</div></div>';
+}
+
+let _dirOrderFid = null;
+
+function openDirOrderModal(fid) {
+  const f = (S.fournisseurs||[]).find(x=>x.id===fid);
+  if (!f) return;
+  _dirOrderFid = fid;
+  // Find all products linked to this supplier
+  const linked = [];
+  Object.entries(S.zones).forEach(([,z])=>{
+    z.products.forEach(p=>{
+      const sups = p.suppliers && p.suppliers.length ? p.suppliers : (p.supplier ? [p.supplier] : []);
+      const match = sups.some(s=>s && (s.dirId===fid || (s.mail && s.mail===f.mail)));
+      if (match) linked.push(p);
+    });
+  });
+  const sub = document.getElementById('dir-order-sub');
+  if (sub) sub.textContent = `chez ${f.nom}`;
+  const body = document.getElementById('dir-order-body');
+  if (!body) return;
+  if (!linked.length) {
+    body.innerHTML = `<div style="padding:16px 0;color:var(--text2);font-size:13px;text-align:center">Aucun produit lié à ce fournisseur.<br>Assignez ce fournisseur dans l'onglet 🏭 Fourn. d'un produit.</div>`;
+  } else {
+    body.innerHTML = linked.map(p=>`
+      <div style="padding:10px 0;border-bottom:1px solid var(--gray2)">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+          <div style="display:flex;align-items:center;gap:9px;flex:1;min-width:0">
+            <input type="checkbox" id="dco-chk-${p.id}" checked style="width:18px;height:18px;accent-color:var(--blue);flex-shrink:0">
+            <div>
+              <div style="font-weight:600;font-size:14px">${esc(p.name)}</div>
+              <div style="font-size:11px;color:var(--text2)">Stock : ${p.qty} ${p.unit}</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+            <input type="number" id="dco-qty-${p.id}" class="fi fi-sm" min="1" step="any" placeholder="Qté" style="width:75px;text-align:center">
+            <span style="font-size:12px;color:var(--text2)">${esc(p.unit)}</span>
+          </div>
+        </div>
+      </div>`).join('');
+  }
+  showModal('dir-order');
+}
+
+function confirmDirOrder() {
+  const f = (S.fournisseurs||[]).find(x=>x.id===_dirOrderFid);
+  if (!f) return;
+  const body = document.getElementById('dir-order-body');
+  if (!body) return;
+  const items = [];
+  const noQty = [];
+  body.querySelectorAll('[id^="dco-chk-"]').forEach(chk=>{
+    if (!chk.checked) return;
+    const pid = chk.id.replace('dco-chk-','');
+    const qty = parseFloat(document.getElementById('dco-qty-'+pid)?.value)||0;
+    const p = findProduct(pid)?.p;
+    if (!p) return;
+    if (qty <= 0) { noQty.push(p.name); return; }
+    // Get the matching supplier slot for ref
+    const sups = p.suppliers && p.suppliers.length ? p.suppliers : (p.supplier ? [p.supplier] : []);
+    const sup = sups.find(s=>s&&(s.dirId===_dirOrderFid||(s.mail&&s.mail===f.mail))) || {};
+    items.push({p, qty, ref: sup.ref||p.officialName||p.name});
+  });
+  if (noQty.length) { toast(`⚠ Quantité manquante : ${noQty.join(', ')}`, 'error'); return; }
+  if (!items.length) { toast('⚠ Sélectionnez au moins un produit', 'error'); return; }
+  if (!f.mail) { toast('⚠ Cet fournisseur n\'a pas d\'email — ajoutez-en un dans le répertoire', 'error'); return; }
+  const lignes = items.map(({p,qty,ref},i)=>`${i+1}. ${p.name}\n   Référence : ${ref}\n   Quantité souhaitée : ${qty} ${p.unit}`).join('\n\n');
+  const contact = f.contact||'';
+  const intro = contact ? `Bonjour ${contact},` : `Bonjour ${f.nom},`;
+  const subject = `Commande — ${items.length>1?items.length+' produits':items[0].ref}`;
+  const body2 = `${intro}\n\nNous souhaitons passer commande pour les produits suivants :\n\n${lignes}\n\nMerci de nous confirmer la disponibilité et les délais de livraison.\n\nCordialement`;
+  _pendingEmails = [{mail:f.mail, mailcc:f.mailcc||'', subject, body:body2}];
+  hideModal('modal-dir-order');
+  const sub = document.getElementById('mailapp-sub');
+  if (sub) sub.textContent = '1 email à envoyer';
+  showModal('mailapp');
 }
 
 function openFournisseurDirModal(id) {
