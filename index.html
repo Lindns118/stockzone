@@ -4453,7 +4453,7 @@ function sendWithApp(appType) {
     } else if(appType==='outlook'){
       const p=new URLSearchParams({to:mail,subject,body});
       if(mailcc) p.set('cc',mailcc);
-      url='https://outlook.live.com/mail/0/deeplink/compose?'+p.toString();
+      url='ms-outlook://compose?'+p.toString();
     } else {
       const cc=mailcc?`&cc=${encodeURIComponent(mailcc)}`:'';
       url=`mailto:${mail}?subject=${encodeURIComponent(subject)}${cc}&body=${encodeURIComponent(body)}`;
