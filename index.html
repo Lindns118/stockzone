@@ -886,19 +886,6 @@ table.conso-tbl tfoot td.num{font-weight:700}
   <div class="mh-row">
     <div class="mh-icon" style="background:#e8f4fd">🏭</div>
     <div><div class="m-title" id="fdir-modal-title">Ajouter un fournisseur</div></div>
-
-<!-- COMMANDE FOURNISSEUR RÉPERTOIRE -->
-<div id="modal-dir-order" class="modal-overlay hidden" onclick="overlayClose(event,'modal-dir-order')">
-<div class="modal-sheet">
-  <div class="mh-row">
-    <div class="mh-icon" style="background:#e8f4fd">✉️</div>
-    <div><div class="m-title">Commander</div><div class="m-sub" id="dir-order-sub"></div></div>
-    <button class="m-close" onclick="hideModal('modal-dir-order')">✕</button>
-  </div>
-  <div id="dir-order-body"></div>
-  <button class="btn-primary" style="margin-top:14px" onclick="confirmDirOrder()">📧 Envoyer la commande</button>
-</div>
-</div>
     <button class="m-close" onclick="hideModal('modal-fournisseur-dir')">✕</button>
   </div>
   <label class="fl">Nom / Société</label>
@@ -912,6 +899,19 @@ table.conso-tbl tfoot td.num{font-weight:700}
   <label class="fl">Téléphone</label>
   <input type="tel" id="fdir-tel" class="fi" maxlength="30" style="margin-bottom:16px" placeholder="+33 6 00 00 00 00">
   <button class="btn-primary" onclick="saveFournisseurDir()">💾 Enregistrer</button>
+</div>
+</div>
+
+<!-- COMMANDE FOURNISSEUR RÉPERTOIRE -->
+<div id="modal-dir-order" class="modal-overlay hidden" onclick="overlayClose(event,'modal-dir-order')">
+<div class="modal-sheet">
+  <div class="mh-row">
+    <div class="mh-icon" style="background:#e8f4fd">✉️</div>
+    <div><div class="m-title">Commander</div><div class="m-sub" id="dir-order-sub"></div></div>
+    <button class="m-close" onclick="hideModal('modal-dir-order')">✕</button>
+  </div>
+  <div id="dir-order-body"></div>
+  <button class="btn-primary" style="margin-top:14px" onclick="confirmDirOrder()">📧 Envoyer la commande</button>
 </div>
 </div>
 
