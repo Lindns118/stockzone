@@ -814,6 +814,28 @@ table.conso-tbl tfoot td.num{font-weight:700}
 </div>
 </div>
 
+<!-- CHOIX APPLICATION EMAIL -->
+<div id="modal-mailapp" class="modal-overlay hidden" onclick="overlayClose(event,'modal-mailapp')">
+<div class="modal-sheet">
+  <div class="mh-row">
+    <div class="mh-icon" style="background:#e8f4fd">📧</div>
+    <div><div class="m-title">Ouvrir avec…</div><div class="m-sub" id="mailapp-sub"></div></div>
+    <button class="m-close" onclick="hideModal('modal-mailapp')">✕</button>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:10px;margin-top:4px">
+    <button onclick="sendWithApp('gmail')" style="display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:12px;border:1.5px solid var(--gray2);background:#fff;cursor:pointer;font-family:inherit;font-size:14px;font-weight:500;text-align:left">
+      <span style="font-size:22px">📬</span><span>Gmail</span>
+    </button>
+    <button onclick="sendWithApp('outlook')" style="display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:12px;border:1.5px solid var(--gray2);background:#fff;cursor:pointer;font-family:inherit;font-size:14px;font-weight:500;text-align:left">
+      <span style="font-size:22px">📩</span><span>Outlook</span>
+    </button>
+    <button onclick="sendWithApp('default')" style="display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:12px;border:1.5px solid var(--gray2);background:#fff;cursor:pointer;font-family:inherit;font-size:14px;font-weight:500;text-align:left">
+      <span style="font-size:22px">✉️</span><span>Application par défaut</span>
+    </button>
+  </div>
+</div>
+</div>
+
 <!-- EXPORT -->
 <div id="modal-export" class="modal-overlay hidden" onclick="overlayClose(event,'modal-export')">
 <div class="modal-sheet">
@@ -4233,11 +4255,11 @@ function renderAlertes(zoneFilter='all') {
       <div class="as-card"><div class="as-num">${totalAlerts()}</div><div class="as-lbl">stocks bas</div></div>
       <div class="as-card"><div class="as-num">${okCount}</div><div class="as-lbl">OK</div></div>
     </div>
-    <div class="filter-bar">
-      <button class="f-btn${zoneFilter==='all'?' fa':''}" onclick="renderAlertes('all')">Toutes les zones</button>
-      <button class="f-btn${zoneFilter==='entrepot'?' fa':''}" onclick="renderAlertes('entrepot')">📦 Entrepôt</button>
-      <button class="f-btn${zoneFilter==='vetements'?' fa':''}" onclick="renderAlertes('vetements')">👕 Vêtements</button>
-      <button class="f-btn${zoneFilter==='office'?' fa':''}" onclick="renderAlertes('office')">🏢 Office</button>
+    <div style="margin-bottom:14px">
+      <select onchange="renderAlertes(this.value)" style="width:100%;padding:10px 12px;border-radius:11px;border:1.5px solid var(--gray2);background:#fff;font-size:14px;font-weight:500;font-family:inherit;cursor:pointer;appearance:auto">
+        <option value="all"${zoneFilter==='all'?' selected':''}>🌐 Toutes les zones</option>
+        ${Object.entries(S.zones).map(([k,z])=>`<option value="${k}"${zoneFilter===k?' selected':''}>${z.icon} ${esc(z.name)}</option>`).join('')}
+      </select>
     </div>
     ${alerts.length?`
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
@@ -4339,6 +4361,8 @@ function openOrderModal() {
   showModal('order');
 }
 
+let _pendingEmails = [];
+
 function confirmOrderEmails() {
   const groups={};
   const noEmail=[];
@@ -4367,7 +4391,8 @@ function confirmOrderEmails() {
   const entries=Object.entries(groups);
   if(!entries.length) return;
 
-  entries.forEach(([,group],idx)=>{
+  // Build raw (unencoded) email payloads
+  _pendingEmails = entries.map(([,group])=>{
     const {mail,mailcc,sup:sup0,items}=group;
     const contact=sup0.contact||'';
     const societe=sup0.societe||'';
@@ -4375,15 +4400,37 @@ function confirmOrderEmails() {
       const ref=sup.ref||p.officialName||p.name;
       return `${i+1}. ${p.name}\n   Référence : ${ref}\n   Quantité souhaitée : ${qty} ${p.unit}`;
     }).join('\n\n');
-    const subj=encodeURIComponent(`Commande — ${items.length>1?items.length+' produits':items[0].sup?.ref||items[0].p.name}`);
+    const subject=`Commande — ${items.length>1?items.length+' produits':items[0].sup?.ref||items[0].p.name}`;
     const intro=contact?`Bonjour ${contact},`:`Bonjour${societe?' '+societe:''},`;
-    const body=encodeURIComponent(`${intro}\n\nNous souhaitons passer commande pour les produits suivants :\n\n${lignes}\n\nMerci de nous confirmer la disponibilité et les délais de livraison.\n\nCordialement`);
-    const cc=mailcc?`&cc=${encodeURIComponent(mailcc)}`:'';
-    setTimeout(()=>window.open(`mailto:${mail}?subject=${subj}${cc}&body=${body}`,'_blank'), idx*400);
+    const body=`${intro}\n\nNous souhaitons passer commande pour les produits suivants :\n\n${lignes}\n\nMerci de nous confirmer la disponibilité et les délais de livraison.\n\nCordialement`;
+    return {mail,mailcc,subject,body};
   });
 
   hideModal('modal-order');
-  toast(`📧 ${entries.length} email${entries.length>1?'s':''} ouvert${entries.length>1?'s':''}`, 'success');
+  const sub=document.getElementById('mailapp-sub');
+  if(sub) sub.textContent=`${_pendingEmails.length} email${_pendingEmails.length>1?'s':''} à envoyer`;
+  showModal('mailapp');
+}
+
+function sendWithApp(appType) {
+  hideModal('modal-mailapp');
+  _pendingEmails.forEach(({mail,mailcc,subject,body},idx)=>{
+    let url;
+    if(appType==='gmail'){
+      const p=new URLSearchParams({view:'cm',fs:'1',to:mail,su:subject,body});
+      if(mailcc) p.set('cc',mailcc);
+      url='https://mail.google.com/mail/?'+p.toString();
+    } else if(appType==='outlook'){
+      const p=new URLSearchParams({to:mail,subject,body});
+      if(mailcc) p.set('cc',mailcc);
+      url='https://outlook.live.com/mail/0/deeplink/compose?'+p.toString();
+    } else {
+      const cc=mailcc?`&cc=${encodeURIComponent(mailcc)}`:'';
+      url=`mailto:${mail}?subject=${encodeURIComponent(subject)}${cc}&body=${encodeURIComponent(body)}`;
+    }
+    setTimeout(()=>window.open(url,'_blank'),idx*400);
+  });
+  toast(`📧 ${_pendingEmails.length} email${_pendingEmails.length>1?'s':''} ouvert${_pendingEmails.length>1?'s':''}`, 'success');
 }
 
 // ===== SEUIL MODAL =====
