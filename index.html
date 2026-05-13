@@ -1669,7 +1669,7 @@ function renderProducts() {
         const gprods = grouped[gname] || [];
         const isOpen = !!openGroups[currentZone+':'+gname];
         const hasAlert = gprods.some(p=>p.seuil>0&&p.qty<=p.seuil);
-        const totalQty = gprods.reduce((s,p)=>s+p.qty,0);
+        const totalQty = r2(gprods.reduce((s,p)=>s+p.qty,0));
         const isEmpty = gprods.length === 0;
         html += `<div class="group-header ${zoneGroupClass}${hasAlert?' group-alert':''}" onclick="toggleGroup('${esc(gname)}')">
           <div style="display:flex;justify-content:space-between;align-items:center">
