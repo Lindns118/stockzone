@@ -3771,7 +3771,6 @@ function onProdChk(name,checked){
   const total=inputs.length;
   _prodFilterNoneMode=false;
   if(!checked&&selectedProds.size===0){
-    // Était "tous" → initialiser avec tous puis retirer celui décoché
     inputs.forEach(cb=>selectedProds.add(cb.nextElementSibling.textContent));
   }
   if(checked) selectedProds.add(name); else selectedProds.delete(name);
