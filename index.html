@@ -3767,8 +3767,12 @@ function prodFilterNone(){
 }
 function onProdChk(name,checked){
   const panel=document.getElementById('prod-filter-panel');
-  const total=panel?panel.querySelectorAll('.pfp-item input').length:0;
+  const inputs=panel?panel.querySelectorAll('.pfp-item input'):[];
+  const total=inputs.length;
   _prodFilterNoneMode=false;
+  if(!checked&&selectedProds.size===0){
+    inputs.forEach(cb=>selectedProds.add(cb.nextElementSibling.textContent));
+  }
   if(checked) selectedProds.add(name); else selectedProds.delete(name);
   if(selectedProds.size>=total) selectedProds.clear();
   updateProdFilterSummary(total);
