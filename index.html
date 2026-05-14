@@ -4506,7 +4506,7 @@ function openOrderModal() {
           ${supSelect}
         </div>
         <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-          <input type="number" id="oqty-${pid}" class="fi fi-sm" min="1" step="any" placeholder="Qté" style="width:75px;text-align:center" value="${p.seuil>p.qty?Math.ceil(p.seuil-p.qty):''}">
+          <input type="number" id="oqty-${pid}" class="fi fi-sm" min="1" step="any" placeholder="Qté" style="width:75px;text-align:center" value="${Math.max(1,Math.ceil(p.seuil-p.qty))}">
           <span style="font-size:12px;color:var(--text2)">${esc(p.unit)}</span>
         </div>
       </div>
