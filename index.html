@@ -1496,6 +1496,7 @@ let currentProduct = null;
 let _supIdx = 0;
 let currentPretType = 'pret';
 let selectedProds = new Set(); // empty = all products
+let _prodFilterNoneMode = false;
 let editHistTarget = null;
 let seuilTarget = null;
 let confirmCb = null;
@@ -3750,32 +3751,24 @@ function renderProdFilter(){
   prods.sort((a,b)=>a.localeCompare(b,'fr'));
   for(const n of [...selectedProds]) if(!prods.includes(n)) selectedProds.delete(n);
   panel.innerHTML=`<div class="pfp-header">
-    <button onclick="selectedProds.clear();renderProdFilter();renderConsoTable()">✓ Tous</button>
+    <button onclick="selectedProds.clear();_prodFilterNoneMode=false;renderProdFilter();renderConsoTable()">✓ Tous</button>
     <button onclick="prodFilterNone()">✗ Aucun</button>
   </div>`+
   prods.map(n=>{
-    const chk=selectedProds.size===0||selectedProds.has(n);
+    const chk=!_prodFilterNoneMode&&(selectedProds.size===0||selectedProds.has(n));
     return `<label class="pfp-item"><input type="checkbox" ${chk?'checked':''} onchange="onProdChk('${n.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;')}',this.checked)"><span>${esc(n)}</span></label>`;
   }).join('');
   updateProdFilterSummary(prods.length);
 }
 function prodFilterNone(){
-  const panel=document.getElementById('prod-filter-panel');
-  if(!panel)return;
-  const prods=[];
-  panel.querySelectorAll('.pfp-item input').forEach(cb=>{
-    cb.checked=false;
-    prods.push(cb.nextElementSibling.textContent);
-  });
-  // Select all so that unchecking means "filter to nothing"
-  // Instead, keep all unchecked = show all (reset)
   selectedProds.clear();
+  _prodFilterNoneMode=true;
   renderProdFilter();renderConsoTable();
 }
 function onProdChk(name,checked){
-  // Build full list from checkboxes
   const panel=document.getElementById('prod-filter-panel');
   const total=panel?panel.querySelectorAll('.pfp-item input').length:0;
+  _prodFilterNoneMode=false;
   if(checked) selectedProds.add(name); else selectedProds.delete(name);
   if(selectedProds.size>=total) selectedProds.clear();
   updateProdFilterSummary(total);
@@ -3785,7 +3778,7 @@ function updateProdFilterSummary(total){
   const el=document.getElementById('prod-filter-summary');
   if(!el)return;
   const n=selectedProds.size;
-  el.textContent=n===0?'📦 Tous les produits ▾':`📦 ${n} produit${n>1?'s':''} sélectionné${n>1?'s':''} ▾`;
+  el.textContent=_prodFilterNoneMode&&n===0?'📦 Aucun produit ▾':n===0?'📦 Tous les produits ▾':`📦 ${n} produit${n>1?'s':''} sélectionné${n>1?'s':''} ▾`;
 }
 
 function populateCatFilter(catSel,zoneSel){
@@ -3846,6 +3839,7 @@ function renderConsoTable(){
         if(cat.startsWith('groupe:')){if(p.groupe!==cat.slice(7))return;}
         else{if(p.category!==cat)return;}
       }
+      if(_prodFilterNoneMode&&selectedProds.size===0)return;
       if(selectedProds.size>0&&!selectedProds.has(p.name))return;
       const raw=calcConso(p,period);
       const grouped={};
