@@ -4575,28 +4575,15 @@ function sendWithApp(appType) {
       if(mailcc) p.set('cc',mailcc);
       url='https://mail.google.com/mail/?'+p.toString();
     } else if(appType==='outlook'){
-      // Anchor click triggers intent URL handling in Android browsers (window.open/_blank doesn't)
-      const data='mailto%3A'+encodeURIComponent(mail);
-      const sub=encodeURIComponent(subject);
-      const bod=encodeURIComponent(body);
-      const ccPart=mailcc?`;S.android.intent.extra.CC=${encodeURIComponent(mailcc)}`:'';
+      // intent://?to=EMAIL&... creates mailto://?to=EMAIL (Outlook reads 'to' query param, no // in address)
+      const query=`to=${encodeURIComponent(mail)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}${mailcc?'&cc='+encodeURIComponent(mailcc):''}`;
       const fallback=encodeURIComponent(`https://outlook.office.com/mail/deeplink/compose?to=${encodeURIComponent(mail)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
-      url=`intent:#Intent;action=android.intent.action.SENDTO;data=${data};S.android.intent.extra.SUBJECT=${sub};S.android.intent.extra.TEXT=${bod}${ccPart};package=com.microsoft.office.outlook;S.browser_fallback_url=${fallback};end`;
+      url=`intent://?${query}#Intent;scheme=mailto;package=com.microsoft.office.outlook;S.browser_fallback_url=${fallback};end`;
     } else {
       const cc=mailcc?`&cc=${encodeURIComponent(mailcc)}`:'';
       url=`mailto:${mail}?subject=${encodeURIComponent(subject)}${cc}&body=${encodeURIComponent(body)}`;
     }
-    setTimeout(()=>{
-      if(appType==='outlook'){
-        const a=document.createElement('a');
-        a.setAttribute('href',url);
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(()=>a.remove(),100);
-      } else {
-        window.open(url,'_blank');
-      }
-    },idx*400);
+    setTimeout(()=>window.open(url,'_blank'),idx*400);
   });
   toast(`📧 ${_pendingEmails.length} email${_pendingEmails.length>1?'s':''} ouvert${_pendingEmails.length>1?'s':''}`, 'success');
 }
