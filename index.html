@@ -1504,6 +1504,10 @@ const pendingCardValues = {}; // pid → unsaved input value
 
 // ===== INIT =====
 window.addEventListener('DOMContentLoaded', () => {
+  // Restore stats sort preference (default: ordre)
+  const savedSort = localStorage.getItem('sz_tbl_sort') || 'ordre';
+  const sortEl = document.getElementById('tbl-sort');
+  if(sortEl) sortEl.value = savedSort;
   setTimeout(() => {
     document.getElementById('splash').style.display = 'none';
     document.getElementById('main').classList.remove('hidden');
@@ -4141,8 +4145,8 @@ function renderStats() {
             <option value="quarter">Par trimestre</option>
             <option value="year">Par année</option>
           </select>
-          <select id="tbl-sort" onchange="renderConsoTable()">
-            <option value="ordre">🔢 Ordre</option>
+          <select id="tbl-sort" onchange="localStorage.setItem('sz_tbl_sort',this.value);renderConsoTable()">
+            <option value="ordre" selected>🔢 Ordre</option>
             <option value="alpha">A → Z</option>
             <option value="desc">Total ↓</option>
             <option value="asc">Total ↑</option>
