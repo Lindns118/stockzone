@@ -4466,7 +4466,7 @@ function updateOrderBar() {
   let withMail=0;
   selectedAlerts.forEach(pid=>{
     const p=findProduct(pid)?.p;
-    if(p?.supplier?.mail) withMail++;
+    if(p&&getProductSuppliers(p).some(s=>s&&s.mail)) withMail++;
   });
   const noMail=n-withMail;
   const hint=noMail>0?`<span>${noMail} sans email fournisseur</span>`:'';
@@ -4506,7 +4506,7 @@ function openOrderModal() {
           ${supSelect}
         </div>
         <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-          <input type="number" id="oqty-${pid}" class="fi fi-sm" min="1" step="any" placeholder="Qté" style="width:75px;text-align:center" value="">
+          <input type="number" id="oqty-${pid}" class="fi fi-sm" min="1" step="any" placeholder="Qté" style="width:75px;text-align:center" value="${p.seuil>p.qty?Math.ceil(p.seuil-p.qty):''}">
           <span style="font-size:12px;color:var(--text2)">${esc(p.unit)}</span>
         </div>
       </div>
