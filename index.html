@@ -4575,13 +4575,12 @@ function sendWithApp(appType) {
       if(mailcc) p.set('cc',mailcc);
       url='https://mail.google.com/mail/?'+p.toString();
     } else if(appType==='outlook'){
-      // SENDTO action with mailto: data forces Outlook app on Android (ms-outlook:// not supported on Android)
-      const data='mailto%3A'+encodeURIComponent(mail);
-      const sub=encodeURIComponent(subject);
-      const bod=encodeURIComponent(body);
-      const cc=mailcc?`;S.android.intent.extra.CC=${encodeURIComponent(mailcc)}`:'';
+      // intent://USER@DOMAIN?...#Intent;scheme=mailto;package=... creates mailto:USER@DOMAIN?...
+      // targeting Outlook. intent:// (with //) is required for window.open on Android browsers.
+      const [local,...dom]=mail.split('@'); const domain=dom.join('@');
+      const query=`subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}${mailcc?'&cc='+encodeURIComponent(mailcc):''}`;
       const fallback=encodeURIComponent(`https://outlook.office.com/mail/deeplink/compose?to=${encodeURIComponent(mail)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
-      url=`intent:#Intent;action=android.intent.action.SENDTO;data=${data};S.android.intent.extra.SUBJECT=${sub};S.android.intent.extra.TEXT=${bod}${cc};package=com.microsoft.office.outlook;S.browser_fallback_url=${fallback};end`;
+      url=`intent://${local}@${domain}?${query}#Intent;scheme=mailto;package=com.microsoft.office.outlook;S.browser_fallback_url=${fallback};end`;
     } else {
       const cc=mailcc?`&cc=${encodeURIComponent(mailcc)}`:'';
       url=`mailto:${mail}?subject=${encodeURIComponent(subject)}${cc}&body=${encodeURIComponent(body)}`;
