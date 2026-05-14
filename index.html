@@ -4575,8 +4575,7 @@ function sendWithApp(appType) {
       if(mailcc) p.set('cc',mailcc);
       url='https://mail.google.com/mail/?'+p.toString();
     } else if(appType==='outlook'){
-      // intent:#Intent;action=SENDTO;data=mailto%3AEMAIL creates mailto:EMAIL (no //)
-      // window.location.href needed for intent: (no //) format on Android browsers
+      // Anchor click triggers intent URL handling in Android browsers (window.open/_blank doesn't)
       const data='mailto%3A'+encodeURIComponent(mail);
       const sub=encodeURIComponent(subject);
       const bod=encodeURIComponent(body);
@@ -4588,8 +4587,15 @@ function sendWithApp(appType) {
       url=`mailto:${mail}?subject=${encodeURIComponent(subject)}${cc}&body=${encodeURIComponent(body)}`;
     }
     setTimeout(()=>{
-      if(appType==='outlook') window.location.href=url;
-      else window.open(url,'_blank');
+      if(appType==='outlook'){
+        const a=document.createElement('a');
+        a.setAttribute('href',url);
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(()=>a.remove(),100);
+      } else {
+        window.open(url,'_blank');
+      }
     },idx*400);
   });
   toast(`📧 ${_pendingEmails.length} email${_pendingEmails.length>1?'s':''} ouvert${_pendingEmails.length>1?'s':''}`, 'success');
