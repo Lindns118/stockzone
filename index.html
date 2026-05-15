@@ -5410,7 +5410,6 @@ function enterVetementsMode() {
   vetCatFilter = 'all';
   const vc = document.getElementById('vet-content');
   if (vc) vc.style.display = 'none';
-  switchZone('vetements');
   buildVetNavTabs();
 }
 
@@ -5445,7 +5444,7 @@ function setVetTab(tab) {
     currentVetTab = 'stock';
     vetCatFilter = 'all';
     vc.style.display = 'none';
-    switchZone('vetements');
+    renderProducts();
   } else {
     currentVetTab = tab;
     vetCatFilter = 'all';
