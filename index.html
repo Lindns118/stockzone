@@ -4857,6 +4857,7 @@ function renderFournisseursDir() {
         <div style="font-weight:600;font-size:13px">${esc(f.nom)}</div>
         <div style="font-size:12px;color:var(--text2)">${esc(f.mail||'')}${f.tel?' · '+esc(f.tel):''}</div>
       </div>
+      ${f.tel?`<a class="ze-edit" style="color:var(--green);text-decoration:none" href="tel:${esc(f.tel)}" title="Appeler">📞</a>`:''}
       <button class="ze-edit" style="color:var(--blue)" onclick="openDirOrderModal('${f.id}')" title="Commander">✉️</button>
       <button class="ze-edit" onclick="openFournisseurDirModal('${f.id}')">✏️</button>
       <button class="ze-edit" style="color:var(--red)" onclick="deleteFournisseurDir('${f.id}')">🗑</button>
