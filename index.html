@@ -3854,6 +3854,20 @@ function calcConso(product, period='month') {
     const key=period==='week'?getWeekKey(cur.date):cur.date.slice(0,7);
     if(key) r[key]=r2((r[key]||0)+c);
   }
+  // For vetements products managed via distributions (don): count don events
+  // when there aren't enough inventory snapshots to derive consumption
+  const dons = product.history.filter(h=>h.type==='don'&&h.qty>0&&h.date&&/^\d{4}-\d{2}-\d{2}/.test(h.date));
+  if (dons.length) {
+    // Only use don events for periods not already covered by snapshot pairs
+    const coveredFrom = invs.length >= 2 ? new Date(invs[0].date) : null;
+    const coveredTo   = invs.length >= 2 ? new Date(invs[invs.length-1].date) : null;
+    dons.forEach(h => {
+      const d = new Date(h.date);
+      if (coveredFrom && d >= coveredFrom && d <= coveredTo) return; // snapshot already covers this
+      const key = period==='week' ? getWeekKey(h.date) : h.date.slice(0,7);
+      if (key) r[key] = r2((r[key]||0) + h.qty);
+    });
+  }
   return r;
 }
 
