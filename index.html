@@ -4069,10 +4069,20 @@ function renderConsoTable(){
       });
       const total=r2(Object.values(grouped).reduce((a,v)=>a+v,0));
       const displayName=p.groupe?`${p.groupe} › ${p.name}`:p.name;
-      // Last non-zero period consumption for days-remaining estimate
-      const sortedPks=Object.keys(grouped).sort();
-      const lastPeriodConso=sortedPks.reduceRight((found,pk)=>found||(grouped[pk]>0?grouped[pk]:0),0);
-      rows.push({name:p.name,displayName,cat:p.category,unit:p.unit,zone:z.name,groupe:p.ordre,ordre:p.ordre,grouped,total,qty:p.qty,lastPeriodConso});
+      // Daily rate: sum of last 7 known days with consumption data
+      const byDay={};
+      p.history.filter(h=>h.type==='don'&&h.qty>0&&h.date).forEach(h=>{const d=h.date.slice(0,10);byDay[d]=(byDay[d]||0)+h.qty;});
+      const knownDays=Object.keys(byDay).sort().reverse().slice(0,7);
+      let dailyRate=null;
+      if(knownDays.length){
+        dailyRate=knownDays.reduce((s,d)=>s+byDay[d],0)/7;
+      } else {
+        // Fallback for non-don products: use last period / its days
+        const sortedPks=Object.keys(grouped).sort();
+        const lastConso=sortedPks.reduceRight((f,pk)=>f||(grouped[pk]>0?grouped[pk]:0),0);
+        if(lastConso>0){const dpp=period==='week'?7:period==='year'?365:period==='quarter'?91:30.44;dailyRate=lastConso/dpp;}
+      }
+      rows.push({name:p.name,displayName,cat:p.category,unit:p.unit,zone:z.name,groupe:p.ordre,ordre:p.ordre,grouped,total,qty:p.qty,dailyRate});
     });
   });
 
@@ -4133,10 +4143,8 @@ function renderConsoTable(){
       return `<td class="num ${cls}">${v}<span class="mini-bar" style="width:${bw}px;background:${cls==='hi'?'#ef4444':cls==='med'?'#f59e0b':'#2d35a8'}"></span></td>`;
     }).join('');
     let daysTag = '';
-    if (r.lastPeriodConso > 0 && r.qty >= 0) {
-      const daysPerPeriod = period==='week'?7:period==='year'?365:period==='quarter'?91:30.44;
-      const dailyRate = r.lastPeriodConso / daysPerPeriod;
-      const days = Math.round(r.qty / dailyRate);
+    if (r.dailyRate > 0 && r.qty >= 0) {
+      const days = Math.round(r.qty / r.dailyRate);
       const col = days <= 7 ? '#ef4444' : days <= 30 ? '#f59e0b' : '#16a34a';
       daysTag = ` <span style="font-size:11px;color:${col};font-weight:600">(~${days}j)</span>`;
     }
