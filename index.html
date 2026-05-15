@@ -431,6 +431,40 @@ body.vet-mode .main{padding-bottom:20px}
 .pack-distrib-title{font-weight:600;font-size:14px;margin-bottom:10px}
 .pack-distrib-row{display:flex;gap:8px}
 .pack-distrib-btn{background:#7c3aed;color:#fff;border:none;border-radius:10px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;flex-shrink:0}
+/* VET CONTENT OVERLAY */
+#vet-content{display:none;position:fixed;top:96px;left:0;right:0;bottom:0;overflow-y:auto;background:#f5f3ff;z-index:148;padding:14px 14px 30px;-webkit-overflow-scrolling:touch}
+.vet-tab-sep{width:1px;background:rgba(91,33,182,.25);flex-shrink:0;margin:2px 4px}
+.vet-nav-btn{background:transparent;border:none;border-radius:20px;padding:6px 13px;font-size:13px;font-weight:500;cursor:pointer;color:#5b21b6;white-space:nowrap;flex-shrink:0;transition:background .15s,color .15s}
+.vet-nav-btn.active{background:#7c3aed;color:#fff}
+.vc-sec{font-weight:700;font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin:16px 0 8px}
+.vc-sec:first-child{margin-top:0}
+.dpk-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px}
+.dpk-card{background:#fff;border-radius:12px;padding:14px 10px;border-left:4px solid;box-shadow:0 1px 4px rgba(0,0,0,.07);cursor:pointer;transition:transform .12s,box-shadow .12s;text-align:center}
+.dpk-card.sel{box-shadow:0 0 0 2.5px #7c3aed,0 2px 8px rgba(124,58,237,.2)}
+.dpk-card:active{transform:scale(.96)}
+.dpk-icon{font-size:26px;margin-bottom:4px}
+.dpk-name{font-size:12px;font-weight:700;color:#1f1f1f}
+.dpk-count{font-size:11px;color:#9ca3af}
+.dsz-card{background:#fff;border-radius:14px;padding:14px;box-shadow:0 1px 5px rgba(0,0,0,.07);margin-bottom:10px}
+.dsz-name{font-weight:600;font-size:14px;margin-bottom:6px;color:#1f1f1f}
+.sz-btns{display:flex;flex-wrap:wrap;gap:6px}
+.sz-btn{background:#f3f4f6;border:2px solid transparent;border-radius:8px;padding:6px 9px;font-size:12px;font-weight:700;cursor:pointer;min-width:38px;text-align:center;color:#374151;transition:all .12s;line-height:1.2}
+.sz-btn.sel{background:#ede9fe;border-color:#7c3aed;color:#7c3aed}
+.sz-btn.zero{opacity:.35}
+.dperson-card{background:#fff;border-radius:14px;padding:14px;box-shadow:0 1px 5px rgba(0,0,0,.07);margin-bottom:10px}
+.distrib-btn{width:100%;background:#7c3aed;color:#fff;border:none;border-radius:14px;padding:14px;font-size:16px;font-weight:700;cursor:pointer;margin-top:6px}
+.distrib-btn:active{background:#5b21b6}
+.pcard{background:#fff;border-radius:14px;padding:14px 16px;box-shadow:0 1px 5px rgba(0,0,0,.07);margin-bottom:10px;display:flex;align-items:center;gap:12px;cursor:pointer}
+.pcard-avatar{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;flex-shrink:0}
+.pcard-info{flex:1;min-width:0}
+.pcard-name{font-weight:700;font-size:15px}
+.pcard-sub{font-size:12px;color:#6b7280;margin-top:2px}
+.pcard-arrow{color:#9ca3af;font-size:18px}
+.p-detail{background:#fff;border-radius:14px;padding:14px;box-shadow:0 1px 5px rgba(0,0,0,.07);margin-bottom:12px}
+.p-sz-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f3f4f6;font-size:13px}
+.p-sz-name{flex:1;font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.p-hist-item{padding:8px 0;border-bottom:1px solid #f3f4f6;font-size:13px}
+.add-person-btn{width:100%;background:#7c3aed;color:#fff;border:none;border-radius:12px;padding:12px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:14px;display:flex;align-items:center;justify-content:center;gap:8px}
 </style>
 </head>
 <body>
@@ -1108,7 +1142,8 @@ const DEF = {
     {id:'pack_employe', name:'Pack employé', icon:'💼', color:'#2563eb', items:[]},
     {id:'pack_ete',     name:'Pack été',     icon:'☀️', color:'#16a34a', items:[]},
     {id:'pack_hiver',   name:'Pack hiver',   icon:'❄️', color:'#0891b2', items:[]}
-  ]
+  ],
+  persons: []
 };
 
 
@@ -1199,6 +1234,7 @@ function migrateData(data) {
     });
   }
   if (!data.vetPacks) data.vetPacks = JSON.parse(JSON.stringify(DEF.vetPacks));
+  if (!data.persons) data.persons = [];
   return data;
 }
 
@@ -1551,7 +1587,9 @@ function save() {
 let currentZone = 'entrepot';
 let currentSort = localStorage.getItem('sz_sort') || 'ordre';
 let vetCatFilter = 'all';
+let currentVetTab = 'stock';
 let lastNonVetZone = 'entrepot';
+let _newPersonSizes = {};
 let currentProduct = null;
 let _supIdx = 0;
 let currentPretType = 'pret';
@@ -5199,35 +5237,7 @@ async function confirmResetAll() {
   toast('✅ Données réinitialisées');
 }
 
-// ── VET PACKS ──
-function showVetPacks() {
-  if (!S.vetPacks) S.vetPacks = JSON.parse(JSON.stringify(DEF.vetPacks));
-  renderVetPacksList();
-  showModal('vet-packs');
-}
-
-function renderVetPacksList() {
-  const el = document.getElementById('vet-packs-list');
-  if (!el) return;
-  el.innerHTML = (S.vetPacks || []).map(pack => {
-    const preview = pack.items.length
-      ? pack.items.slice(0,3).map(i=>`<div class="pack-preview-item">• ${esc(i.name)} × ${i.qty}</div>`).join('') +
-        (pack.items.length>3 ? `<div class="pack-preview-item" style="color:#9ca3af">+${pack.items.length-3} autres…</div>` : '')
-      : '<div class="pack-preview-item" style="font-style:italic;color:#9ca3af">Aucun article configuré</div>';
-    return `<div class="pack-card" style="border-left-color:${pack.color}">
-      <div class="pack-card-top">
-        <span class="pack-icon-lg">${pack.icon}</span>
-        <div><div class="pack-name">${esc(pack.name)}</div><div class="pack-count">${pack.items.length} article${pack.items.length!==1?'s':''}</div></div>
-      </div>
-      <div class="pack-preview">${preview}</div>
-      <div class="pack-actions">
-        <button class="pack-act-btn pack-act-edit" onclick="openPackEditor('${pack.id}');hideModal('modal-vet-packs')">✏️ Modifier</button>
-        <button class="pack-act-btn pack-act-distrib" ${!pack.items.length?'disabled':''} onclick="openPackEditor('${pack.id}');hideModal('modal-vet-packs')">🎁 Distribuer</button>
-      </div>
-    </div>`;
-  }).join('');
-}
-
+// ── VET PACKS (editor modal functions) ──
 function openPackEditor(packId) {
   const pack = (S.vetPacks || []).find(p => p.id === packId);
   if (!pack) return;
@@ -5281,6 +5291,7 @@ function packItemAdd() {
   sel.value = '';
   document.getElementById('pack-add-qty').value = '1';
   toast('✅ Article ajouté', 'success');
+  if (currentVetTab === 'packs') refreshVetPacksTab();
 }
 
 function packItemQtyChange(packId, idx, delta) {
@@ -5322,37 +5333,390 @@ function distributePackFromEditor() {
   save();
   renderProducts();
   hideModal('modal-pack-edit');
+  if (currentVetTab === 'packs') refreshVetPacksTab();
   toast(`✅ Pack "${pack.name}" distribué à ${person}`, 'success');
+}
+
+function refreshVetPacksTab() {
+  const vc = document.getElementById('vet-content');
+  if (vc && currentVetTab === 'packs') vc.innerHTML = buildVetPacksTabHTML();
+  buildVetNavTabs();
 }
 
 // ── VETEMENTS MODE ──
 function enterVetementsMode() {
   document.body.classList.add('vet-mode');
-  rebuildVetCatTabs();
+  currentVetTab = 'stock';
+  vetCatFilter = 'all';
+  const vc = document.getElementById('vet-content');
+  if (vc) vc.style.display = 'none';
+  buildVetNavTabs();
 }
 
 function exitVetementsMode() {
   vetCatFilter = 'all';
+  currentVetTab = 'stock';
+  const vc = document.getElementById('vet-content');
+  if (vc) vc.style.display = 'none';
   switchZone(lastNonVetZone);
 }
 
-function rebuildVetCatTabs() {
+function buildVetNavTabs() {
   const zd = S.zones.vetements;
-  if (!zd) return;
-  const cats = [...new Set(zd.products.map(p => p.category))].sort((a,b) => a.localeCompare(b,'fr'));
+  const cats = zd ? [...new Set(zd.products.map(p=>p.category))].sort((a,b)=>a.localeCompare(b,'fr')) : [];
   const tabs = document.getElementById('vet-cat-tabs');
   if (!tabs) return;
-  let html = `<button class="vet-cat-btn${vetCatFilter==='all'?' active':''}" onclick="setVetCat('all')">Tous</button>`;
-  cats.forEach(c => {
-    html += `<button class="vet-cat-btn${vetCatFilter===c?' active':''}" onclick="setVetCat(${JSON.stringify(c)})">${esc(c)}</button>`;
+  let html = cats.map(c => {
+    const active = currentVetTab==='stock' && vetCatFilter===c ? ' active' : '';
+    return `<button class="vet-nav-btn${active}" onclick="setVetTab('c:${c}')">${esc(c)}</button>`;
+  }).join('');
+  if (cats.length) html += '<span class="vet-tab-sep"></span>';
+  [{id:'packs',icon:'📦',lbl:'Packs'},{id:'distribution',icon:'🎁',lbl:'Distribution'},{id:'personnes',icon:'👥',lbl:'Personnes'}].forEach(t => {
+    const active = currentVetTab===t.id ? ' active' : '';
+    html += `<button class="vet-nav-btn${active}" onclick="setVetTab('${t.id}')">${t.icon} ${t.lbl}</button>`;
   });
   tabs.innerHTML = html;
 }
 
-function setVetCat(cat) {
-  vetCatFilter = cat;
-  rebuildVetCatTabs();
+function setVetTab(tab) {
+  const vc = document.getElementById('vet-content');
+  if (!vc) return;
+  if (tab.startsWith('c:')) {
+    const cat = tab.slice(2);
+    currentVetTab = 'stock';
+    vetCatFilter = vetCatFilter === cat ? 'all' : cat;
+    vc.style.display = 'none';
+    renderProducts();
+  } else {
+    currentVetTab = tab;
+    vetCatFilter = 'all';
+    vc.style.display = 'block';
+    vc.scrollTop = 0;
+    if (tab === 'packs') vc.innerHTML = buildVetPacksTabHTML();
+    else if (tab === 'distribution') { distribState = {packId:null,sizes:{},personName:''}; vc.innerHTML = buildDistribHTML(); }
+    else if (tab === 'personnes') vc.innerHTML = buildPersonnesHTML();
+  }
+  buildVetNavTabs();
+}
+
+// ── PACKS TAB ──
+function buildVetPacksTabHTML() {
+  const packs = S.vetPacks || [];
+  if (!packs.length) return '<div style="text-align:center;color:#9ca3af;padding:40px 20px">Aucun pack configuré</div>';
+  return packs.map(pack => {
+    const preview = pack.items.length
+      ? pack.items.slice(0,3).map(i=>`<div class="pack-preview-item">• ${esc(i.name)} × ${i.qty}</div>`).join('') +
+        (pack.items.length>3 ? `<div class="pack-preview-item" style="color:#9ca3af">+${pack.items.length-3} autres…</div>` : '')
+      : '<div class="pack-preview-item" style="font-style:italic;color:#9ca3af">Aucun article configuré</div>';
+    return `<div class="pack-card" style="border-left-color:${pack.color}">
+      <div class="pack-card-top">
+        <span class="pack-icon-lg">${pack.icon}</span>
+        <div><div class="pack-name">${esc(pack.name)}</div><div class="pack-count">${pack.items.length} article${pack.items.length!==1?'s':''}</div></div>
+      </div>
+      <div class="pack-preview">${preview}</div>
+      <div class="pack-actions">
+        <button class="pack-act-btn pack-act-edit" onclick="openPackEditor('${pack.id}')">✏️ Modifier</button>
+        <button class="pack-act-btn pack-act-distrib" ${!pack.items.length?'disabled':''} onclick="setVetTab('distribution');setTimeout(()=>selectDistribPack('${pack.id}'),50)">🎁 Distribuer</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── DISTRIBUTION TAB ──
+let distribState = {packId: null, sizes: {}, personName: ''};
+
+function buildDistribHTML() {
+  const packs = S.vetPacks || [];
+  const persons = S.persons || [];
+  const personOpts = persons.map(p=>`<option value="${esc(p.name)}">`).join('');
+
+  const packsGrid = `<div class="vc-sec">📦 Choisir un pack</div>
+    <div class="dpk-grid">
+      ${packs.map(p=>`<div class="dpk-card${distribState.packId===p.id?' sel':''}" style="border-left-color:${p.color}" onclick="selectDistribPack('${p.id}')">
+        <div class="dpk-icon">${p.icon}</div>
+        <div class="dpk-name">${esc(p.name)}</div>
+        <div class="dpk-count">${p.items.length} article${p.items.length!==1?'s':''}</div>
+      </div>`).join('')}
+    </div>`;
+
+  const personSection = `<div class="vc-sec">👤 Bénéficiaire</div>
+    <div class="dperson-card">
+      <input id="distrib-person" class="fi" list="distrib-plist" placeholder="Nom du bénéficiaire…" value="${esc(distribState.personName)}" oninput="onDistribPersonChange(this.value)">
+      <datalist id="distrib-plist">${personOpts}</datalist>
+    </div>`;
+
+  const sizesHTML = distribState.packId ? buildSizeSectionHTML() : '';
+  const sizesSec = sizesHTML ? `<div class="vc-sec">📐 Tailles</div>${sizesHTML}` : '';
+
+  const confirmBtn = distribState.packId ? `<button class="distrib-btn" onclick="confirmDistrib()">✅ Enregistrer la distribution</button>` : '';
+
+  const donUnique = `<div class="vc-sec" style="margin-top:20px">🎁 Don unique</div>
+    <div class="dsz-card">
+      <select id="don-prod" class="fi" style="margin-bottom:8px" onchange="updateDonSizes()">
+        <option value="">Choisir un article…</option>
+        ${(S.zones.vetements?.products||[]).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}
+      </select>
+      <div id="don-size-area"></div>
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+        <label style="font-size:13px;color:#6b7280;flex-shrink:0">Qté :</label>
+        <input type="number" id="don-qty" class="fi" value="1" min="1" style="width:70px;padding:8px;text-align:center">
+      </div>
+      <button style="width:100%;background:#5b21b6;color:#fff;border:none;border-radius:12px;padding:11px;font-size:14px;font-weight:600;cursor:pointer;margin-top:10px" onclick="confirmDonUnique()">Enregistrer le don unique</button>
+    </div>`;
+
+  return packsGrid + personSection + sizesSec + confirmBtn + donUnique;
+}
+
+function buildSizeSectionHTML() {
+  const pack = (S.vetPacks||[]).find(p=>p.id===distribState.packId);
+  if (!pack) return '';
+  const zd = S.zones.vetements;
+  if (!zd) return '';
+  return pack.items.map(item => {
+    const product = zd.products.find(p=>p.id===item.productId);
+    if (!product) return '';
+    if (!product.sized) {
+      return `<div class="dsz-card"><div class="dsz-name">${esc(item.name)} <span style="font-size:12px;font-weight:400;color:#6b7280">× ${item.qty}</span></div><div style="font-size:13px;color:#6b7280">Sans taille</div></div>`;
+    }
+    const sizes = product.sizes || {};
+    const sel = distribState.sizes[item.productId] || '';
+    const btns = SIZES.map(s => {
+      const stock = sizes[s] || 0;
+      return `<button class="sz-btn${sel===s?' sel':''}${stock===0?' zero':''}" onclick="selectDistribSize('${item.productId}','${s}')">${s}<br><span style="font-size:10px;opacity:.7">${stock}</span></button>`;
+    }).join('');
+    return `<div class="dsz-card">
+      <div class="dsz-name">${esc(item.name)} <span style="font-size:12px;font-weight:400;color:#6b7280">× ${item.qty}</span></div>
+      <div class="sz-btns">${btns}</div>
+    </div>`;
+  }).join('');
+}
+
+function selectDistribPack(packId) {
+  distribState.packId = distribState.packId === packId ? null : packId;
+  if (distribState.packId) loadPersonSizesIfKnown();
+  refreshDistribView();
+}
+
+function onDistribPersonChange(name) {
+  distribState.personName = name;
+  loadPersonSizesIfKnown();
+}
+
+function loadPersonSizesIfKnown() {
+  const name = distribState.personName.trim().toLowerCase();
+  if (!name) return;
+  const person = (S.persons||[]).find(p=>p.name.toLowerCase()===name);
+  if (person && person.sizes) {
+    Object.assign(distribState.sizes, person.sizes);
+    refreshDistribView();
+  }
+}
+
+function selectDistribSize(productId, size) {
+  distribState.sizes[productId] = distribState.sizes[productId] === size ? '' : size;
+  refreshDistribView();
+}
+
+function refreshDistribView() {
+  const vc = document.getElementById('vet-content');
+  if (!vc || currentVetTab !== 'distribution') return;
+  const inp = document.getElementById('distrib-person');
+  if (inp) distribState.personName = inp.value;
+  vc.innerHTML = buildDistribHTML();
+  buildVetNavTabs();
+}
+
+function confirmDistrib() {
+  const person = (document.getElementById('distrib-person')?.value || '').trim();
+  if (!person) { toast('Saisissez un bénéficiaire', 'warning'); return; }
+  if (!distribState.packId) { toast('Sélectionnez un pack', 'warning'); return; }
+  const pack = (S.vetPacks||[]).find(p=>p.id===distribState.packId);
+  if (!pack) return;
+  const zd = S.zones.vetements;
+  const now = nowIso();
+  const itemsRecord = [];
+  pack.items.forEach(item => {
+    const product = zd?.products.find(p=>p.id===item.productId);
+    if (!product) return;
+    const size = distribState.sizes[item.productId] || null;
+    const diff = Math.min(item.qty, product.qty);
+    if (diff > 0) {
+      product.qty = r2(product.qty - diff);
+      if (size && product.sized && product.sizes && product.sizes[size] !== undefined) {
+        product.sizes[size] = Math.max(0, (product.sizes[size]||0) - diff);
+      }
+      product.history.push({id:uid(), type:'don', date:now, qty:diff, person, size:size||undefined});
+    }
+    itemsRecord.push({productId:item.productId, name:item.name, qty:item.qty, size});
+  });
+  if (!S.attributions) S.attributions = [];
+  S.attributions.push({id:uid(), person, packId:pack.id, packName:pack.name, date:now, items:itemsRecord});
+  updatePersonSizes(person, distribState.sizes);
+  save();
   renderProducts();
+  distribState = {packId:null, sizes:{}, personName:''};
+  setVetTab('distribution');
+  toast(`✅ Pack "${pack.name}" distribué à ${person}`, 'success');
+}
+
+function updatePersonSizes(name, sizes) {
+  if (!name) return;
+  if (!S.persons) S.persons = [];
+  let person = S.persons.find(p=>p.name.toLowerCase()===name.toLowerCase());
+  if (!person) { person = {id:uid(), name, sizes:{}}; S.persons.push(person); }
+  Object.entries(sizes||{}).forEach(([k,v])=>{ if(v) person.sizes[k]=v; });
+}
+
+function updateDonSizes() {
+  const prodId = document.getElementById('don-prod')?.value;
+  const area = document.getElementById('don-size-area');
+  if (!area) return;
+  if (!prodId) { area.innerHTML=''; return; }
+  const product = (S.zones.vetements?.products||[]).find(p=>p.id===prodId);
+  if (!product||!product.sized) { area.innerHTML=''; return; }
+  const sizes = product.sizes||{};
+  area.innerHTML = `<div class="sz-btns" id="don-sz-btns">${SIZES.map(s=>{
+    const stock=sizes[s]||0;
+    return `<button class="sz-btn${stock===0?' zero':''}" onclick="selectDonSize(this,'${s}')">${s}<br><span style="font-size:10px;opacity:.7">${stock}</span></button>`;
+  }).join('')}</div>`;
+}
+
+function selectDonSize(btn,size) {
+  document.querySelectorAll('#don-sz-btns .sz-btn').forEach(b=>b.classList.remove('sel'));
+  btn.classList.add('sel');
+}
+
+function confirmDonUnique() {
+  const prodId = document.getElementById('don-prod')?.value;
+  const personName = (document.getElementById('distrib-person')?.value||'').trim();
+  if (!prodId) { toast('Sélectionnez un article','warning'); return; }
+  if (!personName) { toast('Saisissez un bénéficiaire','warning'); return; }
+  const selBtn = document.querySelector('#don-sz-btns .sz-btn.sel');
+  const size = selBtn ? selBtn.textContent.trim().split('\n')[0] : null;
+  const qty = Math.max(1, parseInt(document.getElementById('don-qty')?.value)||1);
+  const product = (S.zones.vetements?.products||[]).find(p=>p.id===prodId);
+  if (!product) return;
+  const now = nowIso();
+  const diff = Math.min(qty, product.qty);
+  if (diff > 0) {
+    product.qty = r2(product.qty - diff);
+    if (size && product.sizes && product.sizes[size] !== undefined) product.sizes[size] = Math.max(0,(product.sizes[size]||0)-diff);
+    product.history.push({id:uid(), type:'don', date:now, qty:diff, person:personName, size:size||undefined});
+  }
+  if (!S.attributions) S.attributions = [];
+  S.attributions.push({id:uid(), person:personName, date:now, items:[{productId:prodId, name:product.name, qty:diff, size}]});
+  if (size) { const sz={}; sz[prodId]=size; updatePersonSizes(personName,sz); }
+  save(); renderProducts();
+  setVetTab('distribution');
+  toast(`✅ Don enregistré pour ${personName}`,'success');
+}
+
+// ── PERSONNES TAB ──
+function buildPersonnesHTML() {
+  const persons = S.persons || [];
+  const addBtn = `<button class="add-person-btn" onclick="openAddPersonView()">➕ Ajouter une personne</button>`;
+  if (!persons.length) return addBtn + '<div style="text-align:center;color:#9ca3af;padding:30px 20px;font-size:14px">Aucune personne.<br>Elles sont créées automatiquement lors des distributions.</div>';
+  const cards = persons.map(p => {
+    const attrCount = (S.attributions||[]).filter(a=>a.person.toLowerCase()===p.name.toLowerCase()).length;
+    const knownSizes = Object.values(p.sizes||{}).filter(Boolean).length;
+    return `<div class="pcard" onclick="showPersonDetail('${p.id}')">
+      <div class="pcard-avatar">${p.name.charAt(0).toUpperCase()}</div>
+      <div class="pcard-info">
+        <div class="pcard-name">${esc(p.name)}</div>
+        <div class="pcard-sub">${attrCount} distribution${attrCount!==1?'s':''} · ${knownSizes} taille${knownSizes!==1?'s':''} connue${knownSizes!==1?'s':''}</div>
+      </div>
+      <span class="pcard-arrow">›</span>
+    </div>`;
+  }).join('');
+  return addBtn + cards;
+}
+
+function showPersonDetail(personId) {
+  const person = (S.persons||[]).find(p=>p.id===personId);
+  if (!person) return;
+  const vc = document.getElementById('vet-content');
+  if (!vc) return;
+  const zd = S.zones.vetements;
+  const attrs = (S.attributions||[]).filter(a=>a.person.toLowerCase()===person.name.toLowerCase()).slice().reverse();
+  const sizesHTML = (zd?.products||[]).filter(p=>p.sized).map(prod => {
+    const knownSize = (person.sizes||{})[prod.id]||'';
+    const btns = SIZES.map(s=>`<button class="sz-btn${knownSize===s?' sel':''}" onclick="setPersonSize('${personId}','${prod.id}','${s}')">${s}</button>`).join('');
+    return `<div class="p-sz-row"><span class="p-sz-name">${esc(prod.name)}</span><div class="sz-btns" style="gap:4px">${btns}</div></div>`;
+  }).join('');
+  const histHTML = attrs.length
+    ? attrs.slice(0,15).map(a=>{
+        const date = fmtDate(a.date?.slice(0,10));
+        const items = (a.items||[]).map(i=>i.name+(i.size?` (${i.size})`:'')+(i.qty>1?` ×${i.qty}`:'')).join(', ');
+        return `<div class="p-hist-item"><div style="font-weight:600">${esc(a.packName||'Don')} — ${date}</div><div style="color:#6b7280;margin-top:2px;font-size:12px">${items}</div></div>`;
+      }).join('')
+    : '<div style="color:#9ca3af;font-size:13px;padding:8px 0">Aucune distribution</div>';
+  vc.innerHTML = `<button onclick="setVetTab('personnes')" style="background:transparent;border:none;color:#7c3aed;font-size:14px;font-weight:600;cursor:pointer;padding:0;margin-bottom:14px">← Personnes</button>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+      <div class="pcard-avatar" style="width:52px;height:52px;font-size:22px">${person.name.charAt(0).toUpperCase()}</div>
+      <div style="font-size:20px;font-weight:800">${esc(person.name)}</div>
+    </div>
+    <button style="width:100%;background:#7c3aed;color:#fff;border:none;border-radius:12px;padding:12px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:16px" onclick="distribToPersonTab('${personId}')">🎁 Nouveau pack pour ${esc(person.name)}</button>
+    <div class="vc-sec">Tailles connues</div>
+    <div class="p-detail">${sizesHTML||'<div style="color:#9ca3af;font-size:13px;padding:8px 0">Aucun article taillé</div>'}</div>
+    <div class="vc-sec">Historique des dons</div>
+    <div class="p-detail">${histHTML}</div>`;
+}
+
+function setPersonSize(personId, productId, size) {
+  const person = (S.persons||[]).find(p=>p.id===personId);
+  if (!person) return;
+  if (!person.sizes) person.sizes={};
+  person.sizes[productId] = person.sizes[productId]===size ? '' : size;
+  save();
+  showPersonDetail(personId);
+}
+
+function distribToPersonTab(personId) {
+  const person = (S.persons||[]).find(p=>p.id===personId);
+  if (!person) return;
+  distribState = {packId:null, sizes:{...(person.sizes||{})}, personName:person.name};
+  setVetTab('distribution');
+}
+
+function openAddPersonView() {
+  const vc = document.getElementById('vet-content');
+  if (!vc) return;
+  const zd = S.zones.vetements;
+  const sizedRows = (zd?.products||[]).filter(p=>p.sized).map(p=>`
+    <div class="p-sz-row">
+      <span class="p-sz-name">${esc(p.name)}</span>
+      <div class="sz-btns" style="gap:4px" id="np-sz-${p.id}">
+        ${SIZES.map(s=>`<button class="sz-btn" onclick="toggleNewPersonSize(this,'${p.id}','${s}')">${s}</button>`).join('')}
+      </div>
+    </div>`).join('');
+  _newPersonSizes = {};
+  vc.innerHTML = `<button onclick="setVetTab('personnes')" style="background:transparent;border:none;color:#7c3aed;font-size:14px;font-weight:600;cursor:pointer;padding:0;margin-bottom:14px">← Personnes</button>
+    <div class="vc-sec">Nouvelle personne</div>
+    <div class="p-detail">
+      <input id="new-person-name" class="fi" placeholder="Prénom et/ou nom" style="margin-bottom:${sizedRows?'12px':'0'}">
+      ${sizedRows ? `<div class="vc-sec" style="margin-top:8px">Tailles connues (optionnel)</div>${sizedRows}` : ''}
+      <button class="distrib-btn" onclick="saveNewPerson()" style="margin-top:14px">Enregistrer</button>
+    </div>`;
+}
+
+function toggleNewPersonSize(btn, productId, size) {
+  const row = document.getElementById('np-sz-'+productId);
+  if (row) row.querySelectorAll('.sz-btn').forEach(b=>b.classList.remove('sel'));
+  if (!_newPersonSizes[productId] || _newPersonSizes[productId]!==size) {
+    btn.classList.add('sel'); _newPersonSizes[productId]=size;
+  } else { btn.classList.remove('sel'); delete _newPersonSizes[productId]; }
+}
+
+function saveNewPerson() {
+  const name = (document.getElementById('new-person-name')?.value||'').trim();
+  if (!name) { toast('Saisissez un nom','warning'); return; }
+  if (!S.persons) S.persons=[];
+  if (S.persons.find(p=>p.name.toLowerCase()===name.toLowerCase())) { toast('Personne déjà enregistrée','warning'); return; }
+  S.persons.push({id:uid(), name, sizes:{..._newPersonSizes}});
+  _newPersonSizes={};
+  save();
+  toast(`✅ ${name} ajouté(e)`,'success');
+  setVetTab('personnes');
 }
 
 // ── UNIT SELECT HELPER ── (used in all dropdowns)
@@ -5402,11 +5766,10 @@ function unitOptions(selected) {
 <div id="vet-bar">
   <div class="vet-toprow">
     <button id="vet-back-btn" onclick="exitVetementsMode()">← StockZone</button>
-    <span class="vet-bar-title">👕 Vêtements de travail</span>
-    <button class="vet-packs-btn" onclick="showVetPacks()">📦 Packs</button>
   </div>
   <div id="vet-cat-tabs"></div>
 </div>
+<div id="vet-content"></div>
 
 </body>
 </html>
