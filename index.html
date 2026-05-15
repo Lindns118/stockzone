@@ -391,6 +391,21 @@ table.conso-tbl tfoot td.num{font-weight:700}
 .stats-panel.active{display:block}
 .mini-bar{display:inline-block;height:6px;border-radius:3px;vertical-align:middle;margin-left:6px}
 .sum-badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;background:var(--blue-light);color:var(--blue)}
+
+/* ===== VETEMENTS MODE ===== */
+#vet-bar{display:none;position:fixed;top:0;left:0;right:0;z-index:150;flex-direction:column}
+body.vet-mode #vet-bar{display:flex}
+.vet-toprow{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:linear-gradient(135deg,#2d0a5a,#5b21b6)}
+#vet-back-btn{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:8px;padding:6px 13px;font-size:13px;font-weight:500;cursor:pointer;transition:background .15s}
+#vet-back-btn:active{background:rgba(255,255,255,.28)}
+.vet-bar-title{color:#fff;font-weight:700;font-size:15px;letter-spacing:.3px}
+#vet-cat-tabs{display:flex;gap:7px;padding:9px 14px;background:#f5f3ff;border-bottom:1px solid #e9d5ff;overflow-x:auto;scrollbar-width:none}
+#vet-cat-tabs::-webkit-scrollbar{display:none}
+.vet-cat-btn{background:#ede9fe;border:none;border-radius:20px;padding:6px 15px;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;color:#5b21b6;flex-shrink:0;transition:background .15s,color .15s}
+.vet-cat-btn.active{background:#7c3aed;color:#fff}
+body.vet-mode #app{padding-top:96px}
+body.vet-mode .bottom-nav{display:none!important}
+body.vet-mode .main{padding-bottom:20px}
 </style>
 </head>
 <body>
@@ -1503,6 +1518,8 @@ function save() {
 // ===== STATE =====
 let currentZone = 'entrepot';
 let currentSort = localStorage.getItem('sz_sort') || 'ordre';
+let vetCatFilter = 'all';
+let lastNonVetZone = 'entrepot';
 let currentProduct = null;
 let _supIdx = 0;
 let currentPretType = 'pret';
@@ -1537,6 +1554,7 @@ window.addEventListener('DOMContentLoaded', () => {
 function switchZone(z) {
   // Clear unsaved card values from previous zone
   Object.keys(pendingCardValues).forEach(k=>delete pendingCardValues[k]);
+  if (z !== 'vetements') { lastNonVetZone = z; document.body.classList.remove('vet-mode'); }
   currentZone = z;
   localStorage.setItem('sz_last_zone', z);
   // nav styling
@@ -1573,6 +1591,7 @@ function switchZone(z) {
     const addGroupBtn = document.getElementById('add-group-btn');
     const isProductZone = ['entrepot','office','vetements'].includes(z) || (S.zones[z] !== undefined && !['stats','prets','alertes','reglages','attributions'].includes(z));
     if(addGroupBtn) addGroupBtn.style.display = isProductZone ? 'inline-flex' : 'none';
+    if (z === 'vetements') enterVetementsMode();
   } else if (z === 'attributions') {
     document.getElementById('zh-icon').textContent = '👕';
     document.getElementById('zh-name').textContent = 'Attributions';
@@ -1639,6 +1658,7 @@ function renderProducts() {
   if (!zd) return;
   const q = (document.getElementById('search-input')||{}).value?.toLowerCase()||'';
   let prods = zd.products.filter(p=>p.name.toLowerCase().includes(q)||p.category.toLowerCase().includes(q));
+  if (currentZone === 'vetements' && vetCatFilter !== 'all') prods = prods.filter(p => p.category === vetCatFilter);
   prods = sortedProds(prods);
   const el = document.getElementById('product-list');
   if (!prods.length) {
@@ -5147,6 +5167,36 @@ async function confirmResetAll() {
   toast('✅ Données réinitialisées');
 }
 
+// ── VETEMENTS MODE ──
+function enterVetementsMode() {
+  document.body.classList.add('vet-mode');
+  rebuildVetCatTabs();
+}
+
+function exitVetementsMode() {
+  vetCatFilter = 'all';
+  switchZone(lastNonVetZone);
+}
+
+function rebuildVetCatTabs() {
+  const zd = S.zones.vetements;
+  if (!zd) return;
+  const cats = [...new Set(zd.products.map(p => p.category))].sort((a,b) => a.localeCompare(b,'fr'));
+  const tabs = document.getElementById('vet-cat-tabs');
+  if (!tabs) return;
+  let html = `<button class="vet-cat-btn${vetCatFilter==='all'?' active':''}" onclick="setVetCat('all')">Tous</button>`;
+  cats.forEach(c => {
+    html += `<button class="vet-cat-btn${vetCatFilter===c?' active':''}" onclick="setVetCat(${JSON.stringify(c)})">${esc(c)}</button>`;
+  });
+  tabs.innerHTML = html;
+}
+
+function setVetCat(cat) {
+  vetCatFilter = cat;
+  rebuildVetCatTabs();
+  renderProducts();
+}
+
 // ── UNIT SELECT HELPER ── (used in all dropdowns)
 function unitOptions(selected) {
   const units = S.units || DEFAULT_UNITS;
@@ -5154,5 +5204,16 @@ function unitOptions(selected) {
 }
 
 </script>
+
+<!-- VETEMENTS FLOATING BAR -->
+<div id="vet-bar">
+  <div class="vet-toprow">
+    <button id="vet-back-btn" onclick="exitVetementsMode()">← StockZone</button>
+    <span class="vet-bar-title">👕 Vêtements de travail</span>
+    <span style="width:90px"></span>
+  </div>
+  <div id="vet-cat-tabs"></div>
+</div>
+
 </body>
 </html>
