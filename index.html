@@ -6115,10 +6115,22 @@ function exportDispoList() {
 }
 
 function mailDispoList() {
-  const text = _dispoText();
-  const subject = encodeURIComponent('StockZone – Packs vêtements disponibles');
-  const body = encodeURIComponent(text);
-  window.location.href = `mailto:?subject=${subject}&body=${body}`;
+  const analysis = calcPacksAnalysis();
+  const date = new Date().toLocaleDateString('fr-FR');
+  let text = `COMMANDE VÊTEMENTS MANQUANTS\n${date}\n\n`;
+  let hasAny = false;
+  analysis.forEach(r => {
+    if (!r.missing.length) return;
+    hasAny = true;
+    text += `${r.pack.name}\n`;
+    r.missing.forEach(m => {
+      text += `  - ${m.name}${m.size ? ' ' + m.size : ''} : ${m.qty} à commander\n`;
+    });
+    text += '\n';
+  });
+  if (!hasAny) text += 'Aucun article manquant — stock suffisant pour toutes les personnes.\n';
+  const subject = encodeURIComponent('StockZone – Articles manquants à commander');
+  window.location.href = `mailto:?subject=${subject}&body=${encodeURIComponent(text)}`;
 }
 
 // ── UNIT SELECT HELPER ── (used in all dropdowns)
