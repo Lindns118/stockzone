@@ -631,6 +631,12 @@ body.vet-mode .main{padding-bottom:20px}
           <input type="text" id="ps-palette-unit" class="fi fi-sm" placeholder="packs" maxlength="30" style="flex:1;min-width:0">
         </div>
       </div>
+      <div style="margin-bottom:14px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="ps-sized-toggle" onchange="psSizedToggle(this)">
+          <span>Ce produit a des tailles (S, M, L…)</span>
+        </label>
+      </div>
       <div id="ps-sizes-section" style="display:none;margin-bottom:14px">
         <label class="fl">Tailles actives</label>
         <div id="ps-sizes-list" style="display:flex;flex-wrap:wrap;gap:6px"></div>
@@ -2235,6 +2241,8 @@ function openDetail(id) {
       if(list) list.innerHTML = '';
     }
   }
+  const sizedToggle = document.getElementById('ps-sized-toggle');
+  if(sizedToggle) sizedToggle.checked = !!found.p.sized;
   if(found.p.sized && sizeSection) {
     sizeSection.style.display = 'block';
     psRenderSizesList(found.p);
@@ -2484,6 +2492,21 @@ function psRenderSizesList(product) {
       ${active?`<span style="font-size:10px;color:#6b7280">${product.sizes[s]}</span>`:''}
     </div>`;
   }).join('');
+}
+
+function psSizedToggle(cb) {
+  if (!currentProduct) return;
+  const section = document.getElementById('ps-sizes-section');
+  if (cb.checked) {
+    currentProduct.sized = true;
+    if (!currentProduct.sizes || Object.keys(currentProduct.sizes).length === 0) {
+      currentProduct.sizes = {S:0,M:0,L:0,XL:0,'2XL':0,'3XL':0};
+    }
+    if (section) { section.style.display = 'block'; psRenderSizesList(currentProduct); }
+  } else {
+    currentProduct.sized = false;
+    if (section) section.style.display = 'none';
+  }
 }
 
 function psToggleSize(size) {
