@@ -5924,7 +5924,8 @@ function printDistribSheet(personId, packId) {
   });
   const css = `
     body{font-family:Arial,sans-serif;font-size:13px;color:#111;margin:0;padding:24px}
-    .pb{page-break-after:always;padding-bottom:20px;max-width:600px;margin:0 auto}
+    .pb{padding-bottom:20px;max-width:600px;margin:0 auto}
+    .pb+.pb{page-break-before:always}
     .header-row{display:flex;align-items:center;gap:14px;margin-bottom:18px;padding-bottom:14px;border-bottom:2px solid #7c3aed}
     .avatar{width:50px;height:50px;border-radius:50%;background:#7c3aed;color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;flex-shrink:0}
     .person-name{font-size:22px;font-weight:800;line-height:1.1}
@@ -5938,7 +5939,7 @@ function printDistribSheet(personId, packId) {
     .field-line{flex:1;border-bottom:1.5px solid #333;height:22px;display:block}
     .sig-box{flex:1;border:1.5px solid #333;height:70px;display:block;border-radius:4px}
     .foot{font-size:10px;color:#aaa;text-align:right;margin-top:12px}
-    @media print{body{padding:12px}.pb{page-break-after:always}}`;
+    @media print{body{padding:12px}.pb+.pb{page-break-before:always}}`;
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
     <title>${pack.name} — ${personId ? persons[0].name : 'Toutes les personnes'}</title>
     <style>${css}</style></head>
