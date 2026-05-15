@@ -5856,6 +5856,35 @@ function deleteAttribution(attrId, personId) {
 }
 
 function printPersonCard(personId) {
+  const vc = document.getElementById('vet-content');
+  if (!vc) return;
+  const persons = personId
+    ? [(S.persons||[]).find(p=>p.id===personId)].filter(Boolean)
+    : (S.persons||[]);
+  if (!persons.length) { toast('Aucune personne à exporter','warning'); return; }
+  const packs = (S.vetPacks||[]).filter(pk=>pk.items.length);
+  const packOptions = packs.map(pk =>
+    `<div onclick="printDistribSheet('${personId||''}','${pk.id}')" style="background:#fff;border:2px solid #e5e7eb;border-radius:12px;padding:14px 16px;cursor:pointer;display:flex;align-items:center;gap:12px;margin-bottom:10px;transition:border-color .15s" onmouseenter="this.style.borderColor='#7c3aed'" onmouseleave="this.style.borderColor='#e5e7eb'">
+      <span style="font-size:24px">${pk.icon}</span>
+      <div>
+        <div style="font-weight:700;font-size:15px">${esc(pk.name)}</div>
+        <div style="font-size:12px;color:#6b7280">${pk.items.length} article${pk.items.length!==1?'s':''}</div>
+      </div>
+      <span style="margin-left:auto;color:#7c3aed;font-size:18px">›</span>
+    </div>`
+  ).join('');
+  const backFn = personId ? `showPersonDetail('${personId}')` : `setVetTab('personnes')`;
+  vc.innerHTML = `
+    <button onclick="${backFn}" style="background:transparent;border:none;color:#7c3aed;font-size:14px;font-weight:600;cursor:pointer;padding:0;margin-bottom:16px">← Retour</button>
+    <div style="font-size:18px;font-weight:800;margin-bottom:4px">📄 Export PDF</div>
+    <div style="font-size:13px;color:#6b7280;margin-bottom:16px">Choisissez le pack à exporter${!personId?' pour toutes les personnes':''}</div>
+    ${packs.length ? packOptions : '<div style="color:#9ca3af;font-size:13px;padding:20px 0;text-align:center">Aucun pack configuré</div>'}`;
+  vc.style.display = 'block';
+}
+
+function printDistribSheet(personId, packId) {
+  const pack = (S.vetPacks||[]).find(pk=>pk.id===packId);
+  if (!pack) return;
   const zd = S.zones.vetements;
   const persons = personId
     ? [(S.persons||[]).find(p=>p.id===personId)].filter(Boolean)
@@ -5864,35 +5893,56 @@ function printPersonCard(personId) {
   const now = new Date().toLocaleDateString('fr-FR');
   let body = '';
   persons.forEach(p => {
-    const attrs = (S.attributions||[]).filter(a=>a.person.toLowerCase()===p.name.toLowerCase()).slice().reverse();
-    const sizeRows = (zd?.products||[]).filter(pr=>pr.sized).map(pr => {
-      const sz = (p.sizes||{})[pr.id]||'—';
-      return `<tr><td>${pr.name}</td><td style="font-weight:700">${sz}</td></tr>`;
-    }).join('');
-    const histRows = attrs.map(a => {
-      const date = a.date?.slice(0,10)||'';
-      const items = (a.items||[]).map(i=>i.name+(i.size?` (${i.size})`:'')+(i.qty>1?` ×${i.qty}`:'')).join(', ');
-      return `<tr><td>${a.packName||'Don'}</td><td>${date}</td><td>${items}</td></tr>`;
+    const rows = pack.items.map(item => {
+      const product = zd?.products?.find(pr=>pr.id===item.productId);
+      const sz = product?.sized ? ((p.sizes||{})[item.productId] || '___') : '—';
+      return `<tr><td>${item.name}</td><td style="text-align:center;font-weight:700;font-size:15px">${sz}</td><td style="text-align:center">${item.qty}</td></tr>`;
     }).join('');
     body += `<div class="pb">
-      <h2>${p.name.charAt(0).toUpperCase()}</h2>
-      <h1>${p.name}</h1>
-      <div class="sec">Tailles connues</div>
-      ${sizeRows ? `<table><tr><th>Article</th><th>Taille</th></tr>${sizeRows}</table>` : '<p class="empty">Aucune taille enregistrée</p>'}
-      <div class="sec">Historique des dons</div>
-      ${histRows ? `<table><tr><th>Pack/Don</th><th>Date</th><th>Détail</th></tr>${histRows}</table>` : '<p class="empty">Aucune distribution</p>'}
+      <div class="header-row">
+        <div class="avatar">${p.name.charAt(0).toUpperCase()}</div>
+        <div>
+          <div class="person-name">${p.name}</div>
+          <div class="pack-lbl">${pack.icon} ${pack.name}</div>
+        </div>
+      </div>
+      <table>
+        <tr><th>Article</th><th style="width:80px;text-align:center">Taille</th><th style="width:60px;text-align:center">Qté</th></tr>
+        ${rows}
+      </table>
+      <div class="fields">
+        <div class="field-row">
+          <span class="field-lbl">Date</span>
+          <span class="field-line"></span>
+        </div>
+        <div class="field-row" style="margin-top:14px">
+          <span class="field-lbl">Signature</span>
+          <span class="sig-box"></span>
+        </div>
+      </div>
     </div>`;
   });
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>StockZone Vêtements — ${personId ? persons[0].name : 'Toutes les personnes'}</title>
-  <style>body{font-family:Arial,sans-serif;font-size:13px;color:#111;margin:0;padding:20px}
-  .pb{page-break-after:always;padding-bottom:20px}h2{width:44px;height:44px;border-radius:50%;background:#7c3aed;color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;margin:0 0 6px}
-  h1{font-size:22px;font-weight:800;margin:0 0 16px}
-  .sec{font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin:14px 0 6px;border-top:1px solid #eee;padding-top:10px}
-  table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #ddd;padding:5px 8px;text-align:left}th{background:#f5f3ff;font-weight:700}
-  .empty{color:#999;font-size:12px;margin:4px 0}
-  .foot{font-size:10px;color:#aaa;text-align:right;margin-top:8px}
-  @media print{body{padding:10px}.pb{page-break-after:always}}</style></head>
-  <body>${body}<div class="foot">StockZone — Exporté le ${now}</div></body></html>`;
+  const css = `
+    body{font-family:Arial,sans-serif;font-size:13px;color:#111;margin:0;padding:24px}
+    .pb{page-break-after:always;padding-bottom:20px;max-width:600px;margin:0 auto}
+    .header-row{display:flex;align-items:center;gap:14px;margin-bottom:18px;padding-bottom:14px;border-bottom:2px solid #7c3aed}
+    .avatar{width:50px;height:50px;border-radius:50%;background:#7c3aed;color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;flex-shrink:0}
+    .person-name{font-size:22px;font-weight:800;line-height:1.1}
+    .pack-lbl{font-size:13px;color:#7c3aed;font-weight:600;margin-top:2px}
+    table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:24px}
+    th,td{border:1px solid #ccc;padding:8px 10px;text-align:left}
+    th{background:#f5f3ff;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+    .fields{margin-top:10px}
+    .field-row{display:flex;align-items:flex-end;gap:12px;margin-bottom:4px}
+    .field-lbl{font-size:12px;font-weight:700;color:#555;white-space:nowrap;width:72px}
+    .field-line{flex:1;border-bottom:1.5px solid #333;height:22px;display:block}
+    .sig-box{flex:1;border:1.5px solid #333;height:70px;display:block;border-radius:4px}
+    .foot{font-size:10px;color:#aaa;text-align:right;margin-top:12px}
+    @media print{body{padding:12px}.pb{page-break-after:always}}`;
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+    <title>${pack.name} — ${personId ? persons[0].name : 'Toutes les personnes'}</title>
+    <style>${css}</style></head>
+    <body>${body}<div class="foot">StockZone · ${pack.name} · Exporté le ${now}</div></body></html>`;
   const w = window.open('', '_blank');
   if (!w) { toast('Autorisez les pop-ups pour exporter','warning'); return; }
   w.document.write(html);
