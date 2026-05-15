@@ -1218,6 +1218,7 @@ function migrateData(data) {
   // Migrate vetements products: add sizes if missing
   if (data.zones && data.zones.vetements) {
     data.zones.vetements.products.forEach(p => {
+      if (p.sized === false) return; // explicitly unsized — leave it alone
       if (!p.sizes) {
         p.sized = true;
         p.sizes = {};
@@ -1235,7 +1236,7 @@ function migrateData(data) {
           p.sizes['M'] = p.qty || 0;
         }
       }
-      if(!p.sized) p.sized = true;
+      if(p.sized == null) p.sized = true;
     });
   }
   if (!data.vetPacks) data.vetPacks = JSON.parse(JSON.stringify(DEF.vetPacks));
