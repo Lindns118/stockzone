@@ -406,6 +406,31 @@ body.vet-mode #vet-bar{display:flex}
 body.vet-mode #app{padding-top:96px}
 body.vet-mode .bottom-nav{display:none!important}
 body.vet-mode .main{padding-bottom:20px}
+
+/* PACKS VÊTEMENTS */
+.vet-packs-btn{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.28);color:#fff;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s;white-space:nowrap}
+.vet-packs-btn:active{background:rgba(255,255,255,.32)}
+.pack-card{background:#fff;border-radius:14px;padding:16px;border-left:5px solid #7c3aed;box-shadow:0 1px 5px rgba(0,0,0,.07);margin-bottom:12px}
+.pack-card-top{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.pack-icon-lg{font-size:26px;line-height:1}
+.pack-name{font-weight:700;font-size:16px}
+.pack-count{font-size:12px;color:#6b7280;margin-top:1px}
+.pack-preview{padding:4px 0 10px}
+.pack-preview-item{font-size:13px;color:#6b7280;padding:2px 0}
+.pack-actions{display:flex;gap:8px}
+.pack-act-btn{flex:1;padding:9px 0;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer}
+.pack-act-edit{background:#f3f4f6;color:#374151}
+.pack-act-distrib{background:#7c3aed;color:#fff}
+.pack-act-distrib:disabled{opacity:.4;cursor:default}
+.pack-item-row{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid #f3f4f6}
+.pack-item-name{flex:1;font-size:14px;font-weight:500}
+.piq-btn{background:#f3f4f6;border:none;width:30px;height:30px;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;line-height:1}
+.piq-val{width:32px;text-align:center;font-weight:700;font-size:16px;flex-shrink:0}
+.pack-add-row{display:flex;gap:8px;align-items:stretch;margin-top:14px}
+.pack-distrib-section{margin-top:16px;border-top:1px solid var(--gray2);padding-top:14px}
+.pack-distrib-title{font-weight:600;font-size:14px;margin-bottom:10px}
+.pack-distrib-row{display:flex;gap:8px}
+.pack-distrib-btn{background:#7c3aed;color:#fff;border:none;border-radius:10px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;flex-shrink:0}
 </style>
 </head>
 <body>
@@ -1077,7 +1102,13 @@ const DEF = {
   attributions: [],
   palettes: {},
   fournisseurs: [],
-  units: [...DEFAULT_UNITS]
+  units: [...DEFAULT_UNITS],
+  vetPacks: [
+    {id:'pack_ouvrier', name:'Pack ouvrier', icon:'⚒️', color:'#d97706', items:[]},
+    {id:'pack_employe', name:'Pack employé', icon:'💼', color:'#2563eb', items:[]},
+    {id:'pack_ete',     name:'Pack été',     icon:'☀️', color:'#16a34a', items:[]},
+    {id:'pack_hiver',   name:'Pack hiver',   icon:'❄️', color:'#0891b2', items:[]}
+  ]
 };
 
 
@@ -1167,6 +1198,7 @@ function migrateData(data) {
       if(!p.sized) p.sized = true;
     });
   }
+  if (!data.vetPacks) data.vetPacks = JSON.parse(JSON.stringify(DEF.vetPacks));
   return data;
 }
 
@@ -5167,6 +5199,132 @@ async function confirmResetAll() {
   toast('✅ Données réinitialisées');
 }
 
+// ── VET PACKS ──
+function showVetPacks() {
+  if (!S.vetPacks) S.vetPacks = JSON.parse(JSON.stringify(DEF.vetPacks));
+  renderVetPacksList();
+  showModal('vet-packs');
+}
+
+function renderVetPacksList() {
+  const el = document.getElementById('vet-packs-list');
+  if (!el) return;
+  el.innerHTML = (S.vetPacks || []).map(pack => {
+    const preview = pack.items.length
+      ? pack.items.slice(0,3).map(i=>`<div class="pack-preview-item">• ${esc(i.name)} × ${i.qty}</div>`).join('') +
+        (pack.items.length>3 ? `<div class="pack-preview-item" style="color:#9ca3af">+${pack.items.length-3} autres…</div>` : '')
+      : '<div class="pack-preview-item" style="font-style:italic;color:#9ca3af">Aucun article configuré</div>';
+    return `<div class="pack-card" style="border-left-color:${pack.color}">
+      <div class="pack-card-top">
+        <span class="pack-icon-lg">${pack.icon}</span>
+        <div><div class="pack-name">${esc(pack.name)}</div><div class="pack-count">${pack.items.length} article${pack.items.length!==1?'s':''}</div></div>
+      </div>
+      <div class="pack-preview">${preview}</div>
+      <div class="pack-actions">
+        <button class="pack-act-btn pack-act-edit" onclick="openPackEditor('${pack.id}');hideModal('modal-vet-packs')">✏️ Modifier</button>
+        <button class="pack-act-btn pack-act-distrib" ${!pack.items.length?'disabled':''} onclick="openPackEditor('${pack.id}');hideModal('modal-vet-packs')">🎁 Distribuer</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openPackEditor(packId) {
+  const pack = (S.vetPacks || []).find(p => p.id === packId);
+  if (!pack) return;
+  document.getElementById('pack-edit-title').textContent = pack.icon + ' ' + pack.name;
+  document.getElementById('pack-edit-id').value = packId;
+  document.getElementById('pack-distrib-person').value = '';
+  renderPackEditorItems(pack);
+  buildPackProductSelect();
+  showModal('pack-edit');
+}
+
+function renderPackEditorItems(pack) {
+  const el = document.getElementById('pack-edit-items');
+  if (!el) return;
+  if (!pack.items.length) {
+    el.innerHTML = '<div style="text-align:center;color:#9ca3af;padding:14px 0;font-size:13px;font-style:italic">Aucun article — ajoutez-en ci-dessous</div>';
+    return;
+  }
+  el.innerHTML = pack.items.map((item, i) => `
+    <div class="pack-item-row">
+      <div class="pack-item-name">${esc(item.name)}</div>
+      <button class="piq-btn" style="color:#ef4444" onclick="packItemQtyChange('${pack.id}',${i},-1)">−</button>
+      <span class="piq-val">${item.qty}</span>
+      <button class="piq-btn" style="color:#16a34a" onclick="packItemQtyChange('${pack.id}',${i},1)">+</button>
+      <button class="piq-btn" style="color:#ef4444;font-size:14px" onclick="packItemRemove('${pack.id}',${i})">✕</button>
+    </div>`).join('');
+}
+
+function buildPackProductSelect() {
+  const sel = document.getElementById('pack-add-product');
+  if (!sel) return;
+  const zd = S.zones.vetements;
+  if (!zd) return;
+  sel.innerHTML = '<option value="">Choisir un article…</option>' +
+    zd.products.map(p => `<option value="${p.id}" data-name="${esc(p.name)}">${esc(p.name)}</option>`).join('');
+}
+
+function packItemAdd() {
+  const packId = document.getElementById('pack-edit-id').value;
+  const sel = document.getElementById('pack-add-product');
+  const qty = Math.max(1, parseInt(document.getElementById('pack-add-qty').value) || 1);
+  if (!sel.value) { toast('Sélectionnez un article', 'warning'); return; }
+  const name = sel.options[sel.selectedIndex].getAttribute('data-name') || sel.options[sel.selectedIndex].text;
+  const pack = (S.vetPacks || []).find(p => p.id === packId);
+  if (!pack) return;
+  const existing = pack.items.find(item => item.productId === sel.value);
+  if (existing) { existing.qty += qty; }
+  else { pack.items.push({productId: sel.value, name, qty}); }
+  save();
+  renderPackEditorItems(pack);
+  sel.value = '';
+  document.getElementById('pack-add-qty').value = '1';
+  toast('✅ Article ajouté', 'success');
+}
+
+function packItemQtyChange(packId, idx, delta) {
+  const pack = (S.vetPacks || []).find(p => p.id === packId);
+  if (!pack) return;
+  const nq = pack.items[idx].qty + delta;
+  if (nq < 1) return;
+  pack.items[idx].qty = nq;
+  save();
+  renderPackEditorItems(pack);
+}
+
+function packItemRemove(packId, idx) {
+  const pack = (S.vetPacks || []).find(p => p.id === packId);
+  if (!pack) return;
+  pack.items.splice(idx, 1);
+  save();
+  renderPackEditorItems(pack);
+}
+
+function distributePackFromEditor() {
+  const packId = document.getElementById('pack-edit-id').value;
+  const person = (document.getElementById('pack-distrib-person').value || '').trim();
+  if (!person) { toast('Saisissez un nom', 'warning'); return; }
+  const pack = (S.vetPacks || []).find(p => p.id === packId);
+  if (!pack || !pack.items.length) { toast('Ajoutez des articles au pack', 'warning'); return; }
+  const zd = S.zones.vetements;
+  const now = nowIso();
+  pack.items.forEach(item => {
+    const product = zd ? zd.products.find(p => p.id === item.productId) : null;
+    if (!product) return;
+    const diff = Math.min(item.qty, product.qty);
+    if (diff <= 0) return;
+    product.qty = r2(product.qty - diff);
+    product.history.push({id:uid(), type:'don', date:now, qty:diff, person});
+  });
+  if (!S.attributions) S.attributions = [];
+  S.attributions.push({id:uid(), person, packId, packName:pack.name, date:now, items:pack.items.map(i=>({...i}))});
+  save();
+  renderProducts();
+  hideModal('modal-pack-edit');
+  toast(`✅ Pack "${pack.name}" distribué à ${person}`, 'success');
+}
+
 // ── VETEMENTS MODE ──
 function enterVetementsMode() {
   document.body.classList.add('vet-mode');
@@ -5205,12 +5363,47 @@ function unitOptions(selected) {
 
 </script>
 
+<!-- MODAL: PACKS VÊTEMENTS -->
+<div id="modal-vet-packs" class="modal-overlay hidden" onclick="overlayClose(event,'modal-vet-packs')">
+<div class="modal-sheet">
+  <div class="mh-row">
+    <div><div class="m-title">📦 Packs vêtements</div><div class="m-sub">Ensembles prédéfinis à distribuer</div></div>
+    <button class="m-close" onclick="hideModal('modal-vet-packs')">✕</button>
+  </div>
+  <div id="vet-packs-list"></div>
+</div>
+</div>
+
+<!-- MODAL: ÉDITEUR DE PACK -->
+<div id="modal-pack-edit" class="modal-overlay hidden" onclick="overlayClose(event,'modal-pack-edit')">
+<div class="modal-sheet">
+  <div class="mh-row">
+    <div class="m-title" id="pack-edit-title">Pack</div>
+    <button class="m-close" onclick="hideModal('modal-pack-edit')">✕</button>
+  </div>
+  <input type="hidden" id="pack-edit-id">
+  <div id="pack-edit-items"></div>
+  <div class="pack-add-row">
+    <select id="pack-add-product" class="fi" style="flex:1;min-width:0"></select>
+    <input type="number" id="pack-add-qty" class="fi" value="1" min="1" max="99" style="width:58px;padding:9px 6px;text-align:center">
+    <button onclick="packItemAdd()" style="background:#7c3aed;color:#fff;border:none;border-radius:10px;padding:9px 16px;font-size:20px;cursor:pointer;flex-shrink:0;line-height:1">+</button>
+  </div>
+  <div class="pack-distrib-section">
+    <div class="pack-distrib-title">🎁 Distribuer ce pack</div>
+    <div class="pack-distrib-row">
+      <input type="text" id="pack-distrib-person" class="fi" placeholder="Nom du bénéficiaire" style="flex:1">
+      <button class="pack-distrib-btn" onclick="distributePackFromEditor()">Distribuer</button>
+    </div>
+  </div>
+</div>
+</div>
+
 <!-- VETEMENTS FLOATING BAR -->
 <div id="vet-bar">
   <div class="vet-toprow">
     <button id="vet-back-btn" onclick="exitVetementsMode()">← StockZone</button>
     <span class="vet-bar-title">👕 Vêtements de travail</span>
-    <span style="width:90px"></span>
+    <button class="vet-packs-btn" onclick="showVetPacks()">📦 Packs</button>
   </div>
   <div id="vet-cat-tabs"></div>
 </div>
