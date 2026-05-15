@@ -4069,7 +4069,10 @@ function renderConsoTable(){
       });
       const total=r2(Object.values(grouped).reduce((a,v)=>a+v,0));
       const displayName=p.groupe?`${p.groupe} › ${p.name}`:p.name;
-      rows.push({name:p.name,displayName,cat:p.category,unit:p.unit,zone:z.name,groupe:p.ordre,ordre:p.ordre,grouped,total});
+      // Last non-zero period consumption for days-remaining estimate
+      const sortedPks=Object.keys(grouped).sort();
+      const lastPeriodConso=sortedPks.reduceRight((found,pk)=>found||(grouped[pk]>0?grouped[pk]:0),0);
+      rows.push({name:p.name,displayName,cat:p.category,unit:p.unit,zone:z.name,groupe:p.ordre,ordre:p.ordre,grouped,total,qty:p.qty,lastPeriodConso});
     });
   });
 
@@ -4129,8 +4132,16 @@ function renderConsoTable(){
       const bw=Math.round((v/rowMax)*36);
       return `<td class="num ${cls}">${v}<span class="mini-bar" style="width:${bw}px;background:${cls==='hi'?'#ef4444':cls==='med'?'#f59e0b':'#2d35a8'}"></span></td>`;
     }).join('');
+    let daysTag = '';
+    if (r.lastPeriodConso > 0 && r.qty >= 0) {
+      const daysPerPeriod = period==='week'?7:period==='year'?365:period==='quarter'?91:30.44;
+      const dailyRate = r.lastPeriodConso / daysPerPeriod;
+      const days = Math.round(r.qty / dailyRate);
+      const col = days <= 7 ? '#ef4444' : days <= 30 ? '#f59e0b' : '#16a34a';
+      daysTag = ` <span style="font-size:11px;color:${col};font-weight:600">(~${days}j)</span>`;
+    }
     return `<tr>
-      <td><div class="prod-cell"><span class="prod-cell-name">${esc(r.displayName)}</span><span class="prod-cell-cat">${esc(r.cat)} · ${esc(r.unit)}</span></div></td>
+      <td><div class="prod-cell"><span class="prod-cell-name">${esc(r.displayName)}${daysTag}</span><span class="prod-cell-cat">${esc(r.cat)} · ${esc(r.unit)}</span></div></td>
       <td style="font-size:12px;color:var(--text2)">${esc(r.zone)}</td>
       ${cells}
       <td class="num"><span class="sum-badge">${r2(r.total)}</span></td>
