@@ -5713,7 +5713,7 @@ function confirmDonUnique() {
 
 // ── PERSONNES TAB ──
 function buildPersonnesHTML() {
-  const persons = S.persons || [];
+  const persons = (S.persons || []).slice().sort((a,b) => a.name.localeCompare(b.name, 'fr', {sensitivity:'base'}));
   const addBtn = `<button class="add-person-btn" onclick="openAddPersonView()">➕ Ajouter une personne</button>`;
   const topBtns = `<div style="display:flex;gap:8px;margin-bottom:10px">
     <button onclick="showPackDispoView()" style="flex:1;background:#f3f4f6;border:none;border-radius:10px;padding:10px 8px;font-size:13px;font-weight:600;cursor:pointer">📊 Packs disponibles</button>
@@ -5860,7 +5860,7 @@ function printPersonCard(personId) {
   if (!vc) return;
   const persons = personId
     ? [(S.persons||[]).find(p=>p.id===personId)].filter(Boolean)
-    : (S.persons||[]);
+    : (S.persons||[]).slice().sort((a,b) => a.name.localeCompare(b.name, 'fr', {sensitivity:'base'}));
   if (!persons.length) { toast('Aucune personne à exporter','warning'); return; }
   const packs = (S.vetPacks||[]).filter(pk=>pk.items.length);
   const packOptions = packs.map(pk =>
@@ -5888,7 +5888,7 @@ function printDistribSheet(personId, packId) {
   const zd = S.zones.vetements;
   const persons = personId
     ? [(S.persons||[]).find(p=>p.id===personId)].filter(Boolean)
-    : (S.persons||[]);
+    : (S.persons||[]).slice().sort((a,b) => a.name.localeCompare(b.name, 'fr', {sensitivity:'base'}));
   if (!persons.length) { toast('Aucune personne à exporter','warning'); return; }
   const now = new Date().toLocaleDateString('fr-FR');
   let body = '';
