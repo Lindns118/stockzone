@@ -2608,6 +2608,12 @@ function saveParams() {
     }
   }
 
+  // Auto-switch to unsized if no sizes left
+  if (currentProduct.sized && currentProduct.sizes && Object.keys(currentProduct.sizes).length === 0) {
+    currentProduct.sized = false;
+    delete currentProduct.sizes;
+  }
+
   save();
   switchZone(currentZone);
   hideModal('modal-detail');
