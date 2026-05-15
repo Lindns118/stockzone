@@ -5673,7 +5673,11 @@ function confirmDonUnique() {
 function buildPersonnesHTML() {
   const persons = S.persons || [];
   const addBtn = `<button class="add-person-btn" onclick="openAddPersonView()">➕ Ajouter une personne</button>`;
-  if (!persons.length) return addBtn + '<div style="text-align:center;color:#9ca3af;padding:30px 20px;font-size:14px">Aucune personne.<br>Elles sont créées automatiquement lors des distributions.</div>';
+  const topBtns = `<div style="display:flex;gap:8px;margin-bottom:10px">
+    <button onclick="showPackDispoView()" style="flex:1;background:#f3f4f6;border:none;border-radius:10px;padding:10px 8px;font-size:13px;font-weight:600;cursor:pointer">📊 Packs disponibles</button>
+    ${persons.length ? `<button onclick="printPersonCard(null)" style="flex:1;background:#f3f4f6;border:none;border-radius:10px;padding:10px 8px;font-size:13px;font-weight:600;cursor:pointer">📄 Export tous PDF</button>` : ''}
+  </div>`;
+  if (!persons.length) return topBtns + addBtn + '<div style="text-align:center;color:#9ca3af;padding:30px 20px;font-size:14px">Aucune personne.<br>Elles sont créées automatiquement lors des distributions.</div>';
   const cards = persons.map(p => {
     const attrCount = (S.attributions||[]).filter(a=>a.person.toLowerCase()===p.name.toLowerCase()).length;
     const knownSizes = Object.values(p.sizes||{}).filter(Boolean).length;
@@ -5686,7 +5690,7 @@ function buildPersonnesHTML() {
       <span class="pcard-arrow">›</span>
     </div>`;
   }).join('');
-  return addBtn + cards;
+  return topBtns + addBtn + cards;
 }
 
 function showPersonDetail(personId) {
@@ -5698,17 +5702,24 @@ function showPersonDetail(personId) {
   const attrs = (S.attributions||[]).filter(a=>a.person.toLowerCase()===person.name.toLowerCase()).slice().reverse();
   const sizesHTML = (zd?.products||[]).filter(p=>p.sized).map(prod => {
     const knownSize = (person.sizes||{})[prod.id]||'';
-    const btns = SIZES.map(s=>`<button class="sz-btn${knownSize===s?' sel':''}" onclick="setPersonSize('${personId}','${prod.id}','${s}')">${s}</button>`).join('');
+    const btns = getProductSizes(prod).map(s=>`<button class="sz-btn${knownSize===s?' sel':''}" onclick="setPersonSize('${personId}','${prod.id}','${s}')">${s}</button>`).join('');
     return `<div class="p-sz-row"><span class="p-sz-name">${esc(prod.name)}</span><div class="sz-btns" style="gap:4px">${btns}</div></div>`;
   }).join('');
   const histHTML = attrs.length
-    ? attrs.slice(0,15).map(a=>{
+    ? attrs.slice(0,30).map(a=>{
         const date = fmtDate(a.date?.slice(0,10));
         const items = (a.items||[]).map(i=>i.name+(i.size?` (${i.size})`:'')+(i.qty>1?` ×${i.qty}`:'')).join(', ');
-        return `<div class="p-hist-item"><div style="font-weight:600">${esc(a.packName||'Don')} — ${date}</div><div style="color:#6b7280;margin-top:2px;font-size:12px">${items}</div></div>`;
+        return `<div class="p-hist-item" style="display:flex;align-items:flex-start;gap:8px">
+          <div style="flex:1"><div style="font-weight:600">${esc(a.packName||'Don')} — ${date}</div><div style="color:#6b7280;margin-top:2px;font-size:12px">${items}</div></div>
+          <button onclick="deleteAttribution('${a.id}','${personId}')" style="background:none;border:none;color:#ef4444;font-size:16px;cursor:pointer;padding:2px 4px;flex-shrink:0" title="Supprimer">🗑</button>
+        </div>`;
       }).join('')
     : '<div style="color:#9ca3af;font-size:13px;padding:8px 0">Aucune distribution</div>';
-  vc.innerHTML = `<button onclick="setVetTab('personnes')" style="background:transparent;border:none;color:#7c3aed;font-size:14px;font-weight:600;cursor:pointer;padding:0;margin-bottom:14px">← Personnes</button>
+  vc.innerHTML = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+      <button onclick="setVetTab('personnes')" style="background:transparent;border:none;color:#7c3aed;font-size:14px;font-weight:600;cursor:pointer;padding:0">← Personnes</button>
+      <span style="flex:1"></span>
+      <button onclick="printPersonCard('${personId}')" style="background:#f3f4f6;border:none;border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer;font-weight:600">📄 PDF</button>
+    </div>
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
       <div class="pcard-avatar" style="width:52px;height:52px;font-size:22px">${person.name.charAt(0).toUpperCase()}</div>
       <div style="font-size:20px;font-weight:800">${esc(person.name)}</div>
@@ -5744,7 +5755,7 @@ function openAddPersonView() {
     <div class="p-sz-row">
       <span class="p-sz-name">${esc(p.name)}</span>
       <div class="sz-btns" style="gap:4px" id="np-sz-${p.id}">
-        ${SIZES.map(s=>`<button class="sz-btn" onclick="toggleNewPersonSize(this,'${p.id}','${s}')">${s}</button>`).join('')}
+        ${getProductSizes(p).map(s=>`<button class="sz-btn" onclick="toggleNewPersonSize(this,'${p.id}','${s}')">${s}</button>`).join('')}
       </div>
     </div>`).join('');
   _newPersonSizes = {};
@@ -5775,6 +5786,139 @@ function saveNewPerson() {
   save();
   toast(`✅ ${name} ajouté(e)`,'success');
   setVetTab('personnes');
+}
+
+function deleteAttribution(attrId, personId) {
+  if (!confirm('Supprimer cette distribution ? Le stock sera restitué.')) return;
+  const attrIdx = (S.attributions||[]).findIndex(a=>a.id===attrId);
+  if (attrIdx === -1) return;
+  const attr = S.attributions[attrIdx];
+  const zd = S.zones.vetements;
+  if (zd && attr.items) {
+    attr.items.forEach(item => {
+      const product = zd.products.find(p=>p.id===item.productId);
+      if (!product) return;
+      if (product.sized && item.size) {
+        if (!product.sizes) product.sizes = {};
+        product.sizes[item.size] = (product.sizes[item.size]||0) + item.qty;
+        product.qty = Object.values(product.sizes).reduce((s,v)=>s+v,0);
+      } else {
+        product.qty += item.qty;
+      }
+    });
+  }
+  S.attributions.splice(attrIdx, 1);
+  save();
+  toast('✅ Distribution supprimée, stock restitué', 'success');
+  showPersonDetail(personId);
+}
+
+function printPersonCard(personId) {
+  const zd = S.zones.vetements;
+  const persons = personId
+    ? [(S.persons||[]).find(p=>p.id===personId)].filter(Boolean)
+    : (S.persons||[]);
+  if (!persons.length) { toast('Aucune personne à exporter','warning'); return; }
+  const now = new Date().toLocaleDateString('fr-FR');
+  let body = '';
+  persons.forEach(p => {
+    const attrs = (S.attributions||[]).filter(a=>a.person.toLowerCase()===p.name.toLowerCase()).slice().reverse();
+    const sizeRows = (zd?.products||[]).filter(pr=>pr.sized).map(pr => {
+      const sz = (p.sizes||{})[pr.id]||'—';
+      return `<tr><td>${pr.name}</td><td style="font-weight:700">${sz}</td></tr>`;
+    }).join('');
+    const histRows = attrs.map(a => {
+      const date = a.date?.slice(0,10)||'';
+      const items = (a.items||[]).map(i=>i.name+(i.size?` (${i.size})`:'')+(i.qty>1?` ×${i.qty}`:'')).join(', ');
+      return `<tr><td>${a.packName||'Don'}</td><td>${date}</td><td>${items}</td></tr>`;
+    }).join('');
+    body += `<div class="pb">
+      <h2>${p.name.charAt(0).toUpperCase()}</h2>
+      <h1>${p.name}</h1>
+      <div class="sec">Tailles connues</div>
+      ${sizeRows ? `<table><tr><th>Article</th><th>Taille</th></tr>${sizeRows}</table>` : '<p class="empty">Aucune taille enregistrée</p>'}
+      <div class="sec">Historique des dons</div>
+      ${histRows ? `<table><tr><th>Pack/Don</th><th>Date</th><th>Détail</th></tr>${histRows}</table>` : '<p class="empty">Aucune distribution</p>'}
+    </div>`;
+  });
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>StockZone Vêtements — ${personId ? persons[0].name : 'Toutes les personnes'}</title>
+  <style>body{font-family:Arial,sans-serif;font-size:13px;color:#111;margin:0;padding:20px}
+  .pb{page-break-after:always;padding-bottom:20px}h2{width:44px;height:44px;border-radius:50%;background:#7c3aed;color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;margin:0 0 6px}
+  h1{font-size:22px;font-weight:800;margin:0 0 16px}
+  .sec{font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin:14px 0 6px;border-top:1px solid #eee;padding-top:10px}
+  table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #ddd;padding:5px 8px;text-align:left}th{background:#f5f3ff;font-weight:700}
+  .empty{color:#999;font-size:12px;margin:4px 0}
+  .foot{font-size:10px;color:#aaa;text-align:right;margin-top:8px}
+  @media print{body{padding:10px}.pb{page-break-after:always}}</style></head>
+  <body>${body}<div class="foot">StockZone — Exporté le ${now}</div></body></html>`;
+  const w = window.open('', '_blank');
+  if (!w) { toast('Autorisez les pop-ups pour exporter','warning'); return; }
+  w.document.write(html);
+  w.document.close();
+  setTimeout(()=>w.print(), 400);
+}
+
+function showPackDispoView() {
+  const vc = document.getElementById('vet-content');
+  if (!vc) return;
+  vc.scrollTop = 0;
+  const packs = S.vetPacks || [];
+  const zd = S.zones.vetements;
+  const persons = S.persons || [];
+  const backBtn = `<button onclick="setVetTab('personnes')" style="background:transparent;border:none;color:#7c3aed;font-size:14px;font-weight:600;cursor:pointer;padding:0;margin-bottom:16px">← Personnes</button>`;
+  if (!packs.some(p=>p.items.length)) {
+    vc.innerHTML = backBtn + '<div style="text-align:center;color:#9ca3af;padding:30px 20px;font-size:14px">Aucun pack configuré</div>';
+    return;
+  }
+  const cards = packs.filter(pack=>pack.items.length).map(pack => {
+    let maxPacks = Infinity;
+    const shortages = [];
+    pack.items.forEach(item => {
+      const product = zd?.products?.find(p=>p.id===item.productId);
+      if (!product) { maxPacks = 0; return; }
+      const canMake = Math.floor(product.qty / item.qty);
+      if (canMake < maxPacks) maxPacks = canMake;
+      if (canMake === 0) shortages.push(`${item.name} (stock: ${product.qty}, besoin: ${item.qty})`);
+    });
+    if (maxPacks === Infinity) maxPacks = 0;
+    const countColor = maxPacks > 0 ? '#16a34a' : '#ef4444';
+    const countBg = maxPacks > 0 ? '#f0fdf4' : '#fef2f2';
+    const shortageHTML = shortages.length
+      ? `<div style="background:#fef2f2;border-radius:8px;padding:8px 10px;margin:8px 0;font-size:12px">${shortages.map(s=>`<div style="color:#dc2626">⚠ ${s}</div>`).join('')}</div>`
+      : '';
+    const personRows = persons.length ? persons.map(p => {
+      const canItems = [], cantItems = [];
+      pack.items.forEach(item => {
+        const product = zd?.products?.find(pr=>pr.id===item.productId);
+        if (!product) { cantItems.push(item.name+' (article manquant)'); return; }
+        if (!product.sized) {
+          if (product.qty < item.qty) cantItems.push(`${item.name} (stock ${product.qty})`);
+          return;
+        }
+        const sz = (p.sizes||{})[item.productId];
+        if (!sz) { cantItems.push(item.name+' (taille inconnue)'); return; }
+        const stkSz = (product.sizes||{})[sz]||0;
+        if (stkSz < item.qty) cantItems.push(`${item.name} ${sz} (stock ${stkSz})`);
+        else canItems.push(`${item.name} ${sz}`);
+      });
+      const ok = cantItems.length === 0;
+      return `<div style="display:flex;align-items:flex-start;gap:6px;padding:5px 0;border-bottom:1px solid #f3f4f6;font-size:12px">
+        <span style="font-size:14px">${ok?'✅':'❌'}</span>
+        <div><div style="font-weight:600">${esc(p.name)}</div>${!ok?`<div style="color:#dc2626;font-size:11px">${cantItems.join(', ')}</div>`:''}</div>
+      </div>`;
+    }).join('') : '<div style="font-size:12px;color:#9ca3af;padding:5px 0">Aucune personne enregistrée</div>';
+    return `<div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.08)">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+        <span style="font-size:24px">${pack.icon}</span>
+        <div style="flex:1"><div style="font-weight:700;font-size:15px">${esc(pack.name)}</div></div>
+        <div style="background:${countBg};color:${countColor};font-weight:700;font-size:13px;border-radius:8px;padding:4px 10px">${maxPacks} dispo</div>
+      </div>
+      ${shortageHTML}
+      <div style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;margin:10px 0 4px">Personnes</div>
+      ${personRows}
+    </div>`;
+  }).join('');
+  vc.innerHTML = backBtn + `<div style="font-size:18px;font-weight:800;margin-bottom:14px">📊 Packs disponibles</div>` + cards;
 }
 
 // ── UNIT SELECT HELPER ── (used in all dropdowns)
