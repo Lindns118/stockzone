@@ -406,7 +406,7 @@ body.vet-mode #vet-bar{display:flex}
 body.vet-mode #app{padding-top:96px}
 body.vet-mode .bottom-nav{display:none!important}
 body.vet-mode .main{padding-bottom:20px}
-body.vet-mode #zone-header{display:none}
+
 
 /* PACKS VÊTEMENTS */
 .vet-packs-btn{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.28);color:#fff;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s;white-space:nowrap}
@@ -5363,19 +5363,12 @@ function exitVetementsMode() {
 }
 
 function buildVetNavTabs() {
-  const zd = S.zones.vetements;
-  const cats = zd ? [...new Set(zd.products.map(p=>p.category))].sort((a,b)=>a.localeCompare(b,'fr')) : [];
   const tabs = document.getElementById('vet-cat-tabs');
   if (!tabs) return;
-  let html = cats.map(c => {
-    const active = currentVetTab==='stock' && vetCatFilter===c ? ' active' : '';
-    return `<button class="vet-nav-btn${active}" onclick="setVetTab('c:${c}')">${esc(c)}</button>`;
-  }).join('');
-  if (cats.length) html += '<span class="vet-tab-sep"></span>';
-  [{id:'packs',icon:'📦',lbl:'Packs'},{id:'distribution',icon:'🎁',lbl:'Distribution'},{id:'personnes',icon:'👥',lbl:'Personnes'}].forEach(t => {
+  let html = [{id:'packs',icon:'📦',lbl:'Packs'},{id:'distribution',icon:'🎁',lbl:'Distribution'},{id:'personnes',icon:'👥',lbl:'Personnes'}].map(t => {
     const active = currentVetTab===t.id ? ' active' : '';
-    html += `<button class="vet-nav-btn${active}" onclick="setVetTab('${t.id}')">${t.icon} ${t.lbl}</button>`;
-  });
+    return `<button class="vet-nav-btn${active}" onclick="setVetTab('${t.id}')">${t.icon} ${t.lbl}</button>`;
+  }).join('');
   tabs.innerHTML = html;
 }
 
