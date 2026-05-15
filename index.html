@@ -5299,13 +5299,19 @@ function createAndAddProduct() {
     document.getElementById('pack-create-hint').style.display = 'none';
     return;
   }
-  const has4xl = document.getElementById('pack-create-4xl').checked;
-  const has5xl = document.getElementById('pack-create-5xl').checked;
-  const sizes = {S:0,M:0,L:0,XL:0,'2XL':0,'3XL':0};
-  if (has4xl) sizes['4XL'] = 0;
-  if (has5xl) sizes['5XL'] = 0;
+  const noSizes = document.getElementById('pack-create-nosizes').checked;
+  const has4xl = !noSizes && document.getElementById('pack-create-4xl').checked;
+  const has5xl = !noSizes && document.getElementById('pack-create-5xl').checked;
   const newId = 'v' + Date.now();
-  const newProd = {id:newId, name, category:'Vêtements', qty:0, unit:'pièces', seuil:0, sized:true, sizes, history:[]};
+  let newProd;
+  if (noSizes) {
+    newProd = {id:newId, name, category:'Vêtements', qty:0, unit:'pièces', seuil:0, sized:false, history:[]};
+  } else {
+    const sizes = {S:0,M:0,L:0,XL:0,'2XL':0,'3XL':0};
+    if (has4xl) sizes['4XL'] = 0;
+    if (has5xl) sizes['5XL'] = 0;
+    newProd = {id:newId, name, category:'Vêtements', qty:0, unit:'pièces', seuil:0, sized:true, sizes, history:[]};
+  }
   zd.products.push(newProd);
   buildPackProductSelect();
   const packId = document.getElementById('pack-edit-id').value;
@@ -5323,8 +5329,14 @@ function createAndAddProduct() {
   document.getElementById('pack-create-hint').style.display = 'none';
   document.getElementById('pack-create-4xl').checked = false;
   document.getElementById('pack-create-5xl').checked = false;
+  document.getElementById('pack-create-nosizes').checked = false;
+  document.getElementById('pack-create-sizes-panel').style.display = '';
   document.getElementById('pack-add-qty').value = '1';
   toast(`✅ "${name}" créé et ajouté`, 'success');
+}
+
+function toggleCreateSizesPanel(cb) {
+  document.getElementById('pack-create-sizes-panel').style.display = cb.checked ? 'none' : '';
 }
 
 function packItemAdd() {
@@ -5956,11 +5968,17 @@ function unitOptions(selected) {
     <button onclick="packItemAdd()" style="background:#7c3aed;color:#fff;border:none;border-radius:10px;padding:9px 16px;font-size:20px;cursor:pointer;flex-shrink:0;line-height:1">+</button>
   </div>
   <div id="pack-create-hint" style="display:none;background:#faf5ff;border:1px solid #ddd6fe;border-radius:12px;padding:12px;margin-top:8px">
-    <div style="font-size:13px;font-weight:600;color:#7c3aed;margin-bottom:8px">Créer cet article dans le stock</div>
-    <div style="font-size:12px;color:#6b7280;margin-bottom:8px">Tailles supplémentaires :</div>
-    <div style="display:flex;gap:14px;margin-bottom:10px">
-      <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer"><input type="checkbox" id="pack-create-4xl"> 4XL</label>
-      <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer"><input type="checkbox" id="pack-create-5xl"> 5XL</label>
+    <div style="font-size:13px;font-weight:600;color:#7c3aed;margin-bottom:10px">Créer cet article dans le stock</div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:10px">
+      <input type="checkbox" id="pack-create-nosizes" onchange="toggleCreateSizesPanel(this)">
+      <span>Sans taille (ex: casquette, ceinture…)</span>
+    </label>
+    <div id="pack-create-sizes-panel">
+      <div style="font-size:12px;color:#6b7280;margin-bottom:6px">Tailles supplémentaires :</div>
+      <div style="display:flex;gap:14px;margin-bottom:10px">
+        <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer"><input type="checkbox" id="pack-create-4xl"> 4XL</label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer"><input type="checkbox" id="pack-create-5xl"> 5XL</label>
+      </div>
     </div>
     <button onclick="createAndAddProduct()" style="background:#7c3aed;color:#fff;border:none;border-radius:10px;padding:9px 0;font-size:13px;cursor:pointer;width:100%;font-weight:600">✅ Créer et ajouter au pack</button>
   </div>
