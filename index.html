@@ -5410,6 +5410,7 @@ function enterVetementsMode() {
   vetCatFilter = 'all';
   const vc = document.getElementById('vet-content');
   if (vc) vc.style.display = 'none';
+  switchZone('vetements');
   buildVetNavTabs();
 }
 
@@ -5424,7 +5425,7 @@ function exitVetementsMode() {
 function buildVetNavTabs() {
   const tabs = document.getElementById('vet-cat-tabs');
   if (!tabs) return;
-  let html = [{id:'packs',icon:'📦',lbl:'Packs'},{id:'distribution',icon:'🎁',lbl:'Distribution'},{id:'personnes',icon:'👥',lbl:'Personnes'}].map(t => {
+  let html = [{id:'stock',icon:'🧥',lbl:'Zone'},{id:'packs',icon:'📦',lbl:'Packs'},{id:'distribution',icon:'🎁',lbl:'Distribution'},{id:'personnes',icon:'👥',lbl:'Personnes'}].map(t => {
     const active = currentVetTab===t.id ? ' active' : '';
     return `<button class="vet-nav-btn${active}" onclick="setVetTab('${t.id}')">${t.icon} ${t.lbl}</button>`;
   }).join('');
@@ -5440,6 +5441,11 @@ function setVetTab(tab) {
     vetCatFilter = vetCatFilter === cat ? 'all' : cat;
     vc.style.display = 'none';
     renderProducts();
+  } else if (tab === 'stock') {
+    currentVetTab = 'stock';
+    vetCatFilter = 'all';
+    vc.style.display = 'none';
+    switchZone('vetements');
   } else {
     currentVetTab = tab;
     vetCatFilter = 'all';
