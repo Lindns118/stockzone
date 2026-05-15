@@ -5962,55 +5962,162 @@ function showPackDispoView() {
     vc.innerHTML = backBtn + '<div style="text-align:center;color:#9ca3af;padding:30px 20px;font-size:14px">Aucun pack configuré</div>';
     return;
   }
-  const cards = packs.filter(pack=>pack.items.length).map(pack => {
+  const analysis = calcPacksAnalysis();
+  const actionBtns = `<div style="display:flex;gap:8px;margin-bottom:16px">
+    <button onclick="exportDispoList()" style="flex:1;background:#f3f4f6;border:none;border-radius:10px;padding:10px 8px;font-size:13px;font-weight:600;cursor:pointer">📋 Exporter liste</button>
+    <button onclick="mailDispoList()" style="flex:1;background:#f3f4f6;border:none;border-radius:10px;padding:10px 8px;font-size:13px;font-weight:600;cursor:pointer">✉️ Envoyer par mail</button>
+  </div>`;
+  const cards = analysis.map(r => {
+    const countColor = r.maxPacks > 0 ? '#16a34a' : '#ef4444';
+    const countBg = r.maxPacks > 0 ? '#f0fdf4' : '#fef2f2';
+    const personRows = r.personStatus.length
+      ? r.personStatus.map(ps => `<div style="display:flex;align-items:flex-start;gap:6px;padding:5px 0;border-bottom:1px solid #f3f4f6;font-size:12px">
+          <span style="font-size:14px">${ps.ok?'✅':'❌'}</span>
+          <div><div style="font-weight:600">${esc(ps.person.name)}</div>${!ps.ok?`<div style="color:#dc2626;font-size:11px">${ps.cant.join(', ')}</div>`:''}</div>
+        </div>`).join('')
+      : '<div style="font-size:12px;color:#9ca3af;padding:5px 0">Aucune personne enregistrée</div>';
+    let simHTML = '';
+    if (r.eligible.length > 0) {
+      const missingHTML = r.missing.length
+        ? `<div style="background:#fef2f2;border-radius:8px;padding:8px 10px;margin-bottom:8px">
+            <div style="font-weight:700;color:#dc2626;font-size:12px;margin-bottom:4px">⚠ Manquants pour servir tout le monde</div>
+            ${r.missing.map(m=>`<div style="font-size:12px;color:#dc2626">• ${m.name}${m.size?' '+m.size:''} — ${m.qty} manquant${m.qty!==1?'s':''}</div>`).join('')}
+          </div>` : '';
+      const remRows = r.remaining.map(rem =>
+        !rem.sized
+          ? `<div style="font-size:12px">• ${rem.name} : <b>${rem.qty}</b> restant${rem.qty!==1?'s':''}</div>`
+          : `<div style="font-size:12px">• ${rem.name} : ${rem.sizes.map(({s,qty})=>`<b style="color:${qty===0?'#ef4444':'#111'}">${s}:${qty}</b>`).join(' ')}</div>`
+      ).join('');
+      simHTML = `<div style="margin-top:10px;border-top:1px solid #f3f4f6;padding-top:10px">
+        <div style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Si distribué aux ${r.eligible.length} ✅</div>
+        ${missingHTML}
+        <div>${remRows}</div>
+      </div>`;
+    }
+    return `<div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.08)">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <span style="font-size:24px">${r.pack.icon}</span>
+        <div style="flex:1"><div style="font-weight:700;font-size:15px">${esc(r.pack.name)}</div></div>
+        <div style="background:${countBg};color:${countColor};font-weight:700;font-size:13px;border-radius:8px;padding:4px 10px">${r.maxPacks} dispo</div>
+      </div>
+      <div style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Personnes</div>
+      ${personRows}${simHTML}
+    </div>`;
+  }).join('');
+  vc.innerHTML = backBtn + `<div style="font-size:18px;font-weight:800;margin-bottom:14px">📊 Packs disponibles</div>` + actionBtns + cards;
+}
+
+function calcPacksAnalysis() {
+  const packs = (S.vetPacks||[]).filter(pk=>pk.items.length);
+  const zd = S.zones.vetements;
+  const persons = S.persons||[];
+  return packs.map(pack => {
     let maxPacks = Infinity;
-    const shortages = [];
     pack.items.forEach(item => {
       const product = zd?.products?.find(p=>p.id===item.productId);
       if (!product) { maxPacks = 0; return; }
       const canMake = Math.floor(product.qty / item.qty);
       if (canMake < maxPacks) maxPacks = canMake;
-      if (canMake === 0) shortages.push(`${item.name} (stock: ${product.qty}, besoin: ${item.qty})`);
     });
     if (maxPacks === Infinity) maxPacks = 0;
-    const countColor = maxPacks > 0 ? '#16a34a' : '#ef4444';
-    const countBg = maxPacks > 0 ? '#f0fdf4' : '#fef2f2';
-    const shortageHTML = shortages.length
-      ? `<div style="background:#fef2f2;border-radius:8px;padding:8px 10px;margin:8px 0;font-size:12px">${shortages.map(s=>`<div style="color:#dc2626">⚠ ${s}</div>`).join('')}</div>`
-      : '';
-    const personRows = persons.length ? persons.map(p => {
-      const canItems = [], cantItems = [];
+    const personStatus = persons.map(p => {
+      const cant = [];
       pack.items.forEach(item => {
         const product = zd?.products?.find(pr=>pr.id===item.productId);
-        if (!product) { cantItems.push(item.name+' (article manquant)'); return; }
+        if (!product) { cant.push(item.name+' (article manquant)'); return; }
         if (!product.sized) {
-          if (product.qty < item.qty) cantItems.push(`${item.name} (stock ${product.qty})`);
+          if (product.qty < item.qty) cant.push(`${item.name} (stock ${product.qty})`);
           return;
         }
         const sz = (p.sizes||{})[item.productId];
-        if (!sz) { cantItems.push(item.name+' (taille inconnue)'); return; }
-        const stkSz = (product.sizes||{})[sz]||0;
-        if (stkSz < item.qty) cantItems.push(`${item.name} ${sz} (stock ${stkSz})`);
-        else canItems.push(`${item.name} ${sz}`);
+        if (!sz) { cant.push(item.name+' (taille inconnue)'); return; }
+        if (((product.sizes||{})[sz]||0) < item.qty) cant.push(`${item.name} ${sz} (stock ${(product.sizes||{})[sz]||0})`);
       });
-      const ok = cantItems.length === 0;
-      return `<div style="display:flex;align-items:flex-start;gap:6px;padding:5px 0;border-bottom:1px solid #f3f4f6;font-size:12px">
-        <span style="font-size:14px">${ok?'✅':'❌'}</span>
-        <div><div style="font-weight:600">${esc(p.name)}</div>${!ok?`<div style="color:#dc2626;font-size:11px">${cantItems.join(', ')}</div>`:''}</div>
-      </div>`;
-    }).join('') : '<div style="font-size:12px;color:#9ca3af;padding:5px 0">Aucune personne enregistrée</div>';
-    return `<div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.08)">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
-        <span style="font-size:24px">${pack.icon}</span>
-        <div style="flex:1"><div style="font-weight:700;font-size:15px">${esc(pack.name)}</div></div>
-        <div style="background:${countBg};color:${countColor};font-weight:700;font-size:13px;border-radius:8px;padding:4px 10px">${maxPacks} dispo</div>
-      </div>
-      ${shortageHTML}
-      <div style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;margin:10px 0 4px">Personnes</div>
-      ${personRows}
-    </div>`;
-  }).join('');
-  vc.innerHTML = backBtn + `<div style="font-size:18px;font-weight:800;margin-bottom:14px">📊 Packs disponibles</div>` + cards;
+      return {person:p, ok:cant.length===0, cant};
+    });
+    const eligible = personStatus.filter(ps=>ps.ok);
+    // Simulate distribution to all eligible
+    const sim = {};
+    pack.items.forEach(item => {
+      const product = zd?.products?.find(p=>p.id===item.productId);
+      if (!product) return;
+      sim[item.productId] = product.sized ? {...(product.sizes||{})} : {_qty: product.qty};
+    });
+    const missing = [];
+    eligible.forEach(({person}) => {
+      pack.items.forEach(item => {
+        const product = zd?.products?.find(p=>p.id===item.productId);
+        if (!product) return;
+        if (!product.sized) {
+          sim[item.productId]._qty = (sim[item.productId]._qty||0) - item.qty;
+          if (sim[item.productId]._qty < 0) {
+            const ex = missing.find(m=>m.name===item.name&&!m.size);
+            if (ex) ex.qty += -sim[item.productId]._qty; else missing.push({name:item.name,size:null,qty:-sim[item.productId]._qty});
+            sim[item.productId]._qty = 0;
+          }
+        } else {
+          const sz = (person.sizes||{})[item.productId];
+          if (!sz) return;
+          sim[item.productId][sz] = (sim[item.productId][sz]||0) - item.qty;
+          if (sim[item.productId][sz] < 0) {
+            const ex = missing.find(m=>m.name===item.name&&m.size===sz);
+            if (ex) ex.qty += -sim[item.productId][sz]; else missing.push({name:item.name,size:sz,qty:-sim[item.productId][sz]});
+            sim[item.productId][sz] = 0;
+          }
+        }
+      });
+    });
+    const remaining = pack.items.map(item => {
+      const product = zd?.products?.find(p=>p.id===item.productId);
+      if (!product) return null;
+      const s = sim[item.productId]||{};
+      return product.sized
+        ? {name:item.name, sized:true, sizes: getProductSizes(product).map(sz=>({s:sz,qty:s[sz]||0}))}
+        : {name:item.name, sized:false, qty:s._qty||0};
+    }).filter(Boolean);
+    return {pack, maxPacks, personStatus, eligible, missing, remaining};
+  });
+}
+
+function _dispoText() {
+  const analysis = calcPacksAnalysis();
+  const date = new Date().toLocaleDateString('fr-FR');
+  let t = `STOCK VÊTEMENTS — PACKS DISPONIBLES\n${date}\n\n`;
+  analysis.forEach(r => {
+    t += `${r.pack.name} — ${r.maxPacks} dispo\n`;
+    r.personStatus.forEach(ps => {
+      t += `  ${ps.ok?'✓':'✗'} ${ps.person.name}${!ps.ok?' ('+ps.cant.join(', ')+')':''}\n`;
+    });
+    if (r.eligible.length > 0) {
+      t += `  → Si distribué aux ${r.eligible.length} personne${r.eligible.length!==1?'s':''}:\n`;
+      if (r.missing.length) {
+        t += `  MANQUANTS:\n`;
+        r.missing.forEach(m => t+=`    - ${m.name}${m.size?' '+m.size:''}: ${m.qty} manquant${m.qty!==1?'s':''}\n`);
+      }
+      t += `  Stock restant:\n`;
+      r.remaining.forEach(rem => {
+        if (!rem.sized) t+=`    - ${rem.name}: ${rem.qty}\n`;
+        else t+=`    - ${rem.name}: ${rem.sizes.map(({s,qty})=>s+':'+qty).join(' ')}\n`;
+      });
+    }
+    t += '\n';
+  });
+  return t;
+}
+
+function exportDispoList() {
+  const text = _dispoText();
+  const w = window.open('', '_blank');
+  if (!w) { toast('Autorisez les pop-ups','warning'); return; }
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Packs disponibles</title></head><body><pre style="font-family:monospace;font-size:14px;padding:20px;white-space:pre-wrap">${text}</pre></body></html>`);
+  w.document.close();
+}
+
+function mailDispoList() {
+  const text = _dispoText();
+  const subject = encodeURIComponent('StockZone – Packs vêtements disponibles');
+  const body = encodeURIComponent(text);
+  window.location.href = `mailto:?subject=${subject}&body=${body}`;
 }
 
 // ── UNIT SELECT HELPER ── (used in all dropdowns)
