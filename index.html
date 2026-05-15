@@ -1083,6 +1083,10 @@ body.vet-mode .main{padding-bottom:20px}
 const SK = 'stockzone_v2';
 const DEFAULT_UNITS = ['pièces','kg','rouleaux','ramettes','paires','litres','boîtes','mètres','sachets','cartons'];
 const SIZES = ['S','M','L','XL','2XL','3XL'];
+const ALL_SIZES = ['S','M','L','XL','2XL','3XL','4XL','5XL'];
+function getProductSizes(p) {
+  return p.sizes ? ALL_SIZES.filter(s => s in p.sizes) : SIZES;
+}
 
 const DEF = {
   zones: {
@@ -1862,7 +1866,7 @@ function renderProducts() {
     const isLow = p.seuil>0&&p.qty<=p.seuil;
     if(p.sized && currentZone==='vetements') {
       // Sizes grid card
-      const sizeCells = SIZES.map(s=>{
+      const sizeCells = getProductSizes(p).map(s=>{
         const qty = (p.sizes&&p.sizes[s]) || 0;
         return `<div class="size-cell ${qty===0?'size-zero':''}" style="flex:1;min-width:40px;text-align:center;padding:6px 3px;border-radius:10px;background:${qty===0?'#f3f4f6':'#e8eaff'};cursor:pointer;display:inline-block" onclick="event.stopPropagation();sizeStep('${p.id}','${s}',1)" oncontextmenu="event.preventDefault();event.stopPropagation();sizeStep('${p.id}','${s}',-1)">
           <span class="size-lbl" style="font-size:10px;font-weight:700;color:${qty===0?'#9ca3af':'#2d35a8'};display:block">${s}</span>
@@ -2472,7 +2476,7 @@ function recalcQty(product) {
 function psRenderSizesList(product) {
   const list = document.getElementById('ps-sizes-list');
   if(!list) return;
-  list.innerHTML = SIZES.map(s=>{
+  list.innerHTML = ALL_SIZES.map(s=>{
     const active = product.sizes && product.sizes[s] !== undefined;
     return `<div style="display:flex;align-items:center;gap:4px;background:${active?'#e8eaff':'#f3f4f6'};border-radius:8px;padding:4px 10px;cursor:pointer" onclick="psToggleSize('${s}')">
       <span style="font-size:12px;font-weight:700;color:${active?'#2d35a8':'#9ca3af'}">${s}</span>
@@ -5268,29 +5272,84 @@ function renderPackEditorItems(pack) {
 }
 
 function buildPackProductSelect() {
-  const sel = document.getElementById('pack-add-product');
-  if (!sel) return;
+  const dl = document.getElementById('pack-prod-list');
+  if (!dl) return;
   const zd = S.zones.vetements;
   if (!zd) return;
-  sel.innerHTML = '<option value="">Choisir un article…</option>' +
-    zd.products.map(p => `<option value="${p.id}" data-name="${esc(p.name)}">${esc(p.name)}</option>`).join('');
+  dl.innerHTML = zd.products.map(p => `<option value="${esc(p.name)}">`).join('');
+}
+
+function onPackProdInput() {
+  const val = (document.getElementById('pack-add-product').value || '').trim();
+  const hint = document.getElementById('pack-create-hint');
+  if (!val) { hint.style.display = 'none'; return; }
+  const zd = S.zones.vetements;
+  const exists = zd && zd.products.some(p => p.name.toLowerCase() === val.toLowerCase());
+  hint.style.display = exists ? 'none' : '';
+}
+
+function createAndAddProduct() {
+  const inp = document.getElementById('pack-add-product');
+  const name = (inp.value || '').trim();
+  if (!name) { toast('Saisissez un nom', 'warning'); return; }
+  const zd = S.zones.vetements;
+  if (!zd) return;
+  if (zd.products.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+    toast('Cet article existe déjà', 'warning');
+    document.getElementById('pack-create-hint').style.display = 'none';
+    return;
+  }
+  const has4xl = document.getElementById('pack-create-4xl').checked;
+  const has5xl = document.getElementById('pack-create-5xl').checked;
+  const sizes = {S:0,M:0,L:0,XL:0,'2XL':0,'3XL':0};
+  if (has4xl) sizes['4XL'] = 0;
+  if (has5xl) sizes['5XL'] = 0;
+  const newId = 'v' + Date.now();
+  const newProd = {id:newId, name, category:'Vêtements', qty:0, unit:'pièces', seuil:0, sized:true, sizes, history:[]};
+  zd.products.push(newProd);
+  buildPackProductSelect();
+  const packId = document.getElementById('pack-edit-id').value;
+  const qty = Math.max(1, parseInt(document.getElementById('pack-add-qty').value) || 1);
+  const pack = (S.vetPacks || []).find(p => p.id === packId);
+  if (pack) {
+    const existing = pack.items.find(item => item.productId === newId);
+    if (existing) existing.qty += qty;
+    else pack.items.push({productId:newId, name, qty});
+    renderPackEditorItems(pack);
+    if (currentVetTab === 'packs') refreshVetPacksTab();
+  }
+  save();
+  inp.value = '';
+  document.getElementById('pack-create-hint').style.display = 'none';
+  document.getElementById('pack-create-4xl').checked = false;
+  document.getElementById('pack-create-5xl').checked = false;
+  document.getElementById('pack-add-qty').value = '1';
+  toast(`✅ "${name}" créé et ajouté`, 'success');
 }
 
 function packItemAdd() {
   const packId = document.getElementById('pack-edit-id').value;
-  const sel = document.getElementById('pack-add-product');
+  const inp = document.getElementById('pack-add-product');
+  const name = (inp.value || '').trim();
   const qty = Math.max(1, parseInt(document.getElementById('pack-add-qty').value) || 1);
-  if (!sel.value) { toast('Sélectionnez un article', 'warning'); return; }
-  const name = sel.options[sel.selectedIndex].getAttribute('data-name') || sel.options[sel.selectedIndex].text;
+  if (!name) { toast('Saisissez un article', 'warning'); return; }
+  const zd = S.zones.vetements;
+  const product = zd && zd.products.find(p => p.name.toLowerCase() === name.toLowerCase());
+  if (!product) {
+    document.getElementById('pack-create-hint').style.display = '';
+    toast('Article non trouvé — créez-le ci-dessous', 'warning');
+    return;
+  }
   const pack = (S.vetPacks || []).find(p => p.id === packId);
   if (!pack) return;
-  const existing = pack.items.find(item => item.productId === sel.value);
+  const existing = pack.items.find(item => item.productId === product.id);
   if (existing) { existing.qty += qty; }
-  else { pack.items.push({productId: sel.value, name, qty}); }
+  else { pack.items.push({productId: product.id, name: product.name, qty}); }
   save();
   renderPackEditorItems(pack);
-  sel.value = '';
+  inp.value = '';
   document.getElementById('pack-add-qty').value = '1';
+  document.getElementById('pack-create-hint').style.display = 'none';
   toast('✅ Article ajouté', 'success');
   if (currentVetTab === 'packs') refreshVetPacksTab();
 }
@@ -5474,7 +5533,7 @@ function buildSizeSectionHTML() {
     }
     const sizes = product.sizes || {};
     const sel = distribState.sizes[item.productId] || '';
-    const btns = SIZES.map(s => {
+    const btns = getProductSizes(product).map(s => {
       const stock = sizes[s] || 0;
       return `<button class="sz-btn${sel===s?' sel':''}${stock===0?' zero':''}" onclick="selectDistribSize('${item.productId}','${s}')">${s}<br><span style="font-size:10px;opacity:.7">${stock}</span></button>`;
     }).join('');
@@ -5569,7 +5628,7 @@ function updateDonSizes() {
   const product = (S.zones.vetements?.products||[]).find(p=>p.id===prodId);
   if (!product||!product.sized) { area.innerHTML=''; return; }
   const sizes = product.sizes||{};
-  area.innerHTML = `<div class="sz-btns" id="don-sz-btns">${SIZES.map(s=>{
+  area.innerHTML = `<div class="sz-btns" id="don-sz-btns">${getProductSizes(product).map(s=>{
     const stock=sizes[s]||0;
     return `<button class="sz-btn${stock===0?' zero':''}" onclick="selectDonSize(this,'${s}')">${s}<br><span style="font-size:10px;opacity:.7">${stock}</span></button>`;
   }).join('')}</div>`;
@@ -5742,9 +5801,19 @@ function unitOptions(selected) {
   <input type="hidden" id="pack-edit-id">
   <div id="pack-edit-items"></div>
   <div class="pack-add-row">
-    <select id="pack-add-product" class="fi" style="flex:1;min-width:0"></select>
+    <input type="text" id="pack-add-product" list="pack-prod-list" class="fi" placeholder="Choisir ou créer un article…" oninput="onPackProdInput()" style="flex:1;min-width:0">
+    <datalist id="pack-prod-list"></datalist>
     <input type="number" id="pack-add-qty" class="fi" value="1" min="1" max="99" style="width:58px;padding:9px 6px;text-align:center">
     <button onclick="packItemAdd()" style="background:#7c3aed;color:#fff;border:none;border-radius:10px;padding:9px 16px;font-size:20px;cursor:pointer;flex-shrink:0;line-height:1">+</button>
+  </div>
+  <div id="pack-create-hint" style="display:none;background:#faf5ff;border:1px solid #ddd6fe;border-radius:12px;padding:12px;margin-top:8px">
+    <div style="font-size:13px;font-weight:600;color:#7c3aed;margin-bottom:8px">Créer cet article dans le stock</div>
+    <div style="font-size:12px;color:#6b7280;margin-bottom:8px">Tailles supplémentaires :</div>
+    <div style="display:flex;gap:14px;margin-bottom:10px">
+      <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer"><input type="checkbox" id="pack-create-4xl"> 4XL</label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer"><input type="checkbox" id="pack-create-5xl"> 5XL</label>
+    </div>
+    <button onclick="createAndAddProduct()" style="background:#7c3aed;color:#fff;border:none;border-radius:10px;padding:9px 0;font-size:13px;cursor:pointer;width:100%;font-weight:600">✅ Créer et ajouter au pack</button>
   </div>
   <div class="pack-distrib-section">
     <div class="pack-distrib-title">🎁 Distribuer ce pack</div>
