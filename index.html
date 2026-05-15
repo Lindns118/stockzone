@@ -433,7 +433,7 @@ table.conso-tbl tfoot td.num{font-weight:700}
     </div>
     <div class="sort-bar">
       <button class="sort-btn" onclick="setSort('ordre',this)">🔢 Ordre</button>
-      <button class="sort-btn active" onclick="setSort('az',this)">A–Z</button>
+      <button class="sort-btn" onclick="setSort('az',this)">A–Z</button>
       <button class="sort-btn" onclick="setSort('desc',this)">Stock ↓</button>
       <button class="sort-btn" onclick="setSort('asc',this)">Stock ↑</button>
       <button class="sort-btn" onclick="setSort('alert',this)">⚠ Alertes</button>
@@ -1491,7 +1491,7 @@ function save() {
 
 // ===== STATE =====
 let currentZone = 'entrepot';
-let currentSort = 'az';
+let currentSort = localStorage.getItem('sz_sort') || 'ordre';
 let currentProduct = null;
 let _supIdx = 0;
 let currentPretType = 'pret';
@@ -1504,15 +1504,19 @@ const pendingCardValues = {}; // pid → unsaved input value
 
 // ===== INIT =====
 window.addEventListener('DOMContentLoaded', () => {
-  // Restore stats sort preference (default: ordre)
-  const savedSort = localStorage.getItem('sz_tbl_sort') || 'ordre';
+  // Restore stats table sort
+  const savedTblSort = localStorage.getItem('sz_tbl_sort') || 'ordre';
   const sortEl = document.getElementById('tbl-sort');
-  if(sortEl) sortEl.value = savedSort;
+  if(sortEl) sortEl.value = savedTblSort;
+  // Restore product list sort button active state
+  document.querySelectorAll('.sort-btn').forEach(b=>{
+    const t=b.getAttribute('onclick')?.match(/setSort\('(\w+)'/)?.[1];
+    if(t) b.classList.toggle('active', t===currentSort);
+  });
   setTimeout(() => {
     document.getElementById('splash').style.display = 'none';
     document.getElementById('main').classList.remove('hidden');
     document.getElementById('bottom-nav').classList.remove('hidden');
-    // Restore last visited zone
     const lastZone = localStorage.getItem('sz_last_zone') || 'entrepot';
     switchZone(lastZone);
   }, 1800);
@@ -2040,6 +2044,7 @@ function sortedProds(arr) {
 }
 function setSort(t, btn) {
   currentSort=t;
+  localStorage.setItem('sz_sort',t);
   document.querySelectorAll('.sort-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   renderProducts();
