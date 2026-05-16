@@ -6148,7 +6148,38 @@ function calcPacksAnalysis() {
         ? {name:item.name, sized:true, sizes: getProductSizes(product).map(sz=>({s:sz,qty:s[sz]||0}))}
         : {name:item.name, sized:false, qty:s._qty||0};
     }).filter(Boolean);
-    return {pack, maxPacks, personStatus, eligible, missing, remaining};
+    // Simulate distribution to ALL persons (eligible + non-eligible) to find what to order
+    const sim2 = {};
+    pack.items.forEach(item => {
+      const product = zd?.products?.find(p=>p.id===item.productId);
+      if (!product) return;
+      sim2[item.productId] = product.sized ? {...(product.sizes||{})} : {_qty: product.qty};
+    });
+    const missingForAll = [];
+    personStatus.forEach(({person}) => {
+      pack.items.forEach(item => {
+        const product = zd?.products?.find(p=>p.id===item.productId);
+        if (!product) return;
+        if (!product.sized) {
+          sim2[item.productId]._qty = (sim2[item.productId]._qty||0) - item.qty;
+          if (sim2[item.productId]._qty < 0) {
+            const ex = missingForAll.find(m=>m.name===item.name&&!m.size);
+            if (ex) ex.qty += -sim2[item.productId]._qty; else missingForAll.push({name:item.name,size:null,qty:-sim2[item.productId]._qty});
+            sim2[item.productId]._qty = 0;
+          }
+        } else {
+          const sz = (person.sizes||{})[item.productId];
+          if (!sz) return;
+          sim2[item.productId][sz] = (sim2[item.productId][sz]||0) - item.qty;
+          if (sim2[item.productId][sz] < 0) {
+            const ex = missingForAll.find(m=>m.name===item.name&&m.size===sz);
+            if (ex) ex.qty += -sim2[item.productId][sz]; else missingForAll.push({name:item.name,size:sz,qty:-sim2[item.productId][sz]});
+            sim2[item.productId][sz] = 0;
+          }
+        }
+      });
+    });
+    return {pack, maxPacks, personStatus, eligible, missing, remaining, missingForAll};
   });
 }
 
@@ -6192,10 +6223,10 @@ function mailDispoList() {
   let text = `COMMANDE VÊTEMENTS MANQUANTS\n${date}\n\n`;
   let hasAny = false;
   analysis.forEach(r => {
-    if (!r.missing.length) return;
+    if (!r.missingForAll.length) return;
     hasAny = true;
     text += `${r.pack.name}\n`;
-    r.missing.forEach(m => {
+    r.missingForAll.forEach(m => {
       text += `  - ${m.name}${m.size ? ' ' + m.size : ''} : ${m.qty} à commander\n`;
     });
     text += '\n';
