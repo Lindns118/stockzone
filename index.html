@@ -1735,6 +1735,22 @@ function totalAlerts() {
 }
 
 // ===== PRODUCTS =====
+function calcDaysRemainingFromHistory(p) {
+  const invs = p.history
+    .filter(h=>(h.type==='inventaire'||h.type==='inventaire_base')&&h.date&&/^\d{4}-\d{2}-\d{2}/.test(h.date))
+    .sort((a,b)=>new Date(a.date)-new Date(b.date));
+  if (invs.length < 2) return null;
+  const prev = invs[invs.length-2], last = invs[invs.length-1];
+  const prevD = new Date(prev.date), lastD = new Date(last.date);
+  const days = Math.round((lastD-prevD)/86400000);
+  if (days <= 0) return null;
+  const adj = p.history.filter(h=>['livraison','pret','emprunt','retour_pret','retour_emprunt','vente'].includes(h.type)&&new Date(h.date)>prevD&&new Date(h.date)<=lastD).reduce((s,h)=>s+h.qty,0);
+  const consumed = Math.max(0, prev.qty + adj - last.qty);
+  if (consumed <= 0) return null;
+  const daily = consumed / days;
+  return Math.round(p.qty / daily);
+}
+
 function renderProducts() {
   const zd = S.zones[currentZone];
   if (!zd) return;
@@ -1762,7 +1778,7 @@ function renderProducts() {
       <div class="pc-top">
         <div style="display:flex;align-items:center;gap:8px;min-width:0">
           ${p.photo?`<img src="${p.photo}" style="width:38px;height:38px;border-radius:8px;object-fit:cover;flex-shrink:0;cursor:pointer" onclick="event.stopPropagation();openPhotoViewer('${p.id}')" alt="">`:''}
-          <div style="min-width:0"><div class="pc-name">${esc(p.name)}</div><div class="pc-cat">${esc(p.category)}</div></div>
+          <div style="min-width:0"><div class="pc-name">${esc(p.name)}${(()=>{const d=calcDaysRemainingFromHistory(p);return d===null?'':` <span style="font-size:11px;font-weight:600;color:${d<=7?'#ef4444':d<=30?'#f59e0b':'#16a34a'}">(~${d}j)</span>`;})()}</div><div class="pc-cat">${esc(p.category)}</div></div>
         </div>
         <div style="text-align:right;flex-shrink:0"><div class="pc-qty${isLow?' low':''}">${p.qty}</div><div class="pc-unit">${esc(p.unit)}</div>${p.packQty?`<div style="font-size:10px;color:var(--text2);margin-top:1px">${Math.round(p.qty*p.packQty).toLocaleString('fr')} ${esc(p.packUnit||'u.')}</div>`:''}</div>
       </div>
@@ -1882,7 +1898,7 @@ function renderProducts() {
       }).join('');
       return `<div class="product-card vc" onclick="openDetail('${p.id}')">
         <div class="pc-top">
-          <div><div class="pc-name">${esc(p.name)}</div><div class="pc-cat">${esc(p.category)}</div></div>
+          <div><div class="pc-name">${esc(p.name)}${(()=>{const d=calcDaysRemainingFromHistory(p);return d===null?'':` <span style="font-size:11px;font-weight:600;color:${d<=7?'#ef4444':d<=30?'#f59e0b':'#16a34a'}">(~${d}j)</span>`;})()}</div><div class="pc-cat">${esc(p.category)}</div></div>
           <div><div class="pc-qty${isLow?' low':''}">${p.qty}</div><div class="pc-unit">${esc(p.unit)}</div></div>
         </div>
         ${isLow?`<div><span class="alert-tag">⚠ Seuil bas (≤ ${p.seuil})</span></div>`:''}
