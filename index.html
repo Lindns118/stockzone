@@ -1748,7 +1748,9 @@ function calcDaysRemainingFromHistory(p) {
   const consumed = Math.max(0, prev.qty + adj - last.qty);
   if (consumed <= 0) return null;
   const daily = consumed / days;
-  return Math.round(p.qty / daily);
+  const daysFromLastInv = Math.round(p.qty / daily);
+  const daysSinceLast = Math.round((new Date() - lastD) / 86400000);
+  return Math.max(0, daysFromLastInv - daysSinceLast);
 }
 
 function renderProducts() {
