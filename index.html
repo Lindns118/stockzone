@@ -1247,6 +1247,12 @@ function migrateData(data) {
     });
   }
   if (!data.vetPacks) data.vetPacks = JSON.parse(JSON.stringify(DEF.vetPacks));
+  // Add any default packs missing from saved data
+  DEF.vetPacks.forEach(defPack => {
+    if (!data.vetPacks.find(p => p.id === defPack.id)) {
+      data.vetPacks.push(JSON.parse(JSON.stringify(defPack)));
+    }
+  });
   if (!data.persons) data.persons = [];
   return data;
 }
