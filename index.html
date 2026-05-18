@@ -1151,8 +1151,8 @@ const DEF = {
   vetPacks: [
     {id:'pack_ouvrier', name:'Pack ouvrier', icon:'⚒️', color:'#d97706', items:[]},
     {id:'pack_employe', name:'Pack employé', icon:'💼', color:'#2563eb', items:[]},
-    {id:'pack_ete',     name:'Pack été',     icon:'☀️', color:'#16a34a', items:[]},
-    {id:'pack_hiver',   name:'Pack hiver',   icon:'❄️', color:'#0891b2', items:[]},
+    {id:'pack_ete',     name:'Pack été',     icon:'☀️', color:'#16a34a', items:[], statuts:['ouvrier']},
+    {id:'pack_hiver',   name:'Pack hiver',   icon:'❄️', color:'#0891b2', items:[], statuts:['ouvrier']},
     {id:'pack_duty',    name:'Pack duty',    icon:'🦺', color:'#ea580c', items:[]}
   ],
   persons: []
@@ -1247,10 +1247,13 @@ function migrateData(data) {
     });
   }
   if (!data.vetPacks) data.vetPacks = JSON.parse(JSON.stringify(DEF.vetPacks));
-  // Add any default packs missing from saved data
+  // Add any default packs missing from saved data, and sync statuts from defaults
   DEF.vetPacks.forEach(defPack => {
-    if (!data.vetPacks.find(p => p.id === defPack.id)) {
+    const existing = data.vetPacks.find(p => p.id === defPack.id);
+    if (!existing) {
       data.vetPacks.push(JSON.parse(JSON.stringify(defPack)));
+    } else if (defPack.statuts && !existing.statuts) {
+      existing.statuts = [...defPack.statuts];
     }
   });
   if (!data.persons) data.persons = [];
@@ -5807,15 +5810,16 @@ function statutBadge(person) {
   if (!s) return '';
   return `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:${s.bg};color:${s.color}">${s.label}</span>`;
 }
-function getDisplayProdName(person, prodName) {
-  if (!prodName) return prodName;
-  const lower = prodName.toLowerCase();
-  if (lower.includes('gilet fluo') || lower === 'gilet fluo') {
-    const st = person?.statut;
-    if (st === 'team_leader') return 'Gilet fluo team leader';
-    if (st === 'duty') return 'Gilet fluo duty';
-  }
-  return prodName;
+function giletVisibleForPerson(prodName, statut) {
+  if (!prodName) return true;
+  const lower = prodName.toLowerCase().trim();
+  const isBase        = lower === 'gilet fluo';
+  const isTeamLeader  = lower === 'gilet fluo team leader';
+  const isDuty        = lower === 'gilet fluo duty';
+  if (!isBase && !isTeamLeader && !isDuty) return true;
+  if (statut === 'team_leader') return isTeamLeader;
+  if (statut === 'duty')        return isDuty;
+  return isBase; // employé, ouvrier, ou sans statut → gilet fluo standard
 }
 
 // ── PERSONNES TAB ──
@@ -5848,11 +5852,12 @@ function showPersonDetail(personId) {
   if (!vc) return;
   const zd = S.zones.vetements;
   const attrs = (S.attributions||[]).filter(a=>a.person.toLowerCase()===person.name.toLowerCase()).slice().reverse();
-  const sizesHTML = (zd?.products||[]).filter(p=>p.sized).map(prod => {
+  const sizesHTML = (zd?.products||[]).filter(p=>p.sized).filter(prod => {
+    return giletVisibleForPerson(prod.name, person.statut);
+  }).map(prod => {
     const knownSize = (person.sizes||{})[prod.id]||'';
-    const displayName = getDisplayProdName(person, prod.name);
     const btns = getProductSizes(prod).map(s=>`<button class="sz-btn${knownSize===s?' sel':''}" onclick="setPersonSize('${personId}','${prod.id}','${s}')">${s}</button>`).join('');
-    return `<div class="p-sz-row"><span class="p-sz-name">${esc(displayName)}</span><div class="sz-btns" style="gap:4px">${btns}</div></div>`;
+    return `<div class="p-sz-row"><span class="p-sz-name">${esc(prod.name)}</span><div class="sz-btns" style="gap:4px">${btns}</div></div>`;
   }).join('');
   const histHTML = attrs.length
     ? attrs.slice(0,30).map(a=>{
@@ -6134,7 +6139,10 @@ function showPackDispoView() {
     return `<div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.08)">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
         <span style="font-size:24px">${r.pack.icon}</span>
-        <div style="flex:1"><div style="font-weight:700;font-size:15px">${esc(r.pack.name)}</div></div>
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:15px">${esc(r.pack.name)}</div>
+          ${r.pack.statuts?.length ? `<div style="font-size:10px;font-weight:700;color:#d97706;text-transform:uppercase;letter-spacing:.4px">${r.pack.statuts.map(s=>STATUTS.find(st=>st.id===s)?.label||s).join(', ')} uniquement</div>` : ''}
+        </div>
         <div style="background:${countBg};color:${countColor};font-weight:700;font-size:13px;border-radius:8px;padding:4px 10px">${r.maxPacks} dispo</div>
       </div>
       <div style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Personnes</div>
@@ -6147,8 +6155,12 @@ function showPackDispoView() {
 function calcPacksAnalysis() {
   const packs = (S.vetPacks||[]).filter(pk=>pk.items.length);
   const zd = S.zones.vetements;
-  const persons = S.persons||[];
+  const allPersons = S.persons||[];
   return packs.map(pack => {
+    // Filter persons by pack statut restriction
+    const persons = pack.statuts?.length
+      ? allPersons.filter(p => pack.statuts.includes(p.statut||''))
+      : allPersons;
     let maxPacks = Infinity;
     pack.items.forEach(item => {
       const product = zd?.products?.find(p=>p.id===item.productId);
