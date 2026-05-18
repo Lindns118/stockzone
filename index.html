@@ -5792,6 +5792,32 @@ function confirmDonUnique() {
   toast(`✅ Don enregistré pour ${personName}`,'success');
 }
 
+// ── STATUTS ──
+const STATUTS = [
+  {id:'employe',     label:'Employé',     color:'#2563eb', bg:'#eff6ff'},
+  {id:'ouvrier',     label:'Ouvrier',     color:'#d97706', bg:'#fffbeb'},
+  {id:'team_leader', label:'Team Leader', color:'#7c3aed', bg:'#f5f3ff'},
+  {id:'duty',        label:'Duty',        color:'#ea580c', bg:'#fff7ed'},
+];
+function getStatut(person) {
+  return STATUTS.find(s=>s.id===(person?.statut||''))||null;
+}
+function statutBadge(person) {
+  const s = getStatut(person);
+  if (!s) return '';
+  return `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:${s.bg};color:${s.color}">${s.label}</span>`;
+}
+function getDisplayProdName(person, prodName) {
+  if (!prodName) return prodName;
+  const lower = prodName.toLowerCase();
+  if (lower.includes('gilet fluo') || lower === 'gilet fluo') {
+    const st = person?.statut;
+    if (st === 'team_leader') return 'Gilet fluo team leader';
+    if (st === 'duty') return 'Gilet fluo duty';
+  }
+  return prodName;
+}
+
 // ── PERSONNES TAB ──
 function buildPersonnesHTML() {
   const persons = (S.persons || []).slice().sort((a,b) => a.name.localeCompare(b.name, 'fr', {sensitivity:'base'}));
@@ -5806,7 +5832,7 @@ function buildPersonnesHTML() {
     return `<div class="pcard" onclick="showPersonDetail('${p.id}')">
       <div class="pcard-avatar">${p.name.charAt(0).toUpperCase()}</div>
       <div class="pcard-info">
-        <div class="pcard-name">${esc(p.name)}</div>
+        <div class="pcard-name">${esc(p.name)} ${statutBadge(p)}</div>
         <div class="pcard-sub">${attrCount} distribution${attrCount!==1?'s':''} · ${knownSizes} taille${knownSizes!==1?'s':''} connue${knownSizes!==1?'s':''}</div>
       </div>
       <span class="pcard-arrow">›</span>
@@ -5824,8 +5850,9 @@ function showPersonDetail(personId) {
   const attrs = (S.attributions||[]).filter(a=>a.person.toLowerCase()===person.name.toLowerCase()).slice().reverse();
   const sizesHTML = (zd?.products||[]).filter(p=>p.sized).map(prod => {
     const knownSize = (person.sizes||{})[prod.id]||'';
+    const displayName = getDisplayProdName(person, prod.name);
     const btns = getProductSizes(prod).map(s=>`<button class="sz-btn${knownSize===s?' sel':''}" onclick="setPersonSize('${personId}','${prod.id}','${s}')">${s}</button>`).join('');
-    return `<div class="p-sz-row"><span class="p-sz-name">${esc(prod.name)}</span><div class="sz-btns" style="gap:4px">${btns}</div></div>`;
+    return `<div class="p-sz-row"><span class="p-sz-name">${esc(displayName)}</span><div class="sz-btns" style="gap:4px">${btns}</div></div>`;
   }).join('');
   const histHTML = attrs.length
     ? attrs.slice(0,30).map(a=>{
@@ -5842,9 +5869,13 @@ function showPersonDetail(personId) {
       <span style="flex:1"></span>
       <button onclick="printPersonCard('${personId}')" style="background:#f3f4f6;border:none;border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer;font-weight:600">📄 PDF</button>
     </div>
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
       <div class="pcard-avatar" style="width:52px;height:52px;font-size:22px">${person.name.charAt(0).toUpperCase()}</div>
-      <div style="font-size:20px;font-weight:800">${esc(person.name)}</div>
+      <div><div style="font-size:20px;font-weight:800">${esc(person.name)}</div>${statutBadge(person)}</div>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">
+      ${STATUTS.map(s=>`<button onclick="setPersonStatut('${personId}','${s.id}')" style="padding:5px 12px;border-radius:20px;border:2px solid ${person.statut===s.id?s.color:'#e5e7eb'};background:${person.statut===s.id?s.bg:'#fff'};color:${person.statut===s.id?s.color:'#6b7280'};font-size:12px;font-weight:700;cursor:pointer">${s.label}</button>`).join('')}
+      ${person.statut?`<button onclick="setPersonStatut('${personId}','')" style="padding:5px 12px;border-radius:20px;border:2px solid #e5e7eb;background:#fff;color:#9ca3af;font-size:12px;cursor:pointer">✕ Aucun</button>`:''}
     </div>
     <button style="width:100%;background:#7c3aed;color:#fff;border:none;border-radius:12px;padding:12px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:16px" onclick="distribToPersonTab('${personId}')">🎁 Nouveau pack pour ${esc(person.name)}</button>
     <div class="vc-sec">Tailles connues</div>
@@ -5881,15 +5912,39 @@ function openAddPersonView() {
       </div>
     </div>`).join('');
   _newPersonSizes = {};
+  _newPersonStatut = '';
   vc.innerHTML = `<button onclick="setVetTab('personnes')" style="background:transparent;border:none;color:#7c3aed;font-size:14px;font-weight:600;cursor:pointer;padding:0;margin-bottom:14px">← Personnes</button>
     <div class="vc-sec">Nouvelle personne</div>
     <div class="p-detail">
-      <input id="new-person-name" class="fi" placeholder="Prénom et/ou nom" style="margin-bottom:${sizedRows?'12px':'0'}">
+      <input id="new-person-name" class="fi" placeholder="Prénom et/ou nom" style="margin-bottom:12px">
+      <div class="vc-sec" style="margin-top:4px;margin-bottom:8px">Statut (optionnel)</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px" id="new-person-statut-btns">
+        ${STATUTS.map(s=>`<button id="nps-${s.id}" onclick="selectNewPersonStatut('${s.id}')" style="padding:5px 12px;border-radius:20px;border:2px solid #e5e7eb;background:#fff;color:#6b7280;font-size:12px;font-weight:700;cursor:pointer">${s.label}</button>`).join('')}
+      </div>
       ${sizedRows ? `<div class="vc-sec" style="margin-top:8px">Tailles connues (optionnel)</div>${sizedRows}` : ''}
       <button class="distrib-btn" onclick="saveNewPerson()" style="margin-top:14px">Enregistrer</button>
     </div>`;
 }
 
+let _newPersonStatut = '';
+function selectNewPersonStatut(id) {
+  _newPersonStatut = _newPersonStatut === id ? '' : id;
+  STATUTS.forEach(s => {
+    const btn = document.getElementById('nps-'+s.id);
+    if (!btn) return;
+    const sel = _newPersonStatut === s.id;
+    btn.style.borderColor = sel ? s.color : '#e5e7eb';
+    btn.style.background  = sel ? s.bg    : '#fff';
+    btn.style.color       = sel ? s.color : '#6b7280';
+  });
+}
+function setPersonStatut(personId, statutId) {
+  const person = (S.persons||[]).find(p=>p.id===personId);
+  if (!person) return;
+  person.statut = statutId;
+  save();
+  showPersonDetail(personId);
+}
 function toggleNewPersonSize(btn, productId, size) {
   const row = document.getElementById('np-sz-'+productId);
   if (row) row.querySelectorAll('.sz-btn').forEach(b=>b.classList.remove('sel'));
@@ -5903,8 +5958,10 @@ function saveNewPerson() {
   if (!name) { toast('Saisissez un nom','warning'); return; }
   if (!S.persons) S.persons=[];
   if (S.persons.find(p=>p.name.toLowerCase()===name.toLowerCase())) { toast('Personne déjà enregistrée','warning'); return; }
-  S.persons.push({id:uid(), name, sizes:{..._newPersonSizes}});
-  _newPersonSizes={};
+  const newP = {id:uid(), name, sizes:{..._newPersonSizes}};
+  if (_newPersonStatut) newP.statut = _newPersonStatut;
+  S.persons.push(newP);
+  _newPersonSizes={}; _newPersonStatut='';
   save();
   toast(`✅ ${name} ajouté(e)`,'success');
   setVetTab('personnes');
