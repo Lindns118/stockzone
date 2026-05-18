@@ -1149,8 +1149,8 @@ const DEF = {
   fournisseurs: [],
   units: [...DEFAULT_UNITS],
   vetPacks: [
-    {id:'pack_ouvrier', name:'Pack ouvrier', icon:'⚒️', color:'#d97706', items:[]},
-    {id:'pack_employe', name:'Pack employé', icon:'💼', color:'#2563eb', items:[]},
+    {id:'pack_ouvrier', name:'Pack ouvrier', icon:'⚒️', color:'#d97706', items:[], dispoMode:'taille'},
+    {id:'pack_employe', name:'Pack employé', icon:'💼', color:'#2563eb', items:[], dispoMode:'taille'},
     {id:'pack_ete',     name:'Pack été',     icon:'☀️', color:'#16a34a', items:[], statuts:['ouvrier']},
     {id:'pack_hiver',   name:'Pack hiver',   icon:'❄️', color:'#0891b2', items:[], statuts:['ouvrier']},
     {id:'pack_duty',    name:'Pack duty',    icon:'🦺', color:'#ea580c', items:[]}
@@ -1252,8 +1252,9 @@ function migrateData(data) {
     const existing = data.vetPacks.find(p => p.id === defPack.id);
     if (!existing) {
       data.vetPacks.push(JSON.parse(JSON.stringify(defPack)));
-    } else if (defPack.statuts && !existing.statuts) {
-      existing.statuts = [...defPack.statuts];
+    } else {
+      if (defPack.statuts && !existing.statuts) existing.statuts = [...defPack.statuts];
+      if (defPack.dispoMode && !existing.dispoMode) existing.dispoMode = defPack.dispoMode;
     }
   });
   if (!data.persons) data.persons = [];
@@ -6145,8 +6146,15 @@ function showPackDispoView() {
         </div>
         <div style="background:${countBg};color:${countColor};font-weight:700;font-size:13px;border-radius:8px;padding:4px 10px">${r.maxPacks} dispo</div>
       </div>
-      <div style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Personnes</div>
-      ${personRows}${simHTML}
+      ${r.pack.dispoMode === 'taille'
+        ? `<div style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Packs par taille</div>
+           <div style="display:flex;flex-wrap:wrap;gap:6px">${(r.bySize||[]).map(({size,count})=>{
+             const col = count===0?'#ef4444':count<=3?'#d97706':'#16a34a';
+             const bg  = count===0?'#fef2f2':count<=3?'#fffbeb':'#f0fdf4';
+             return `<div style="background:${bg};border-radius:8px;padding:6px 12px;text-align:center"><div style="font-size:11px;color:#666;font-weight:600">${size}</div><div style="font-size:16px;font-weight:800;color:${col}">${count}</div></div>`;
+           }).join('')}</div>`
+        : `<div style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Personnes</div>${personRows}${simHTML}`
+      }
     </div>`;
   }).join('');
   vc.innerHTML = `<div style="font-size:18px;font-weight:800;margin-bottom:14px">📊 Packs disponibles</div>` + actionBtns + cards;
@@ -6255,7 +6263,36 @@ function calcPacksAnalysis() {
         }
       });
     });
-    return {pack, maxPacks, personStatus, eligible, missing, remaining, missingForAll};
+    // Calcul par taille pour les packs en mode 'taille'
+    let bySize = [];
+    if (pack.dispoMode === 'taille') {
+      const allSizes = ['XS','S','M','L','XL','2XL','3XL'];
+      const usedSizes = new Set();
+      pack.items.forEach(item => {
+        const product = zd?.products?.find(p=>p.id===item.productId);
+        if (product?.sized) Object.keys(product.sizes||{}).forEach(s=>usedSizes.add(s));
+      });
+      const orderedSizes = allSizes.filter(s=>usedSizes.has(s));
+      // include any extra sizes not in standard order
+      [...usedSizes].filter(s=>!allSizes.includes(s)).forEach(s=>orderedSizes.push(s));
+      bySize = orderedSizes.map(size => {
+        let count = Infinity;
+        pack.items.forEach(item => {
+          const product = zd?.products?.find(p=>p.id===item.productId);
+          if (!product) { count = 0; return; }
+          if (!product.sized) {
+            const c = Math.floor(product.qty / item.qty);
+            if (c < count) count = c;
+          } else {
+            const stock = (product.sizes||{})[size] || 0;
+            const c = Math.floor(stock / item.qty);
+            if (c < count) count = c;
+          }
+        });
+        return {size, count: count === Infinity ? 0 : count};
+      });
+    }
+    return {pack, maxPacks, personStatus, eligible, missing, remaining, missingForAll, bySize};
   });
 }
 
