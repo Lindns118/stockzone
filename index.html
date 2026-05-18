@@ -1245,6 +1245,17 @@ function migrateData(data) {
       }
       if(p.sized == null) p.sized = true;
     });
+    // Add Gilet fluo team leader and Gilet fluo duty if missing
+    const giletVariants = ['Gilet fluo team leader', 'Gilet fluo duty'];
+    giletVariants.forEach(gName => {
+      if (!data.zones.vetements.products.find(p => p.name.toLowerCase().trim() === gName.toLowerCase())) {
+        const sizes = {}; SIZES.forEach(s => { sizes[s] = 0; });
+        data.zones.vetements.products.push({
+          id: uid(), name: gName, category: 'Gilets', qty: 0,
+          unit: 'pièces', seuil: 0, sized: true, sizes, history: []
+        });
+      }
+    });
   }
   if (!data.vetPacks) data.vetPacks = JSON.parse(JSON.stringify(DEF.vetPacks));
   // Add any default packs missing from saved data, and sync statuts from defaults
@@ -5657,20 +5668,23 @@ function buildSizeSectionHTML() {
   if (!pack) return '';
   const zd = S.zones.vetements;
   if (!zd) return '';
+  const personStatut = getDistribPersonStatut();
   return pack.items.map(item => {
-    const product = zd.products.find(p=>p.id===item.productId);
-    if (!product) return '';
+    const base = zd.products.find(p=>p.id===item.productId);
+    if (!base) return '';
+    const product = getGiletSubstitute(item.productId, personStatut, zd.products) || base;
+    const effectiveId = product.id;
     if (!product.sized) {
-      return `<div class="dsz-card"><div class="dsz-name">${esc(item.name)} <span style="font-size:12px;font-weight:400;color:#6b7280">× ${item.qty}</span></div><div style="font-size:13px;color:#6b7280">Sans taille</div></div>`;
+      return `<div class="dsz-card"><div class="dsz-name">${esc(product.name)} <span style="font-size:12px;font-weight:400;color:#6b7280">× ${item.qty}</span></div><div style="font-size:13px;color:#6b7280">Sans taille</div></div>`;
     }
     const sizes = product.sizes || {};
-    const sel = distribState.sizes[item.productId] || '';
+    const sel = distribState.sizes[effectiveId] || '';
     const btns = getProductSizes(product).map(s => {
       const stock = sizes[s] || 0;
-      return `<button class="sz-btn${sel===s?' sel':''}${stock===0?' zero':''}" onclick="selectDistribSize('${item.productId}','${s}')">${s}<br><span style="font-size:10px;opacity:.7">${stock}</span></button>`;
+      return `<button class="sz-btn${sel===s?' sel':''}${stock===0?' zero':''}" onclick="selectDistribSize('${effectiveId}','${s}')">${s}<br><span style="font-size:10px;opacity:.7">${stock}</span></button>`;
     }).join('');
     return `<div class="dsz-card">
-      <div class="dsz-name">${esc(item.name)} <span style="font-size:12px;font-weight:400;color:#6b7280">× ${item.qty}</span></div>
+      <div class="dsz-name">${esc(product.name)} <span style="font-size:12px;font-weight:400;color:#6b7280">× ${item.qty}</span></div>
       <div class="sz-btns">${btns}</div>
     </div>`;
   }).join('');
@@ -5720,10 +5734,14 @@ function confirmDistrib() {
   const zd = S.zones.vetements;
   const now = nowIso();
   const itemsRecord = [];
+  const personObj = (S.persons||[]).find(p=>p.name.toLowerCase()===person.toLowerCase());
+  const personStatut = personObj?.statut || '';
   pack.items.forEach(item => {
-    const product = zd?.products.find(p=>p.id===item.productId);
-    if (!product) return;
-    const size = distribState.sizes[item.productId] || null;
+    const base = zd?.products.find(p=>p.id===item.productId);
+    if (!base) return;
+    const product = getGiletSubstitute(item.productId, personStatut, zd.products) || base;
+    const effectiveId = product.id;
+    const size = distribState.sizes[effectiveId] || distribState.sizes[item.productId] || null;
     const diff = Math.min(item.qty, product.qty);
     if (diff > 0) {
       product.qty = r2(product.qty - diff);
@@ -5732,7 +5750,7 @@ function confirmDistrib() {
       }
       product.history.push({id:uid(), type:'don', date:now, qty:diff, person, size:size||undefined});
     }
-    itemsRecord.push({productId:item.productId, name:item.name, qty:item.qty, size});
+    itemsRecord.push({productId:effectiveId, name:product.name, qty:item.qty, size});
   });
   if (!S.attributions) S.attributions = [];
   S.attributions.push({id:uid(), person, packId:pack.id, packName:pack.name, date:now, items:itemsRecord});
@@ -5811,6 +5829,21 @@ function statutBadge(person) {
   if (!s) return '';
   return `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:${s.bg};color:${s.color}">${s.label}</span>`;
 }
+function getGiletSubstitute(productId, personStatut, zdProducts) {
+  const product = zdProducts.find(p => p.id === productId);
+  if (!product) return null;
+  const lower = product.name.toLowerCase().trim();
+  if (lower !== 'gilet fluo') return null;
+  if (personStatut === 'team_leader') return zdProducts.find(p => p.name.toLowerCase().trim() === 'gilet fluo team leader') || null;
+  if (personStatut === 'duty')        return zdProducts.find(p => p.name.toLowerCase().trim() === 'gilet fluo duty')        || null;
+  return null;
+}
+function getDistribPersonStatut() {
+  const name = (distribState.personName || '').trim().toLowerCase();
+  const person = (S.persons||[]).find(p => p.name.toLowerCase() === name);
+  return person?.statut || '';
+}
+
 function giletVisibleForPerson(prodName, statut) {
   if (!prodName) return true;
   const lower = prodName.toLowerCase().trim();
