@@ -1067,6 +1067,39 @@ body.vet-mode .main{padding-bottom:20px}
 </div>
 </div>
 
+<!-- SIGNATURE MODAL -->
+<div id="modal-signature" style="display:none;position:fixed;inset:0;z-index:500;background:#fff;flex-direction:column">
+  <div style="padding:16px 18px 8px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #f3f4f6">
+    <span style="font-size:20px">✍️</span>
+    <div style="flex:1">
+      <div style="font-weight:800;font-size:16px">Signature</div>
+      <div id="sig-subtitle" style="font-size:12px;color:#6b7280"></div>
+    </div>
+    <button onclick="skipSignature()" style="background:#f3f4f6;border:none;border-radius:10px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;color:#6b7280">Passer</button>
+  </div>
+  <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:12px;background:#fafafa">
+    <canvas id="sig-canvas" style="background:#fff;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.12);touch-action:none;cursor:crosshair"></canvas>
+  </div>
+  <div style="padding:12px 18px;display:flex;gap:10px;border-top:1px solid #f3f4f6">
+    <button onclick="clearSignature()" style="flex:1;background:#f3f4f6;border:none;border-radius:12px;padding:12px;font-size:14px;font-weight:600;cursor:pointer">🗑 Effacer</button>
+    <button onclick="saveSignature()" style="flex:2;background:#7c3aed;color:#fff;border:none;border-radius:12px;padding:12px;font-size:14px;font-weight:700;cursor:pointer">✅ Valider la signature</button>
+  </div>
+</div>
+
+<!-- SIGNATURE VIEW MODAL -->
+<div id="modal-sig-view" class="modal-overlay hidden" onclick="overlayClose(event,'modal-sig-view')">
+<div class="modal-sheet">
+  <div class="mh-row">
+    <div class="mh-icon" style="background:#f5f3ff">✍️</div>
+    <div><div class="m-title">Signature</div><div class="m-sub" id="sigview-sub"></div></div>
+    <button class="m-close" onclick="hideModal('modal-sig-view')">✕</button>
+  </div>
+  <div style="text-align:center;padding:8px 0">
+    <img id="sigview-img" src="" style="max-width:100%;border-radius:10px;border:1px solid #e5e7eb">
+  </div>
+</div>
+</div>
+
 <!-- TOAST -->
 <div id="toast" class="hidden"></div>
 
@@ -5753,13 +5786,15 @@ function confirmDistrib() {
     itemsRecord.push({productId:effectiveId, name:product.name, qty:item.qty, size});
   });
   if (!S.attributions) S.attributions = [];
-  S.attributions.push({id:uid(), person, packId:pack.id, packName:pack.name, date:now, items:itemsRecord});
+  const newAttrId = uid();
+  S.attributions.push({id:newAttrId, person, packId:pack.id, packName:pack.name, date:now, items:itemsRecord});
   updatePersonSizes(person, distribState.sizes);
   save();
   renderProducts();
   distribState = {packId:null, sizes:{}, personName:''};
   setVetTab('distribution');
   toast(`✅ Pack "${pack.name}" distribué à ${person}`, 'success');
+  openSignatureModal(newAttrId, `${pack.name} — ${person}`);
 }
 
 function updatePersonSizes(name, sizes) {
@@ -5807,11 +5842,13 @@ function confirmDonUnique() {
     product.history.push({id:uid(), type:'don', date:now, qty:diff, person:personName, size:size||undefined});
   }
   if (!S.attributions) S.attributions = [];
-  S.attributions.push({id:uid(), person:personName, date:now, items:[{productId:prodId, name:product.name, qty:diff, size}]});
+  const donAttrId = uid();
+  S.attributions.push({id:donAttrId, person:personName, date:now, items:[{productId:prodId, name:product.name, qty:diff, size}]});
   if (size) { const sz={}; sz[prodId]=size; updatePersonSizes(personName,sz); }
   save(); renderProducts();
   setVetTab('distribution');
   toast(`✅ Don enregistré pour ${personName}`,'success');
+  openSignatureModal(donAttrId, `${product.name} — ${personName}`);
 }
 
 // ── STATUTS ──
@@ -5856,6 +5893,97 @@ function giletVisibleForPerson(prodName, statut) {
   return isBase; // employé, ouvrier, ou sans statut → gilet fluo standard
 }
 
+// ── SIGNATURE ──
+let _sigAttrId = null;
+let _sigDrawing = false;
+let _sigHasStrokes = false;
+
+function openSignatureModal(attrId, subtitle) {
+  _sigAttrId = attrId;
+  _sigHasStrokes = false;
+  document.getElementById('sig-subtitle').textContent = subtitle || '';
+  const modal = document.getElementById('modal-signature');
+  modal.style.display = 'flex';
+  const canvas = document.getElementById('sig-canvas');
+  // Size canvas to available area
+  requestAnimationFrame(() => {
+    const cont = canvas.parentElement;
+    const w = cont.clientWidth - 24;
+    const h = cont.clientHeight - 24;
+    canvas.width  = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = '#1e1b4b';
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+  });
+}
+function closeSignatureModal() {
+  document.getElementById('modal-signature').style.display = 'none';
+  _sigAttrId = null;
+}
+function skipSignature() { closeSignatureModal(); }
+function clearSignature() {
+  const canvas = document.getElementById('sig-canvas');
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  _sigHasStrokes = false;
+}
+function saveSignature() {
+  if (!_sigHasStrokes) { toast('Veuillez signer avant de valider', 'warning'); return; }
+  const canvas = document.getElementById('sig-canvas');
+  const dataUrl = canvas.toDataURL('image/png');
+  const attr = (S.attributions||[]).find(a=>a.id===_sigAttrId);
+  if (attr) { attr.signature = dataUrl; save(); }
+  closeSignatureModal();
+  toast('✅ Signature enregistrée', 'success');
+}
+function viewSignature(attrId) {
+  const attr = (S.attributions||[]).find(a=>a.id===attrId);
+  if (!attr?.signature) return;
+  document.getElementById('sigview-sub').textContent = (attr.packName||'Don') + ' — ' + fmtDate(attr.date?.slice(0,10));
+  document.getElementById('sigview-img').src = attr.signature;
+  showModal('modal-sig-view');
+}
+
+// Canvas drawing events
+document.addEventListener('DOMContentLoaded', () => {
+  const canvas = document.getElementById('sig-canvas');
+  if (!canvas) return;
+  function getPos(e) {
+    const r = canvas.getBoundingClientRect();
+    const src = e.touches ? e.touches[0] : e;
+    return {x: src.clientX - r.left, y: src.clientY - r.top};
+  }
+  function startDraw(e) {
+    e.preventDefault();
+    _sigDrawing = true;
+    _sigHasStrokes = true;
+    const ctx = canvas.getContext('2d');
+    const {x,y} = getPos(e);
+    ctx.beginPath(); ctx.moveTo(x,y);
+  }
+  function draw(e) {
+    e.preventDefault();
+    if (!_sigDrawing) return;
+    const ctx = canvas.getContext('2d');
+    const {x,y} = getPos(e);
+    ctx.lineTo(x,y); ctx.stroke();
+  }
+  function endDraw(e) { e.preventDefault(); _sigDrawing = false; }
+  canvas.addEventListener('mousedown',  startDraw);
+  canvas.addEventListener('mousemove',  draw);
+  canvas.addEventListener('mouseup',    endDraw);
+  canvas.addEventListener('mouseleave', endDraw);
+  canvas.addEventListener('touchstart', startDraw, {passive:false});
+  canvas.addEventListener('touchmove',  draw,      {passive:false});
+  canvas.addEventListener('touchend',   endDraw,   {passive:false});
+});
+
 // ── PERSONNES TAB ──
 function buildPersonnesHTML() {
   const persons = (S.persons || []).slice().sort((a,b) => a.name.localeCompare(b.name, 'fr', {sensitivity:'base'}));
@@ -5897,9 +6025,12 @@ function showPersonDetail(personId) {
     ? attrs.slice(0,30).map(a=>{
         const date = fmtDate(a.date?.slice(0,10));
         const items = (a.items||[]).map(i=>i.name+(i.size?` (${i.size})`:'')+(i.qty>1?` ×${i.qty}`:'')).join(', ');
+        const sigBadge = a.signature
+          ? `<button onclick="viewSignature('${a.id}')" style="background:#f5f3ff;border:none;border-radius:8px;padding:3px 8px;font-size:11px;font-weight:700;color:#7c3aed;cursor:pointer;flex-shrink:0">✍️ Signé</button>`
+          : `<button onclick="openSignatureModal('${a.id}','${esc(a.packName||'Don')} — ${esc(a.person)}')" style="background:#f3f4f6;border:none;border-radius:8px;padding:3px 8px;font-size:11px;font-weight:600;color:#9ca3af;cursor:pointer;flex-shrink:0">✍️ Signer</button>`;
         return `<div class="p-hist-item" style="display:flex;align-items:flex-start;gap:8px">
           <div style="flex:1"><div style="font-weight:600">${esc(a.packName||'Don')} — ${date}</div><div style="color:#6b7280;margin-top:2px;font-size:12px">${items}</div></div>
-          <button onclick="deleteAttribution('${a.id}','${personId}')" style="background:none;border:none;color:#ef4444;font-size:16px;cursor:pointer;padding:2px 4px;flex-shrink:0" title="Supprimer">🗑</button>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">${sigBadge}<button onclick="deleteAttribution('${a.id}','${personId}')" style="background:none;border:none;color:#ef4444;font-size:16px;cursor:pointer;padding:2px 4px" title="Supprimer">🗑</button></div>
         </div>`;
       }).join('')
     : '<div style="color:#9ca3af;font-size:13px;padding:8px 0">Aucune distribution</div>';
