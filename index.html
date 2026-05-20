@@ -5750,6 +5750,7 @@ function selectDistribPack(packId) {
 function onDistribPersonChange(name) {
   distribState.personName = name;
   loadPersonSizesIfKnown();
+  refreshDistribView(); // toujours rafraîchir pour les substitutions gilet/chaussures selon statut
 }
 
 function loadPersonSizesIfKnown() {
