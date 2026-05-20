@@ -6126,14 +6126,6 @@ function distribToPersonTab(personId) {
 function openAddPersonView() {
   const vc = document.getElementById('vet-content');
   if (!vc) return;
-  const zd = S.zones.vetements;
-  const sizedRows = (zd?.products||[]).filter(p=>p.sized).map(p=>`
-    <div class="p-sz-row">
-      <span class="p-sz-name">${esc(p.name)}</span>
-      <div class="sz-btns" style="gap:4px" id="np-sz-${p.id}">
-        ${getProductSizes(p).map(s=>`<button class="sz-btn" onclick="toggleNewPersonSize(this,'${p.id}','${s}')">${s}</button>`).join('')}
-      </div>
-    </div>`).join('');
   _newPersonSizes = {};
   _newPersonStatut = '';
   vc.innerHTML = `<button onclick="setVetTab('personnes')" style="background:transparent;border:none;color:#7c3aed;font-size:14px;font-weight:600;cursor:pointer;padding:0;margin-bottom:14px">← Personnes</button>
@@ -6144,9 +6136,29 @@ function openAddPersonView() {
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px" id="new-person-statut-btns">
         ${STATUTS.map(s=>`<button id="nps-${s.id}" onclick="selectNewPersonStatut('${s.id}')" style="padding:5px 12px;border-radius:20px;border:2px solid #e5e7eb;background:#fff;color:#6b7280;font-size:12px;font-weight:700;cursor:pointer">${s.label}</button>`).join('')}
       </div>
-      ${sizedRows ? `<div class="vc-sec" style="margin-top:8px">Tailles connues (optionnel)</div>${sizedRows}` : ''}
+      <div id="new-person-sizes-section"></div>
       <button class="distrib-btn" onclick="saveNewPerson()" style="margin-top:14px">Enregistrer</button>
     </div>`;
+  renderNewPersonSizesSection();
+}
+
+function renderNewPersonSizesSection() {
+  const container = document.getElementById('new-person-sizes-section');
+  if (!container) return;
+  const zd = S.zones.vetements;
+  const rows = (zd?.products||[]).filter(p => p.sized && giletVisibleForPerson(p.name, _newPersonStatut)).map(p => `
+    <div class="p-sz-row">
+      <span class="p-sz-name">${esc(p.name)}</span>
+      <div class="sz-btns" style="gap:4px" id="np-sz-${p.id}">
+        ${getProductSizes(p).map(s => {
+          const sel = _newPersonSizes[p.id] === s;
+          return `<button class="sz-btn${sel?' sel':''}" onclick="toggleNewPersonSize(this,'${p.id}','${s}')">${s}</button>`;
+        }).join('')}
+      </div>
+    </div>`).join('');
+  container.innerHTML = rows
+    ? `<div class="vc-sec" style="margin-top:8px">Tailles connues (optionnel)</div>${rows}`
+    : '';
 }
 
 let _newPersonStatut = '';
@@ -6160,6 +6172,7 @@ function selectNewPersonStatut(id) {
     btn.style.background  = sel ? s.bg    : '#fff';
     btn.style.color       = sel ? s.color : '#6b7280';
   });
+  renderNewPersonSizesSection();
 }
 function setPersonStatut(personId, statutId) {
   const person = (S.persons||[]).find(p=>p.id===personId);
