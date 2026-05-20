@@ -1124,7 +1124,13 @@ const DEFAULT_UNITS = ['pièces','kg','rouleaux','ramettes','paires','litres','b
 const SIZES = ['S','M','L','XL','2XL','3XL'];
 const ALL_SIZES = ['S','M','L','XL','2XL','3XL','4XL','5XL'];
 function getProductSizes(p) {
-  return p.sizes ? ALL_SIZES.filter(s => s in p.sizes) : SIZES;
+  if (!p.sizes) return SIZES;
+  const standard = ALL_SIZES.filter(s => s in p.sizes);
+  if (standard.length > 0) return standard;
+  // Custom sizes (e.g. shoe sizes) — sort numerically if all numeric
+  const keys = Object.keys(p.sizes);
+  const allNumeric = keys.length > 0 && keys.every(k => !isNaN(Number(k)));
+  return allNumeric ? keys.slice().sort((a,b) => Number(a)-Number(b)) : keys;
 }
 
 const DEF = {
@@ -1286,6 +1292,18 @@ function migrateData(data) {
         data.zones.vetements.products.push({
           id: uid(), name: gName, category: 'Gilets', qty: 0,
           unit: 'pièces', seuil: 0, sized: true, sizes, history: []
+        });
+      }
+    });
+    // Add Chaussures employé and Chaussures ouvrier with shoe sizes 36–47
+    const shoeVariants = ['Chaussures employé', 'Chaussures ouvrier'];
+    const shoeSizes = ['36','37','38','39','40','41','42','43','44','45','46','47'];
+    shoeVariants.forEach(sName => {
+      if (!data.zones.vetements.products.find(p => p.name.toLowerCase().trim() === sName.toLowerCase())) {
+        const sizes = {}; shoeSizes.forEach(s => { sizes[s] = 0; });
+        data.zones.vetements.products.push({
+          id: uid(), name: sName, category: 'Chaussures', qty: 0,
+          unit: 'paires', seuil: 0, sized: true, sizes, history: []
         });
       }
     });
