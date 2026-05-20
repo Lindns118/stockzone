@@ -5947,7 +5947,7 @@ function openSignatureModal(attrId, subtitle) {
   const modal = document.getElementById('modal-signature');
   modal.style.display = 'flex';
   const canvas = document.getElementById('sig-canvas');
-  // Size canvas to available area
+  const attr = (S.attributions||[]).find(a=>a.id===attrId);
   requestAnimationFrame(() => {
     const cont = canvas.parentElement;
     const w = cont.clientWidth - 24;
@@ -5961,13 +5961,19 @@ function openSignatureModal(attrId, subtitle) {
     ctx.lineWidth = 2.5;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
+    // Load existing signature onto canvas if present
+    if (attr?.signature) {
+      const img = new Image();
+      img.onload = () => { ctx.drawImage(img, 0, 0, w, h); _sigHasStrokes = true; };
+      img.src = attr.signature;
+    }
   });
 }
 function closeSignatureModal() {
   document.getElementById('modal-signature').style.display = 'none';
   _sigAttrId = null;
 }
-function skipSignature() { closeSignatureModal(); }
+function skipSignature() { closeSignatureModal(); } // ferme sans modifier la signature existante
 function clearSignature() {
   const canvas = document.getElementById('sig-canvas');
   const ctx = canvas.getContext('2d');
@@ -6068,7 +6074,7 @@ function showPersonDetail(personId) {
         const date = fmtDate(a.date?.slice(0,10));
         const items = (a.items||[]).map(i=>i.name+(i.size?` (${i.size})`:'')+(i.qty>1?` ×${i.qty}`:'')).join(', ');
         const sigBadge = a.signature
-          ? `<button onclick="viewSignature('${a.id}')" style="background:#f5f3ff;border:none;border-radius:8px;padding:3px 8px;font-size:11px;font-weight:700;color:#7c3aed;cursor:pointer;flex-shrink:0">✍️ Signé</button>`
+          ? `<button onclick="openSignatureModal('${a.id}','${esc(a.packName||'Don')} — ${esc(a.person)}')" style="background:#f5f3ff;border:none;border-radius:8px;padding:3px 8px;font-size:11px;font-weight:700;color:#7c3aed;cursor:pointer;flex-shrink:0">✍️ Signé</button>`
           : `<button onclick="openSignatureModal('${a.id}','${esc(a.packName||'Don')} — ${esc(a.person)}')" style="background:#f3f4f6;border:none;border-radius:8px;padding:3px 8px;font-size:11px;font-weight:600;color:#9ca3af;cursor:pointer;flex-shrink:0">✍️ Signer</button>`;
         return `<div class="p-hist-item" style="display:flex;align-items:flex-start;gap:8px">
           <div style="flex:1"><div style="font-weight:600">${esc(a.packName||'Don')} — ${date}</div><div style="color:#6b7280;margin-top:2px;font-size:12px">${items}</div></div>
