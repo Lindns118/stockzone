@@ -5888,9 +5888,21 @@ function getGiletSubstitute(productId, personStatut, zdProducts) {
   const product = zdProducts.find(p => p.id === productId);
   if (!product) return null;
   const lower = product.name.toLowerCase().trim();
-  if (lower !== 'gilet fluo') return null;
-  if (personStatut === 'team_leader') return zdProducts.find(p => p.name.toLowerCase().trim() === 'gilet fluo team leader') || null;
-  if (personStatut === 'duty')        return zdProducts.find(p => p.name.toLowerCase().trim() === 'gilet fluo duty')        || null;
+  // Gilet fluo substitution
+  if (lower === 'gilet fluo') {
+    if (personStatut === 'team_leader') return zdProducts.find(p => p.name.toLowerCase().trim() === 'gilet fluo team leader') || null;
+    if (personStatut === 'duty')        return zdProducts.find(p => p.name.toLowerCase().trim() === 'gilet fluo duty')        || null;
+    return null;
+  }
+  // Chaussures substitution
+  const empGroup  = ['employe', 'duty'];
+  const ouvrGroup = ['ouvrier', 'team_leader'];
+  if (lower === 'chaussures employé' && ouvrGroup.includes(personStatut)) {
+    return zdProducts.find(p => p.name.toLowerCase().trim() === 'chaussures ouvrier') || null;
+  }
+  if (lower === 'chaussures ouvrier' && empGroup.includes(personStatut)) {
+    return zdProducts.find(p => p.name.toLowerCase().trim() === 'chaussures employé') || null;
+  }
   return null;
 }
 function getDistribPersonStatut() {
@@ -5905,10 +5917,22 @@ function giletVisibleForPerson(prodName, statut) {
   const isBase        = lower === 'gilet fluo';
   const isTeamLeader  = lower === 'gilet fluo team leader';
   const isDuty        = lower === 'gilet fluo duty';
-  if (!isBase && !isTeamLeader && !isDuty) return true;
-  if (statut === 'team_leader') return isTeamLeader;
-  if (statut === 'duty')        return isDuty;
-  return isBase; // employé, ouvrier, ou sans statut → gilet fluo standard
+  if (isBase || isTeamLeader || isDuty) {
+    if (statut === 'team_leader') return isTeamLeader;
+    if (statut === 'duty')        return isDuty;
+    return isBase;
+  }
+  // Chaussures filtering
+  const isChaussEmp    = lower === 'chaussures employé';
+  const isChaussOuvr   = lower === 'chaussures ouvrier';
+  if (isChaussEmp || isChaussOuvr) {
+    if (!statut) return true; // pas de statut → on montre les deux
+    const empGroup  = ['employe', 'duty'];
+    const ouvrGroup = ['ouvrier', 'team_leader'];
+    if (isChaussEmp)  return empGroup.includes(statut);
+    if (isChaussOuvr) return ouvrGroup.includes(statut);
+  }
+  return true;
 }
 
 // ── SIGNATURE ──
