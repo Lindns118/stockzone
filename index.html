@@ -1190,8 +1190,8 @@ const DEF = {
   vetPacks: [
     {id:'pack_ouvrier', name:'Pack ouvrier', icon:'⚒️', color:'#d97706', items:[], dispoMode:'taille'},
     {id:'pack_employe', name:'Pack employé', icon:'💼', color:'#2563eb', items:[], dispoMode:'taille'},
-    {id:'pack_ete',     name:'Pack été',     icon:'☀️', color:'#16a34a', items:[], statuts:['ouvrier']},
-    {id:'pack_hiver',   name:'Pack hiver',   icon:'❄️', color:'#0891b2', items:[], statuts:['ouvrier']},
+    {id:'pack_ete',     name:'Pack été',     icon:'☀️', color:'#16a34a', items:[], statuts:['ouvrier','team_leader']},
+    {id:'pack_hiver',   name:'Pack hiver',   icon:'❄️', color:'#0891b2', items:[], statuts:['ouvrier','team_leader']},
     {id:'pack_duty',    name:'Pack duty',    icon:'🦺', color:'#ea580c', items:[], dispoMode:'taille'}
   ],
   persons: []
@@ -1315,7 +1315,7 @@ function migrateData(data) {
     if (!existing) {
       data.vetPacks.push(JSON.parse(JSON.stringify(defPack)));
     } else {
-      if (defPack.statuts && !existing.statuts) existing.statuts = [...defPack.statuts];
+      if (defPack.statuts) existing.statuts = [...defPack.statuts]; // toujours sync depuis DEF
       if (defPack.dispoMode && !existing.dispoMode) existing.dispoMode = defPack.dispoMode;
     }
   });
