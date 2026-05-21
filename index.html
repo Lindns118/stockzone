@@ -6047,16 +6047,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ── PERSONNES TAB ──
 function buildPersonnesHTML() {
-  const persons = (S.persons || []).slice().sort((a,b) => a.name.localeCompare(b.name, 'fr', {sensitivity:'base'}));
+  const allPersons = (S.persons || []).slice().sort((a,b) => a.name.localeCompare(b.name, 'fr', {sensitivity:'base'}));
   const addBtn = `<button class="add-person-btn" onclick="openAddPersonView()">➕ Ajouter une personne</button>`;
-  const topBtns = persons.length ? `<div style="display:flex;gap:8px;margin-bottom:10px">
+  const topBtns = allPersons.length ? `<div style="display:flex;gap:8px;margin-bottom:10px">
     <button onclick="printPersonCard(null)" style="flex:1;background:#f3f4f6;border:none;border-radius:10px;padding:10px 8px;font-size:13px;font-weight:600;cursor:pointer">📄 Export tous PDF</button>
   </div>` : '';
-  if (!persons.length) return addBtn + '<div style="text-align:center;color:#9ca3af;padding:30px 20px;font-size:14px">Aucune personne.<br>Elles sont créées automatiquement lors des distributions.</div>';
-  const cards = persons.map(p => {
+  if (!allPersons.length) return addBtn + '<div style="text-align:center;color:#9ca3af;padding:30px 20px;font-size:14px">Aucune personne.<br>Elles sont créées automatiquement lors des distributions.</div>';
+  const searchBar = `<div style="position:relative;margin-bottom:10px">
+    <input id="person-search" class="fi" placeholder="🔍 Rechercher une personne…" oninput="filterPersonCards(this.value)" style="padding-left:12px">
+  </div>`;
+  const cards = allPersons.map(p => {
     const attrCount = (S.attributions||[]).filter(a=>a.person.toLowerCase()===p.name.toLowerCase()).length;
     const knownSizes = Object.values(p.sizes||{}).filter(Boolean).length;
-    return `<div class="pcard" onclick="showPersonDetail('${p.id}')">
+    return `<div class="pcard" data-name="${esc(p.name.toLowerCase())}" onclick="showPersonDetail('${p.id}')">
       <div class="pcard-avatar">${p.name.charAt(0).toUpperCase()}</div>
       <div class="pcard-info">
         <div class="pcard-name">${esc(p.name)} ${statutBadge(p)}</div>
@@ -6065,7 +6068,14 @@ function buildPersonnesHTML() {
       <span class="pcard-arrow">›</span>
     </div>`;
   }).join('');
-  return topBtns + addBtn + cards;
+  return topBtns + searchBar + addBtn + `<div id="person-cards-list">${cards}</div>`;
+}
+
+function filterPersonCards(query) {
+  const q = query.trim().toLowerCase();
+  document.querySelectorAll('#person-cards-list .pcard').forEach(card => {
+    card.style.display = (!q || card.dataset.name.includes(q)) ? '' : 'none';
+  });
 }
 
 function showPersonDetail(personId) {
@@ -6205,7 +6215,9 @@ function saveNewPerson() {
   const name = (document.getElementById('new-person-name')?.value||'').trim();
   if (!name) { toast('Saisissez un nom','warning'); return; }
   if (!S.persons) S.persons=[];
-  if (S.persons.find(p=>p.name.toLowerCase()===name.toLowerCase())) { toast('Personne déjà enregistrée','warning'); return; }
+  if (S.persons.find(p=>p.name.toLowerCase()===name.toLowerCase())) {
+    if (!confirm(`"${name}" existe déjà dans la liste des personnes.\nVoulez-vous quand même créer une nouvelle entrée ?`)) return;
+  }
   const newP = {id:uid(), name, sizes:{..._newPersonSizes}};
   if (_newPersonStatut) newP.statut = _newPersonStatut;
   S.persons.push(newP);
