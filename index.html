@@ -5594,11 +5594,20 @@ function refreshVetPacksTab() {
 // ── VETEMENTS MODE ──
 function enterVetementsMode() {
   document.body.classList.add('vet-mode');
-  currentVetTab = 'stock';
   vetCatFilter = 'all';
   const vc = document.getElementById('vet-content');
-  if (vc) vc.style.display = 'none';
-  buildVetNavTabs();
+  const savedTab = localStorage.getItem('sz_vet_tab');
+  const validTabs = ['packs','distribution','personnes','dispo'];
+  if (savedTab && validTabs.includes(savedTab)) {
+    currentVetTab = 'stock'; // reset before setVetTab
+    if (vc) vc.style.display = 'none';
+    buildVetNavTabs();
+    setTimeout(() => setVetTab(savedTab), 0);
+  } else {
+    currentVetTab = 'stock';
+    if (vc) vc.style.display = 'none';
+    buildVetNavTabs();
+  }
 }
 
 function exitVetementsMode() {
@@ -5636,6 +5645,7 @@ function setVetTab(tab) {
   } else {
     currentVetTab = tab;
     vetCatFilter = 'all';
+    localStorage.setItem('sz_vet_tab', tab);
     vc.style.display = 'block';
     vc.scrollTop = 0;
     if (tab === 'packs') vc.innerHTML = buildVetPacksTabHTML();
