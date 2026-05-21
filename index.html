@@ -6493,9 +6493,10 @@ function showPackDispoView() {
     const countColor = r.maxPacks > 0 ? '#16a34a' : '#ef4444';
     const countBg = r.maxPacks > 0 ? '#f0fdf4' : '#fef2f2';
     const personRows = r.personStatus.length
-      ? r.personStatus.map(ps => `<div style="display:flex;align-items:flex-start;gap:6px;padding:5px 0;border-bottom:1px solid #f3f4f6;font-size:12px">
+      ? r.personStatus.map(ps => `<div onclick="setVetTab('personnes');setTimeout(()=>showPersonDetail('${ps.person.id}'),50)" style="display:flex;align-items:flex-start;gap:6px;padding:5px 0;border-bottom:1px solid #f3f4f6;font-size:12px;cursor:pointer">
           <span style="font-size:14px">${ps.ok?'✅':'❌'}</span>
-          <div><div style="font-weight:600">${esc(ps.person.name)}</div>${!ps.ok?`<div style="color:#dc2626;font-size:11px">${ps.cant.join(', ')}</div>`:''}</div>
+          <div style="flex:1"><div style="font-weight:600">${esc(ps.person.name)}</div>${!ps.ok?`<div style="color:#dc2626;font-size:11px">${ps.cant.join(', ')}</div>`:''}</div>
+          <span style="color:#7c3aed;font-size:14px">›</span>
         </div>`).join('')
       : '<div style="font-size:12px;color:#9ca3af;padding:5px 0">Aucune personne enregistrée</div>';
     let simHTML = '';
