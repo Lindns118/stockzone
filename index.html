@@ -5704,10 +5704,8 @@ function buildDistribHTML() {
       <datalist id="distrib-plist">${personOpts}</datalist>
     </div>`;
 
-  const sizesHTML = distribState.packId ? buildSizeSectionHTML() : '';
-  const sizesSec = sizesHTML ? `<div class="vc-sec">📐 Tailles</div>${sizesHTML}` : '';
-
-  const confirmBtn = distribState.packId ? `<button class="distrib-btn" onclick="confirmDistrib()">✅ Enregistrer la distribution</button>` : '';
+  const sizesSec = `<div id="distrib-sizes-section">${distribState.packId ? `<div class="vc-sec">📐 Tailles</div>${buildSizeSectionHTML()}` : ''}</div>`;
+  const confirmBtn = `<div id="distrib-confirm-btn">${distribState.packId ? `<button class="distrib-btn" onclick="confirmDistrib()">✅ Enregistrer la distribution</button>` : ''}</div>`;
 
   const donUnique = `<div class="vc-sec" style="margin-top:20px">🎁 Don unique</div>
     <div class="dsz-card">
@@ -5762,7 +5760,11 @@ function selectDistribPack(packId) {
 function onDistribPersonChange(name) {
   distribState.personName = name;
   loadPersonSizesIfKnown();
-  refreshDistribView(); // toujours rafraîchir pour les substitutions gilet/chaussures selon statut
+  // Mise à jour partielle — ne reconstruit pas le champ input pour garder le clavier ouvert
+  const sizesSec = document.getElementById('distrib-sizes-section');
+  if (sizesSec && distribState.packId) {
+    sizesSec.innerHTML = `<div class="vc-sec">📐 Tailles</div>${buildSizeSectionHTML()}`;
+  }
 }
 
 function loadPersonSizesIfKnown() {
@@ -5785,7 +5787,18 @@ function refreshDistribView() {
   if (!vc || currentVetTab !== 'distribution') return;
   const inp = document.getElementById('distrib-person');
   if (inp) distribState.personName = inp.value;
-  vc.innerHTML = buildDistribHTML();
+  const sizesSec = document.getElementById('distrib-sizes-section');
+  const confirmSec = document.getElementById('distrib-confirm-btn');
+  if (sizesSec) {
+    sizesSec.innerHTML = distribState.packId ? `<div class="vc-sec">📐 Tailles</div>${buildSizeSectionHTML()}` : '';
+    if (confirmSec) confirmSec.innerHTML = distribState.packId ? `<button class="distrib-btn" onclick="confirmDistrib()">✅ Enregistrer la distribution</button>` : '';
+    document.querySelectorAll('.dpk-card').forEach(c => {
+      const m = c.getAttribute('onclick')?.match(/'([^']+)'/);
+      if (m) c.classList.toggle('sel', m[1] === distribState.packId);
+    });
+  } else {
+    vc.innerHTML = buildDistribHTML();
+  }
   buildVetNavTabs();
 }
 
