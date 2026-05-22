@@ -1,0 +1,18 @@
+{
+  "name": "StockZone",
+  "short_name": "StockZone",
+  "description": "Gestion de stock vêtements et entrepôt",
+  "start_url": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#1a1f6e",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
