@@ -6130,12 +6130,7 @@ function showPersonDetail(personId) {
   }).map(prod => {
     const knownSize = (person.sizes||{})[prod.id]||'';
     const btns = getProductSizes(prod).map(s=>`<button class="sz-btn${knownSize===s?' sel':''}" onclick="setPersonSize('${personId}','${prod.id}','${s}')">${s}</button>`).join('');
-    // Find most recent attribution containing this product
-    const relatedAttr = attrs.find(a => (a.items||[]).some(i => i.id === prod.id || i.name === prod.name));
-    const editBtn = relatedAttr
-      ? `<button onclick="openEditAttrModal('${relatedAttr.id}','${personId}')" style="background:#f3f4f6;border:none;border-radius:8px;padding:3px 8px;font-size:11px;font-weight:600;color:#374151;cursor:pointer;flex-shrink:0;margin-left:4px" title="Modifier le don">✏️</button>`
-      : '';
-    return `<div class="p-sz-row" style="display:flex;align-items:center;gap:4px"><span class="p-sz-name">${esc(prod.name)}</span><div class="sz-btns" style="gap:4px;flex:1">${btns}</div>${editBtn}</div>`;
+    return `<div class="p-sz-row"><span class="p-sz-name">${esc(prod.name)}</span><div class="sz-btns" style="gap:4px">${btns}</div></div>`;
   }).join('');
   const histHTML = attrs.length
     ? attrs.slice(0,30).map(a=>{
@@ -6265,7 +6260,7 @@ function openRenamePerson(personId) {
   const inp = document.getElementById('rename-person-input');
   if (sub) sub.textContent = person.name;
   if (inp) { inp.value = person.name; }
-  showModal('modal-rename-person');
+  showModal('rename-person');
   setTimeout(() => { if (inp) inp.focus(); inp.select(); }, 150);
 }
 function saveRenamePerson() {
