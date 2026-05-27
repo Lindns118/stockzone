@@ -1087,6 +1087,19 @@ body.vet-mode .main{padding-bottom:20px}
   </div>
 </div>
 
+<!-- EDIT ATTRIBUTION MODAL -->
+<div id="modal-edit-attr" class="modal-overlay hidden" onclick="overlayClose(event,'modal-edit-attr')">
+<div class="modal-sheet">
+  <div class="mh-row">
+    <div class="mh-icon" style="background:#f0fdf4">✏️</div>
+    <div><div class="m-title">Modifier le don</div><div class="m-sub" id="edit-attr-sub"></div></div>
+    <button class="m-close" onclick="hideModal('modal-edit-attr')">✕</button>
+  </div>
+  <div id="edit-attr-body"></div>
+  <button class="btn-primary" onclick="saveEditAttr()" style="margin-top:10px">💾 Enregistrer</button>
+</div>
+</div>
+
 <!-- SIGNATURE VIEW MODAL -->
 <div id="modal-sig-view" class="modal-overlay hidden" onclick="overlayClose(event,'modal-sig-view')">
 <div class="modal-sheet">
@@ -6117,6 +6130,7 @@ function showPersonDetail(personId) {
           <div style="flex:1"><div style="font-weight:600">${esc(a.packName||'Don')} — ${date}</div><div style="color:#6b7280;margin-top:2px;font-size:12px">${items}</div></div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
             ${sigBadge}
+            <button onclick="openEditAttrModal('${a.id}','${personId}')" style="background:#f3f4f6;border:none;border-radius:8px;padding:3px 8px;font-size:11px;font-weight:600;color:#374151;cursor:pointer">✏️ Modifier</button>
             <button onclick="printAttrSheet('${a.id}')" style="background:#f3f4f6;border:none;border-radius:8px;padding:3px 8px;font-size:11px;font-weight:600;color:#374151;cursor:pointer">📄 PDF</button>
             <button onclick="deleteAttribution('${a.id}','${personId}')" style="background:none;border:none;color:#ef4444;font-size:16px;cursor:pointer;padding:2px 4px" title="Supprimer">🗑</button>
           </div>
@@ -6239,6 +6253,79 @@ function saveNewPerson() {
   save();
   toast(`✅ ${name} ajouté(e)`,'success');
   setVetTab('personnes');
+}
+
+let _editAttrId = null;
+let _editPersonId = null;
+let _editSizes = {}; // {itemIndex: newSize}
+
+function openEditAttrModal(attrId, personId) {
+  const attr = (S.attributions||[]).find(a=>a.id===attrId);
+  if (!attr) return;
+  _editAttrId = attrId;
+  _editPersonId = personId;
+  _editSizes = {};
+  (attr.items||[]).forEach((item,i) => { _editSizes[i] = item.size || ''; });
+  document.getElementById('edit-attr-sub').textContent = (attr.packName||'Don') + ' — ' + fmtDate(attr.date?.slice(0,10));
+  const zd = S.zones.vetements;
+  const rows = (attr.items||[]).map((item,i) => {
+    const product = zd?.products?.find(p=>p.id===item.productId);
+    if (!product?.sized) return `<div style="padding:8px 0;border-bottom:1px solid #f3f4f6;font-size:13px"><b>${esc(item.name)}</b> × ${item.qty} <span style="color:#9ca3af">(sans taille)</span></div>`;
+    const sizes = getProductSizes(product);
+    const btns = sizes.map(s => {
+      const stock = (product.sizes||{})[s]||0;
+      const sel = _editSizes[i]===s;
+      return `<button class="sz-btn${sel?' sel':''}${stock===0&&!sel?' zero':''}" onclick="selectEditSize(${i},'${s}',this)">${s}<br><span style="font-size:10px;opacity:.7">${stock+(sel?item.qty:0)}</span></button>`;
+    }).join('');
+    return `<div style="padding:8px 0;border-bottom:1px solid #f3f4f6">
+      <div style="font-size:13px;font-weight:600;margin-bottom:6px">${esc(item.name)} × ${item.qty}</div>
+      <div class="sz-btns" id="edit-sz-row-${i}" style="gap:4px">${btns}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('edit-attr-body').innerHTML = rows || '<p style="color:#9ca3af;font-size:13px">Aucun article</p>';
+  showModal('modal-edit-attr');
+}
+
+function selectEditSize(itemIndex, size, btn) {
+  _editSizes[itemIndex] = _editSizes[itemIndex]===size ? '' : size;
+  const row = document.getElementById('edit-sz-row-'+itemIndex);
+  if (row) row.querySelectorAll('.sz-btn').forEach(b=>b.classList.remove('sel'));
+  if (_editSizes[itemIndex]) btn.classList.add('sel');
+}
+
+function saveEditAttr() {
+  const attr = (S.attributions||[]).find(a=>a.id===_editAttrId);
+  if (!attr) return;
+  const zd = S.zones.vetements;
+  (attr.items||[]).forEach((item,i) => {
+    const oldSize = item.size || '';
+    const newSize = _editSizes[i] || '';
+    if (oldSize === newSize) return;
+    const product = zd?.products?.find(p=>p.id===item.productId);
+    if (!product?.sized) return;
+    // Restore old size stock
+    if (oldSize && product.sizes && product.sizes[oldSize] !== undefined) {
+      product.sizes[oldSize] = (product.sizes[oldSize]||0) + item.qty;
+      product.qty = r2(product.qty + item.qty);
+    }
+    // Deduct new size stock
+    if (newSize && product.sizes && product.sizes[newSize] !== undefined) {
+      product.sizes[newSize] = Math.max(0, (product.sizes[newSize]||0) - item.qty);
+      product.qty = r2(Math.max(0, product.qty - item.qty));
+    }
+    item.size = newSize || undefined;
+  });
+  // Update person known sizes
+  const person = (S.persons||[]).find(p=>p.id===_editPersonId);
+  if (person) {
+    (attr.items||[]).forEach(item => {
+      if (item.size) { if (!person.sizes) person.sizes={}; person.sizes[item.productId]=item.size; }
+    });
+  }
+  save();
+  hideModal('modal-edit-attr');
+  toast('✅ Don modifié','success');
+  if (_editPersonId) showPersonDetail(_editPersonId);
 }
 
 function deleteAttribution(attrId, personId) {
