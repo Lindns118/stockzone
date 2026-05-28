@@ -1095,6 +1095,10 @@ body.vet-mode .main{padding-bottom:20px}
     <div><div class="m-title">Modifier le don</div><div class="m-sub" id="edit-attr-sub"></div></div>
     <button class="m-close" onclick="hideModal('modal-edit-attr')">✕</button>
   </div>
+  <div style="display:flex;align-items:center;gap:8px;margin:10px 0 4px">
+    <label style="font-size:13px;color:#6b7280;flex-shrink:0">📅 Date :</label>
+    <input type="date" id="edit-attr-date" class="fi" style="flex:1">
+  </div>
   <div id="edit-attr-body"></div>
   <button class="btn-primary" onclick="saveEditAttr()" style="margin-top:10px">💾 Enregistrer</button>
 </div>
@@ -5728,6 +5732,10 @@ function buildDistribHTML() {
     <div class="dperson-card">
       <input id="distrib-person" class="fi" list="distrib-plist" placeholder="Nom du bénéficiaire…" value="${esc(distribState.personName)}" oninput="onDistribPersonChange(this.value)">
       <datalist id="distrib-plist">${personOpts}</datalist>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+        <label style="font-size:13px;color:#6b7280;flex-shrink:0">📅 Date :</label>
+        <input type="date" id="distrib-date" class="fi" style="flex:1" value="${today()}">
+      </div>
     </div>`;
 
   const sizesSec = `<div id="distrib-sizes-section">${distribState.packId ? `<div class="vc-sec">📐 Tailles</div>${buildSizeSectionHTML()}` : ''}</div>`;
@@ -5844,7 +5852,8 @@ function confirmDistrib() {
   const pack = (S.vetPacks||[]).find(p=>p.id===distribState.packId);
   if (!pack) return;
   const zd = S.zones.vetements;
-  const now = nowIso();
+  const dateVal = document.getElementById('distrib-date')?.value;
+  const now = dateVal ? dateVal + 'T12:00:00.000Z' : nowIso();
   const itemsRecord = [];
   const preInv = document.getElementById('distrib-pre-inv')?.checked || false;
   const personObj = (S.persons||[]).find(p=>p.name.toLowerCase()===person.toLowerCase());
@@ -5916,7 +5925,8 @@ function confirmDonUnique() {
   const qty = Math.max(1, parseInt(document.getElementById('don-qty')?.value)||1);
   const product = (S.zones.vetements?.products||[]).find(p=>p.id===prodId);
   if (!product) return;
-  const now = nowIso();
+  const dateVal = document.getElementById('distrib-date')?.value;
+  const now = dateVal ? dateVal + 'T12:00:00.000Z' : nowIso();
   const preInv = document.getElementById('don-pre-inv')?.checked || false;
   if (!preInv) {
     const diff = Math.min(qty, product.qty);
@@ -6351,6 +6361,8 @@ function openEditAttrModal(attrId, personId) {
   _editSizes = {};
   (attr.items||[]).forEach((item,i) => { _editSizes[i] = item.size || ''; });
   document.getElementById('edit-attr-sub').textContent = (attr.packName||'Don') + ' — ' + fmtDate(attr.date?.slice(0,10));
+  const dateInput = document.getElementById('edit-attr-date');
+  if (dateInput) dateInput.value = attr.date?.slice(0,10) || today();
   const zd = S.zones.vetements;
   const rows = (attr.items||[]).map((item,i) => {
     const product = zd?.products?.find(p=>p.id===item.productId);
@@ -6399,6 +6411,9 @@ function saveEditAttr() {
     }
     item.size = newSize || undefined;
   });
+  // Update date
+  const newDate = document.getElementById('edit-attr-date')?.value;
+  if (newDate) attr.date = newDate + (attr.date?.slice(10) || 'T00:00:00.000Z');
   // Update person known sizes
   const person = (S.persons||[]).find(p=>p.id===_editPersonId);
   if (person) {
