@@ -5715,7 +5715,7 @@ function setVetTab(tab) {
     vc.style.display = 'block';
     vc.scrollTop = 0;
     if (tab === 'packs') vc.innerHTML = buildVetPacksTabHTML();
-    else if (tab === 'distribution') { distribState = {packId:null,sizes:{},personName:''}; vc.innerHTML = buildDistribHTML(); }
+    else if (tab === 'distribution') { if (!distribState._keep) distribState = {packId:null,sizes:{},personName:''}; delete distribState._keep; vc.innerHTML = buildDistribHTML(); }
     else if (tab === 'personnes') vc.innerHTML = buildPersonnesHTML();
     else if (tab === 'dispo') showPackDispoView();
   }
@@ -6291,7 +6291,7 @@ function setPersonSize(personId, productId, size) {
 function distribToPersonTab(personId) {
   const person = (S.persons||[]).find(p=>p.id===personId);
   if (!person) return;
-  distribState = {packId:null, sizes:{...(person.sizes||{})}, personName:person.name};
+  distribState = {packId:null, sizes:{...(person.sizes||{})}, personName:person.name, _keep:true};
   setVetTab('distribution');
 }
 
