@@ -6062,7 +6062,7 @@ function viewSignature(attrId) {
   if (!attr?.signature) return;
   document.getElementById('sigview-sub').textContent = (attr.packName||'Don') + ' — ' + fmtDate(attr.date?.slice(0,10));
   document.getElementById('sigview-img').src = attr.signature;
-  showModal('modal-sig-view');
+  showModal('sig-view');
 }
 
 // Canvas drawing events
@@ -6367,7 +6367,7 @@ function openEditAttrModal(attrId, personId) {
     </div>`;
   }).join('');
   document.getElementById('edit-attr-body').innerHTML = rows || '<p style="color:#9ca3af;font-size:13px">Aucun article</p>';
-  showModal('modal-edit-attr');
+  showModal('edit-attr');
 }
 
 function selectEditSize(itemIndex, size, btn) {
