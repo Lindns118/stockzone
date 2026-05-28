@@ -5663,7 +5663,7 @@ function enterVetementsMode() {
   vetCatFilter = 'all';
   const vc = document.getElementById('vet-content');
   const savedTab = localStorage.getItem('sz_vet_tab');
-  const validTabs = ['packs','distribution','personnes','dispo'];
+  const validTabs = ['packs','distribution','personnes','dispo','chaussures'];
   if (savedTab && validTabs.includes(savedTab)) {
     currentVetTab = 'stock'; // reset before setVetTab
     if (vc) vc.style.display = 'none';
@@ -5687,7 +5687,7 @@ function exitVetementsMode() {
 function buildVetNavTabs() {
   const tabs = document.getElementById('vet-cat-tabs');
   if (!tabs) return;
-  let html = [{id:'stock',icon:'🧥',lbl:'Zone'},{id:'packs',icon:'📦',lbl:'Packs'},{id:'distribution',icon:'🎁',lbl:'Distribution'},{id:'personnes',icon:'👥',lbl:'Personnes'},{id:'dispo',icon:'📊',lbl:'Dispo'}].map(t => {
+  let html = [{id:'stock',icon:'🧥',lbl:'Zone'},{id:'packs',icon:'📦',lbl:'Packs'},{id:'distribution',icon:'🎁',lbl:'Distribution'},{id:'personnes',icon:'👥',lbl:'Personnes'},{id:'dispo',icon:'📊',lbl:'Dispo'},{id:'chaussures',icon:'👟',lbl:'Chaussures'}].map(t => {
     const active = currentVetTab===t.id ? ' active' : '';
     return `<button class="vet-nav-btn${active}" onclick="setVetTab('${t.id}')">${t.icon} ${t.lbl}</button>`;
   }).join('');
@@ -5718,8 +5718,163 @@ function setVetTab(tab) {
     else if (tab === 'distribution') { if (!distribState._keep) distribState = {packId:null,sizes:{},personName:''}; delete distribState._keep; vc.innerHTML = buildDistribHTML(); }
     else if (tab === 'personnes') vc.innerHTML = buildPersonnesHTML();
     else if (tab === 'dispo') showPackDispoView();
+    else if (tab === 'chaussures') vc.innerHTML = buildChaussuresTabHTML();
   }
   buildVetNavTabs();
+}
+
+function buildChaussuresTabHTML() {
+  const zd = S.zones.vetements;
+  const persons = S.persons || [];
+  const attrs = S.attributions || [];
+  const shoeSizes = ['36','37','38','39','40','41','42','43','44','45','46','47'];
+
+  // Find shoe products
+  const prodEmp  = (zd?.products||[]).find(p=>p.name.toLowerCase().trim()==='chaussures employé');
+  const prodOuvr = (zd?.products||[]).find(p=>p.name.toLowerCase().trim()==='chaussures ouvrier');
+
+  // Groups: employé+duty → chaussures employé / ouvrier+team_leader → chaussures ouvrier
+  const empGroup  = persons.filter(p=>['employe','duty'].includes(p.statut||''));
+  const ouvrGroup = persons.filter(p=>['ouvrier','team_leader'].includes(p.statut||''));
+
+  // Build one section for each shoe type
+  function buildSection(prod, groupPersons, label, color) {
+    if (!prod) return `<div style="color:#9ca3af;font-size:13px;padding:12px 0">${label} introuvable dans le stock.</div>`;
+
+    const stockSizes = prod.sizes || {};
+    const totalStock = prod.qty || 0;
+
+    // Known sizes from persons
+    const sizeCount = {}; // size -> nb persons with that size
+    shoeSizes.forEach(s => sizeCount[s] = 0);
+    groupPersons.forEach(p => {
+      const sz = (p.sizes||{})[prod.id];
+      if (sz && sizeCount[sz] !== undefined) sizeCount[sz]++;
+    });
+    const knownCount = groupPersons.filter(p=>(p.sizes||{})[prod.id]).length;
+    const unknownCount = groupPersons.length - knownCount;
+
+    // Last attribution date for this product
+    const prodAttrs = attrs.filter(a=>(a.items||[]).some(i=>i.id===prod.id||i.name===prod.name));
+    const lastAttr = prodAttrs.length ? prodAttrs.slice().sort((a,b)=>b.date?.localeCompare(a.date||'')).slice(0,1)[0] : null;
+
+    // Projection: ~1 pair/person/year = 1/12 per month
+    // Monthly demand per size = sizeCount[s] / 12
+    // For unknown persons: spread over sizes proportionally (or evenly if no known size data)
+    const totalKnown = Object.values(sizeCount).reduce((a,b)=>a+b,0);
+
+    function monthlyDemand(s) {
+      let base = sizeCount[s] / 12;
+      if (unknownCount > 0 && totalKnown > 0) {
+        // distribute unknowns proportionally to known distribution
+        base += (unknownCount * (sizeCount[s] / totalKnown)) / 12;
+      } else if (unknownCount > 0) {
+        // no known size data: spread evenly across all sizes
+        base += (unknownCount / shoeSizes.length) / 12;
+      }
+      return base;
+    }
+
+    // Build stock table
+    const activeSizes = shoeSizes.filter(s => (stockSizes[s]||0) > 0 || sizeCount[s] > 0);
+
+    const tableRows = activeSizes.map(s => {
+      const stock = stockSizes[s] || 0;
+      const persons_s = sizeCount[s];
+      const mDemand = monthlyDemand(s);
+      let monthsLeft = mDemand > 0 ? Math.floor(stock / mDemand) : (stock > 0 ? 999 : 0);
+      let alert = '';
+      if (stock === 0 && mDemand > 0) alert = 'red';
+      else if (monthsLeft < 3) alert = 'red';
+      else if (monthsLeft < 6) alert = 'orange';
+
+      const alertStyle = alert === 'red' ? 'background:#fef2f2;' : alert === 'orange' ? 'background:#fffbeb;' : '';
+      const stockColor = alert === 'red' ? 'color:#ef4444;font-weight:700' : alert === 'orange' ? 'color:#d97706;font-weight:700' : '';
+      const durée = monthsLeft === 999 ? (stock > 0 ? '∞' : '—') : mDemand > 0 ? `~${monthsLeft} mois` : '—';
+
+      return `<tr style="${alertStyle}">
+        <td style="padding:7px 10px;font-weight:700;font-size:14px">${s}</td>
+        <td style="padding:7px 10px;text-align:center;${stockColor}">${stock}</td>
+        <td style="padding:7px 10px;text-align:center;color:#6b7280">${persons_s > 0 ? persons_s : '—'}</td>
+        <td style="padding:7px 10px;text-align:center;color:#6b7280">${mDemand > 0 ? (mDemand < 1 ? '<1' : mDemand.toFixed(1)) : '—'}</td>
+        <td style="padding:7px 10px;text-align:center;${stockColor}">${durée}</td>
+      </tr>`;
+    }).join('');
+
+    // 6-month projection summary
+    const projMonths = 6;
+    let projRows = '';
+    const now = new Date();
+    for (let m = 1; m <= projMonths; m++) {
+      const d = new Date(now.getFullYear(), now.getMonth() + m, 1);
+      const label2 = d.toLocaleDateString('fr-FR',{month:'short',year:'2-digit'});
+      // Total shoes needed this month across all sizes
+      const totalDemand = shoeSizes.reduce((sum,s) => sum + monthlyDemand(s), 0);
+      // Sizes that hit 0 this month
+      const critiques = activeSizes.filter(s => {
+        const stock = stockSizes[s]||0;
+        const consumed = monthlyDemand(s) * m;
+        return consumed >= stock && stock > 0 && monthlyDemand(s) > 0;
+      });
+      const bgColor = critiques.length > 0 ? '#fef2f2' : m <= 2 ? '#f0fdf4' : '';
+      projRows += `<tr style="background:${bgColor}">
+        <td style="padding:6px 10px;font-weight:600">${label2}</td>
+        <td style="padding:6px 10px;text-align:center">${totalDemand > 0 ? '~'+Math.ceil(totalDemand) : '—'}</td>
+        <td style="padding:6px 10px;text-align:center;color:${critiques.length?'#ef4444':'#6b7280'};font-size:12px">${critiques.length ? '⚠️ '+critiques.join(', ') : '✅'}</td>
+      </tr>`;
+    }
+
+    const noData = groupPersons.length === 0;
+    const dataNote = noData
+      ? `<div style="color:#9ca3af;font-size:12px;padding:8px 0;font-style:italic">Aucune personne dans ce groupe — projection nulle.</div>`
+      : knownCount === 0
+      ? `<div style="color:#d97706;font-size:12px;padding:8px 0">⚠️ Aucune taille connue (${groupPersons.length} personne${groupPersons.length>1?'s':''}) — projection répartie uniformément.</div>`
+      : `<div style="color:#6b7280;font-size:12px;padding:8px 0">${knownCount}/${groupPersons.length} taille${knownCount>1?'s':''} connue${knownCount>1?'s':''}${unknownCount>0?' · '+unknownCount+' inconnue'+(unknownCount>1?'s':''):''}</div>`;
+
+    return `
+      <div style="background:#fff;border-radius:14px;box-shadow:0 1px 5px rgba(0,0,0,.07);margin-bottom:16px;overflow:hidden">
+        <div style="background:${color}15;padding:12px 16px;border-bottom:1px solid ${color}30">
+          <div style="font-weight:800;font-size:15px;color:${color}">👟 ${label}</div>
+          <div style="font-size:12px;color:#6b7280;margin-top:2px">Stock total : <b>${totalStock}</b> paires · ${groupPersons.length} personne${groupPersons.length!==1?'s':''} concernée${groupPersons.length!==1?'s':''}${lastAttr?` · Dernier don : ${fmtDate(lastAttr.date?.slice(0,10))}`:''}  </div>
+          ${dataNote}
+        </div>
+        ${activeSizes.length > 0 ? `
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead>
+              <tr style="background:#f9fafb">
+                <th style="padding:8px 10px;text-align:left;font-weight:700;color:#374151">Taille</th>
+                <th style="padding:8px 10px;text-align:center;font-weight:700;color:#374151">Stock</th>
+                <th style="padding:8px 10px;text-align:center;font-weight:700;color:#374151">Personnes</th>
+                <th style="padding:8px 10px;text-align:center;font-weight:700;color:#374151">/mois</th>
+                <th style="padding:8px 10px;text-align:center;font-weight:700;color:#374151">Durée</th>
+              </tr>
+            </thead>
+            <tbody>${tableRows}</tbody>
+          </table>
+        </div>
+        <div style="padding:12px 16px;border-top:1px solid #f3f4f6">
+          <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#374151">📅 Projection 6 mois</div>
+          <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead>
+              <tr style="background:#f9fafb">
+                <th style="padding:5px 10px;text-align:left;color:#6b7280">Mois</th>
+                <th style="padding:5px 10px;text-align:center;color:#6b7280">Besoin ~</th>
+                <th style="padding:5px 10px;text-align:center;color:#6b7280">Tailles critiques</th>
+              </tr>
+            </thead>
+            <tbody>${projRows}</tbody>
+          </table>
+        </div>` : `<div style="padding:16px;color:#9ca3af;font-size:13px">Aucun stock ni donnée de taille pour ce produit.</div>`}
+      </div>`;
+  }
+
+  return `
+    <div class="vc-sec">👟 Chaussures — Stock & Projection</div>
+    <div style="font-size:12px;color:#6b7280;margin-bottom:14px">Projection basée sur 1 paire / personne / an. Les tailles inconnues sont réparties proportionnellement.</div>
+    ${buildSection(prodEmp,  empGroup,  'Chaussures Employé (Employé & Duty)',         '#2563eb')}
+    ${buildSection(prodOuvr, ouvrGroup, 'Chaussures Ouvrier (Ouvrier & Team Leader)',   '#d97706')}
+  `;
 }
 
 // ── PACKS TAB ──
