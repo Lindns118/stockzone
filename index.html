@@ -5825,11 +5825,17 @@ function buildChaussuresTabHTML() {
     }
 
     const noData = groupPersons.length === 0;
+    const missingPersons = groupPersons.filter(p=>!(p.sizes||{})[prod.id]);
+    const missingNames = missingPersons.map(p=>esc(p.name)).join(', ');
+    const missingBlock = missingPersons.length === 0
+      ? `<div style="color:#16a34a;font-size:12px;padding:6px 0;font-weight:600">✅ Toutes les tailles sont encodées</div>`
+      : `<div style="background:#fef3c7;border-radius:8px;padding:8px 10px;margin-top:6px">
+          <div style="font-weight:700;color:#d97706;font-size:12px">⚠️ ${missingPersons.length} personne${missingPersons.length>1?'s':''} sans taille chaussure encodée :</div>
+          <div style="color:#92400e;font-size:11px;margin-top:3px;line-height:1.5">${missingNames}</div>
+        </div>`;
     const dataNote = noData
       ? `<div style="color:#9ca3af;font-size:12px;padding:8px 0;font-style:italic">Aucune personne dans ce groupe — projection nulle.</div>`
-      : knownCount === 0
-      ? `<div style="color:#d97706;font-size:12px;padding:8px 0">⚠️ Aucune taille connue (${groupPersons.length} personne${groupPersons.length>1?'s':''}) — projection répartie uniformément.</div>`
-      : `<div style="color:#6b7280;font-size:12px;padding:8px 0">${knownCount}/${groupPersons.length} taille${knownCount>1?'s':''} connue${knownCount>1?'s':''}${unknownCount>0?' · '+unknownCount+' inconnue'+(unknownCount>1?'s':''):''}</div>`;
+      : `<div style="color:#6b7280;font-size:12px;padding:4px 0">${knownCount}/${groupPersons.length} taille${knownCount!==1?'s':''} connue${knownCount!==1?'s':''}</div>${missingBlock}`;
 
     return `
       <div style="background:#fff;border-radius:14px;box-shadow:0 1px 5px rgba(0,0,0,.07);margin-bottom:16px;overflow:hidden">
