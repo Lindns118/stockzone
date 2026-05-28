@@ -1097,7 +1097,7 @@ body.vet-mode .main{padding-bottom:20px}
   </div>
   <div style="display:flex;align-items:center;gap:8px;margin:10px 0 4px">
     <label style="font-size:13px;color:#6b7280;flex-shrink:0">📅 Date :</label>
-    <input type="text" id="edit-attr-date" class="fi" style="flex:1" placeholder="JJ/MM/AAAA" inputmode="numeric" maxlength="10">
+    <input type="text" id="edit-attr-date" class="fi" style="flex:1" placeholder="JJ/MM/AAAA" inputmode="numeric" maxlength="10" oninput="autoFormatDate(this)">
   </div>
   <div id="edit-attr-body"></div>
   <button class="btn-primary" onclick="saveEditAttr()" style="margin-top:10px">💾 Enregistrer</button>
@@ -5018,14 +5018,39 @@ function toast(msg,type='default') {
 function today(){return new Date().toISOString().split('T')[0];}
 function todayFr(){const d=new Date();return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;}
 function nowIso(){return new Date().toISOString();}
+function autoFormatDate(inp) {
+  const pos = inp.selectionStart;
+  const prev = inp.value;
+  // Keep only digits
+  let digits = prev.replace(/\D/g,'').slice(0,8);
+  let formatted = digits;
+  if (digits.length > 4) formatted = digits.slice(0,2)+'/'+digits.slice(2,4)+'/'+digits.slice(4);
+  else if (digits.length > 2) formatted = digits.slice(0,2)+'/'+digits.slice(2);
+  inp.value = formatted;
+  // Restore cursor (account for added slashes)
+  let newPos = pos;
+  if (formatted.length > prev.length && (formatted[pos-1]==='/' || formatted[pos]=='/')) newPos = pos+1;
+  try { inp.setSelectionRange(newPos, newPos); } catch(e){}
+}
 function parseDateInput(val){
   if(!val) return null;
+  const digits = val.replace(/\D/g,'');
+  if (digits.length === 8) {
+    const dd = digits.slice(0,2), mm = digits.slice(2,4), yyyy = digits.slice(4,8);
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  if (digits.length === 6) {
+    const dd = digits.slice(0,2), mm = digits.slice(2,4), yy = digits.slice(4,6);
+    return `20${yy}-${mm}-${dd}`;
+  }
   // DD/MM/YYYY
-  const m1=val.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if(m1) return `${m1[3]}-${m1[2].padStart(2,'0')}-${m1[1].padStart(2,'0')}`;
+  const m1=val.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if(m1){
+    const y = m1[3].length===2 ? '20'+m1[3] : m1[3];
+    return `${y}-${m1[2].padStart(2,'0')}-${m1[1].padStart(2,'0')}`;
+  }
   // YYYY-MM-DD
-  const m2=val.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if(m2) return val;
+  if(val.match(/^\d{4}-\d{2}-\d{2}$/)) return val;
   return null;
 }function fmtDate(d){
   if(d && d.length > 10) d = d.slice(0,10); // strip time part
@@ -5744,7 +5769,7 @@ function buildDistribHTML() {
       <datalist id="distrib-plist">${personOpts}</datalist>
       <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
         <label style="font-size:13px;color:#6b7280;flex-shrink:0">📅 Date :</label>
-        <input type="text" id="distrib-date" class="fi" style="flex:1" placeholder="JJ/MM/AAAA" inputmode="numeric" maxlength="10" value="${todayFr()}">
+        <input type="text" id="distrib-date" class="fi" style="flex:1" placeholder="JJ/MM/AAAA" inputmode="numeric" maxlength="10" value="${todayFr()}" oninput="autoFormatDate(this)">
       </div>
     </div>`;
 
