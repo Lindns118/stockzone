@@ -1097,7 +1097,7 @@ body.vet-mode .main{padding-bottom:20px}
   </div>
   <div style="display:flex;align-items:center;gap:8px;margin:10px 0 4px">
     <label style="font-size:13px;color:#6b7280;flex-shrink:0">📅 Date :</label>
-    <input type="date" id="edit-attr-date" class="fi" style="flex:1">
+    <input type="text" id="edit-attr-date" class="fi" style="flex:1" placeholder="JJ/MM/AAAA" inputmode="numeric" maxlength="10">
   </div>
   <div id="edit-attr-body"></div>
   <button class="btn-primary" onclick="saveEditAttr()" style="margin-top:10px">💾 Enregistrer</button>
@@ -5016,8 +5016,18 @@ function toast(msg,type='default') {
 
 // ===== UTILS =====
 function today(){return new Date().toISOString().split('T')[0];}
+function todayFr(){const d=new Date();return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;}
 function nowIso(){return new Date().toISOString();}
-function fmtDate(d){
+function parseDateInput(val){
+  if(!val) return null;
+  // DD/MM/YYYY
+  const m1=val.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(m1) return `${m1[3]}-${m1[2].padStart(2,'0')}-${m1[1].padStart(2,'0')}`;
+  // YYYY-MM-DD
+  const m2=val.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(m2) return val;
+  return null;
+}function fmtDate(d){
   if(d && d.length > 10) d = d.slice(0,10); // strip time part
   if(!d)return '';const[y,m,dd]=d.split('-');return `${dd}/${m}/${y}`;}
 function fmtDateShort(d){if(!d)return '';try{return new Date(d).toLocaleDateString('fr-FR',{month:'short',year:'2-digit'});}catch{return d;}}
@@ -5734,7 +5744,7 @@ function buildDistribHTML() {
       <datalist id="distrib-plist">${personOpts}</datalist>
       <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
         <label style="font-size:13px;color:#6b7280;flex-shrink:0">📅 Date :</label>
-        <input type="date" id="distrib-date" class="fi" style="flex:1" value="${today()}">
+        <input type="text" id="distrib-date" class="fi" style="flex:1" placeholder="JJ/MM/AAAA" inputmode="numeric" maxlength="10" value="${todayFr()}">
       </div>
     </div>`;
 
@@ -5852,7 +5862,7 @@ function confirmDistrib() {
   const pack = (S.vetPacks||[]).find(p=>p.id===distribState.packId);
   if (!pack) return;
   const zd = S.zones.vetements;
-  const dateVal = document.getElementById('distrib-date')?.value;
+  const dateVal = parseDateInput(document.getElementById('distrib-date')?.value);
   const now = dateVal ? dateVal + 'T12:00:00.000Z' : nowIso();
   const itemsRecord = [];
   const preInv = document.getElementById('distrib-pre-inv')?.checked || false;
@@ -5925,7 +5935,7 @@ function confirmDonUnique() {
   const qty = Math.max(1, parseInt(document.getElementById('don-qty')?.value)||1);
   const product = (S.zones.vetements?.products||[]).find(p=>p.id===prodId);
   if (!product) return;
-  const dateVal = document.getElementById('distrib-date')?.value;
+  const dateVal = parseDateInput(document.getElementById('distrib-date')?.value);
   const now = dateVal ? dateVal + 'T12:00:00.000Z' : nowIso();
   const preInv = document.getElementById('don-pre-inv')?.checked || false;
   if (!preInv) {
@@ -6362,7 +6372,7 @@ function openEditAttrModal(attrId, personId) {
   (attr.items||[]).forEach((item,i) => { _editSizes[i] = item.size || ''; });
   document.getElementById('edit-attr-sub').textContent = (attr.packName||'Don') + ' — ' + fmtDate(attr.date?.slice(0,10));
   const dateInput = document.getElementById('edit-attr-date');
-  if (dateInput) dateInput.value = attr.date?.slice(0,10) || today();
+  if (dateInput) dateInput.value = fmtDate(attr.date?.slice(0,10)) || todayFr();
   const zd = S.zones.vetements;
   const rows = (attr.items||[]).map((item,i) => {
     const product = zd?.products?.find(p=>p.id===item.productId);
@@ -6412,7 +6422,7 @@ function saveEditAttr() {
     item.size = newSize || undefined;
   });
   // Update date
-  const newDate = document.getElementById('edit-attr-date')?.value;
+  const newDate = parseDateInput(document.getElementById('edit-attr-date')?.value);
   if (newDate) attr.date = newDate + (attr.date?.slice(10) || 'T00:00:00.000Z');
   // Update person known sizes
   const person = (S.persons||[]).find(p=>p.id===_editPersonId);
