@@ -6152,13 +6152,18 @@ function buildPersonnesHTML() {
     <button onclick="printPersonCard(null)" style="flex:1;background:#f3f4f6;border:none;border-radius:10px;padding:10px 8px;font-size:13px;font-weight:600;cursor:pointer">📄 Export tous PDF</button>
   </div>` : '';
   if (!allPersons.length) return addBtn + '<div style="text-align:center;color:#9ca3af;padding:30px 20px;font-size:14px">Aucune personne.<br>Elles sont créées automatiquement lors des distributions.</div>';
+  const filterBtns = `<div id="person-filter-btns" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+    <button onclick="setPersonFilter('')" id="pfbtn-all" style="padding:5px 12px;border-radius:20px;border:2px solid #7c3aed;background:#7c3aed;color:#fff;font-size:12px;font-weight:700;cursor:pointer">Tous</button>
+    ${STATUTS.map(s=>`<button onclick="setPersonFilter('${s.id}')" id="pfbtn-${s.id}" style="padding:5px 12px;border-radius:20px;border:2px solid #e5e7eb;background:#fff;color:#6b7280;font-size:12px;font-weight:700;cursor:pointer">${s.label}</button>`).join('')}
+    <button onclick="setPersonFilter('none')" id="pfbtn-none" style="padding:5px 12px;border-radius:20px;border:2px solid #e5e7eb;background:#fff;color:#6b7280;font-size:12px;font-weight:700;cursor:pointer">Sans statut</button>
+  </div>`;
   const searchBar = `<div style="position:relative;margin-bottom:10px">
     <input id="person-search" class="fi" placeholder="🔍 Rechercher une personne…" oninput="filterPersonCards(this.value)" style="padding-left:12px">
   </div>`;
   const cards = allPersons.map(p => {
     const attrCount = (S.attributions||[]).filter(a=>a.person.toLowerCase()===p.name.toLowerCase()).length;
     const knownSizes = Object.values(p.sizes||{}).filter(Boolean).length;
-    return `<div class="pcard" data-name="${esc(p.name.toLowerCase())}" onclick="showPersonDetail('${p.id}')">
+    return `<div class="pcard" data-name="${esc(p.name.toLowerCase())}" data-statut="${esc(p.statut||'none')}" onclick="showPersonDetail('${p.id}')">
       <div class="pcard-avatar">${p.name.charAt(0).toUpperCase()}</div>
       <div class="pcard-info">
         <div class="pcard-name">${esc(p.name)} ${statutBadge(p)}</div>
@@ -6167,13 +6172,45 @@ function buildPersonnesHTML() {
       <span class="pcard-arrow">›</span>
     </div>`;
   }).join('');
-  return topBtns + searchBar + addBtn + `<div id="person-cards-list">${cards}</div>`;
+  return topBtns + filterBtns + searchBar + addBtn + `<div id="person-cards-list">${cards}</div>`;
+}
+
+let _personFilter = '';
+function setPersonFilter(statutId) {
+  _personFilter = statutId;
+  // Update button styles
+  const allBtn = document.getElementById('pfbtn-all');
+  if (allBtn) {
+    const active = !statutId;
+    allBtn.style.background = active ? '#7c3aed' : '#fff';
+    allBtn.style.color = active ? '#fff' : '#6b7280';
+    allBtn.style.borderColor = active ? '#7c3aed' : '#e5e7eb';
+  }
+  STATUTS.forEach(s => {
+    const btn = document.getElementById('pfbtn-'+s.id);
+    if (!btn) return;
+    const active = statutId === s.id;
+    btn.style.background = active ? s.color : '#fff';
+    btn.style.color = active ? '#fff' : '#6b7280';
+    btn.style.borderColor = active ? s.color : '#e5e7eb';
+  });
+  const noneBtn = document.getElementById('pfbtn-none');
+  if (noneBtn) {
+    const active = statutId === 'none';
+    noneBtn.style.background = active ? '#374151' : '#fff';
+    noneBtn.style.color = active ? '#fff' : '#6b7280';
+    noneBtn.style.borderColor = active ? '#374151' : '#e5e7eb';
+  }
+  filterPersonCards(document.getElementById('person-search')?.value || '');
 }
 
 function filterPersonCards(query) {
   const q = query.trim().toLowerCase();
   document.querySelectorAll('#person-cards-list .pcard').forEach(card => {
-    card.style.display = (!q || card.dataset.name.includes(q)) ? '' : 'none';
+    const matchName = !q || card.dataset.name.includes(q);
+    const cardStatut = card.dataset.statut || 'none';
+    const matchStatut = !_personFilter || cardStatut === _personFilter;
+    card.style.display = (matchName && matchStatut) ? '' : 'none';
   });
 }
 
