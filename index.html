@@ -5792,11 +5792,15 @@ function buildChaussuresTabHTML() {
       const stockColor = alert === 'red' ? 'color:#ef4444;font-weight:700' : alert === 'orange' ? 'color:#d97706;font-weight:700' : '';
       const durée = monthsLeft === 999 ? (stock > 0 ? '∞' : '—') : mDemand > 0 ? `~${monthsLeft} mois` : '—';
 
+      const restant = stock - persons_s;
+      const restantColor = restant < 0 ? 'color:#ef4444;font-weight:700' : restant === 0 ? 'color:#d97706;font-weight:700' : 'color:#16a34a;font-weight:600';
+
       return `<tr style="${alertStyle}">
         <td style="padding:7px 10px;font-weight:700;font-size:14px">${s}</td>
         <td style="padding:7px 10px;text-align:center;${stockColor}">${stock}</td>
         <td style="padding:7px 10px;text-align:center;color:#6b7280">${persons_s > 0 ? persons_s : '—'}</td>
-        <td style="padding:7px 10px;text-align:center;color:#6b7280">${mDemand > 0 ? (mDemand < 1 ? '<1' : mDemand.toFixed(1)) : '—'}</td>
+        <td style="padding:7px 10px;text-align:center;font-weight:600;color:#2563eb">${persons_s > 0 ? persons_s : '—'}</td>
+        <td style="padding:7px 10px;text-align:center;${restantColor}">${persons_s > 0 ? (restant > 0 ? '+'+restant : restant) : (stock > 0 ? stock : '—')}</td>
         <td style="padding:7px 10px;text-align:center;${stockColor}">${durée}</td>
       </tr>`;
     }).join('');
@@ -5852,6 +5856,8 @@ function buildChaussuresTabHTML() {
                 <th style="padding:8px 10px;text-align:left;font-weight:700;color:#374151">Taille</th>
                 <th style="padding:8px 10px;text-align:center;font-weight:700;color:#374151">Stock</th>
                 <th style="padding:8px 10px;text-align:center;font-weight:700;color:#374151">Personnes</th>
+                <th style="padding:8px 10px;text-align:center;font-weight:700;color:#2563eb">À donner</th>
+                <th style="padding:8px 10px;text-align:center;font-weight:700;color:#374151">Restant</th>
                 <th style="padding:8px 10px;text-align:center;font-weight:700;color:#374151">/mois</th>
                 <th style="padding:8px 10px;text-align:center;font-weight:700;color:#374151">Durée</th>
               </tr>
