@@ -5805,22 +5805,31 @@ function buildChaussuresTabHTML() {
     const projMonths = 6;
     let projRows = '';
     const now = new Date();
+    // Track cumulative stock per size
+    const runningStock = {};
+    activeSizes.forEach(s => runningStock[s] = stockSizes[s]||0);
+
     for (let m = 1; m <= projMonths; m++) {
       const d = new Date(now.getFullYear(), now.getMonth() + m, 1);
       const label2 = d.toLocaleDateString('fr-FR',{month:'short',year:'2-digit'});
-      // Total shoes needed this month across all sizes
-      const totalDemand = shoeSizes.reduce((sum,s) => sum + monthlyDemand(s), 0);
-      // Sizes that hit 0 this month
-      const critiques = activeSizes.filter(s => {
-        const stock = stockSizes[s]||0;
-        const consumed = monthlyDemand(s) * m;
-        return consumed >= stock && stock > 0 && monthlyDemand(s) > 0;
-      });
-      const bgColor = critiques.length > 0 ? '#fef2f2' : m <= 2 ? '#f0fdf4' : '';
+      const totalDemandMonth = shoeSizes.reduce((sum,s) => sum + monthlyDemand(s), 0);
+      const distribMonth = Math.ceil(totalDemandMonth);
+
+      // Deduct this month's demand from running stock
+      activeSizes.forEach(s => { runningStock[s] = Math.max(0, runningStock[s] - monthlyDemand(s)); });
+      const totalRemaining = activeSizes.reduce((sum,s) => sum + runningStock[s], 0);
+
+      // Sizes that hit 0 or below this month
+      const critiques = activeSizes.filter(s => runningStock[s] <= 0 && monthlyDemand(s) > 0);
+      const hasCritique = critiques.length > 0;
+      const bgColor = hasCritique ? '#fef2f2' : m <= 2 ? '#f0fdf4' : '';
+      const remainColor = totalRemaining <= 0 ? '#ef4444' : totalRemaining < 5 ? '#d97706' : '#16a34a';
+
       projRows += `<tr style="background:${bgColor}">
         <td style="padding:6px 10px;font-weight:600">${label2}</td>
-        <td style="padding:6px 10px;text-align:center">${totalDemand > 0 ? '~'+Math.ceil(totalDemand) : '—'}</td>
-        <td style="padding:6px 10px;text-align:center;color:${critiques.length?'#ef4444':'#6b7280'};font-size:12px">${critiques.length ? '⚠️ '+critiques.join(', ') : '✅'}</td>
+        <td style="padding:6px 10px;text-align:center;color:#2563eb;font-weight:600">${distribMonth > 0 ? '~'+distribMonth : '—'}</td>
+        <td style="padding:6px 10px;text-align:center;font-weight:600;color:${remainColor}">${Math.round(totalRemaining)}</td>
+        <td style="padding:6px 10px;text-align:center;color:${hasCritique?'#ef4444':'#6b7280'};font-size:11px">${hasCritique ? '⚠️ '+critiques.join(', ') : '✅'}</td>
       </tr>`;
     }
 
@@ -5865,7 +5874,8 @@ function buildChaussuresTabHTML() {
             <thead>
               <tr style="background:#f9fafb">
                 <th style="padding:5px 10px;text-align:left;color:#6b7280">Mois</th>
-                <th style="padding:5px 10px;text-align:center;color:#6b7280">Besoin ~</th>
+                <th style="padding:5px 10px;text-align:center;color:#2563eb">À distribuer</th>
+                <th style="padding:5px 10px;text-align:center;color:#374151">Stock restant</th>
                 <th style="padding:5px 10px;text-align:center;color:#6b7280">Tailles critiques</th>
               </tr>
             </thead>
