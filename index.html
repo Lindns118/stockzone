@@ -5825,11 +5825,20 @@ function buildChaussuresTabHTML() {
       const bgColor = hasCritique ? '#fef2f2' : m <= 2 ? '#f0fdf4' : '';
       const remainColor = totalRemaining <= 0 ? '#ef4444' : totalRemaining < 5 ? '#d97706' : '#16a34a';
 
+      // Detail per size: only sizes with demand > 0
+      const sizeDetail = activeSizes
+        .filter(s => monthlyDemand(s) > 0)
+        .map(s => {
+          const qty = Math.round(monthlyDemand(s) * 10) / 10;
+          const isCrit = runningStock[s] <= 0;
+          return `<span style="display:inline-block;margin:1px 2px;padding:1px 5px;border-radius:6px;font-size:10px;font-weight:700;background:${isCrit?'#fecaca':'#dbeafe'};color:${isCrit?'#ef4444':'#1d4ed8'}">${s}×${qty<1?'<1':Math.ceil(qty)}</span>`;
+        }).join('');
+
       projRows += `<tr style="background:${bgColor}">
-        <td style="padding:6px 10px;font-weight:600">${label2}</td>
-        <td style="padding:6px 10px;text-align:center;color:#2563eb;font-weight:600">${distribMonth > 0 ? '~'+distribMonth : '—'}</td>
-        <td style="padding:6px 10px;text-align:center;font-weight:600;color:${remainColor}">${Math.round(totalRemaining)}</td>
-        <td style="padding:6px 10px;text-align:center;color:${hasCritique?'#ef4444':'#6b7280'};font-size:11px">${hasCritique ? '⚠️ '+critiques.join(', ') : '✅'}</td>
+        <td style="padding:6px 10px;font-weight:600;white-space:nowrap">${label2}</td>
+        <td style="padding:6px 10px">${sizeDetail || '—'}</td>
+        <td style="padding:6px 10px;text-align:center;font-weight:600;color:${remainColor};white-space:nowrap">${Math.round(totalRemaining)}</td>
+        <td style="padding:6px 10px;text-align:center;color:${hasCritique?'#ef4444':'#6b7280'};font-size:11px;white-space:nowrap">${hasCritique ? '⚠️ '+critiques.join(', ') : '✅'}</td>
       </tr>`;
     }
 
@@ -5874,7 +5883,7 @@ function buildChaussuresTabHTML() {
             <thead>
               <tr style="background:#f9fafb">
                 <th style="padding:5px 10px;text-align:left;color:#6b7280">Mois</th>
-                <th style="padding:5px 10px;text-align:center;color:#2563eb">À distribuer</th>
+                <th style="padding:5px 10px;text-align:left;color:#2563eb">À distribuer (par taille)</th>
                 <th style="padding:5px 10px;text-align:center;color:#374151">Stock restant</th>
                 <th style="padding:5px 10px;text-align:center;color:#6b7280">Tailles critiques</th>
               </tr>
