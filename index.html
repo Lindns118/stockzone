@@ -6024,7 +6024,12 @@ function refreshDistribView() {
   const confirmSec = document.getElementById('distrib-confirm-btn');
   if (sizesSec) {
     sizesSec.innerHTML = distribState.packId ? `<div class="vc-sec">📐 Tailles</div>${buildSizeSectionHTML()}` : '';
-    if (confirmSec) confirmSec.innerHTML = distribState.packId ? `<button class="distrib-btn" onclick="confirmDistrib()">✅ Enregistrer la distribution</button>` : '';
+    if (confirmSec) confirmSec.innerHTML = distribState.packId ? `
+      <label style="display:flex;align-items:center;gap:8px;margin-bottom:10px;cursor:pointer;font-size:13px;color:#6b7280">
+        <input type="checkbox" id="distrib-pre-inv" style="width:16px;height:16px;cursor:pointer">
+        Distribution avant l'inventaire <span style="font-size:11px">(ne pas modifier le stock)</span>
+      </label>
+      <button class="distrib-btn" onclick="confirmDistrib()">✅ Enregistrer la distribution</button>` : '';
     document.querySelectorAll('.dpk-card').forEach(c => {
       const m = c.getAttribute('onclick')?.match(/'([^']+)'/);
       if (m) c.classList.toggle('sel', m[1] === distribState.packId);
