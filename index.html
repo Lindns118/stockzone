@@ -7249,6 +7249,7 @@ function unitOptions(selected) {
 <div id="vet-bar">
   <div class="vet-toprow">
     <button id="vet-back-btn" onclick="exitVetementsMode()">← StockZone</button>
+    <button onclick="toggleFullscreen()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:8px;padding:6px 13px;font-size:13px;font-weight:500;cursor:pointer" id="vet-fs-btn">⛶ Plein écran</button>
   </div>
   <div id="vet-cat-tabs"></div>
 </div>
@@ -7279,8 +7280,9 @@ function toggleFullscreen() {
   }
 }
 document.addEventListener('fullscreenchange', () => {
-  const btn = document.getElementById('fullscreen-btn');
-  if (btn) btn.textContent = document.fullscreenElement ? '✕ Quitter' : '⛶ Plein écran';
+  const fs = !!document.fullscreenElement;
+  const lbl = fs ? '✕ Quitter' : '⛶ Plein écran';
+  ['fullscreen-btn','vet-fs-btn'].forEach(id => { const b = document.getElementById(id); if(b) b.textContent = lbl; });
 });
 function pwaTriggerInstall() {
   if (_pwaPrompt) {
