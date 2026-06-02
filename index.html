@@ -500,7 +500,7 @@ body.vet-mode .main{padding-bottom:20px}
     <button class="act-btn" id="add-group-btn" style="display:none;background:var(--orange-light);color:var(--orange);border:1.5px solid var(--orange)" onclick="openAddGroupModal()">＋ Groupe</button>
     <button class="act-btn" style="background:#0f766e;color:#fff" onclick="openCalcModal()">🧮 Calc</button>
     <button class="act-btn act-exp" onclick="showModal('export')">⬇ Export</button>
-    <button class="act-btn" id="pwa-install-btn" style="display:none;background:#7c3aed;color:#fff" onclick="pwaTriggerInstall()">📱 Installer</button>
+    <button class="act-btn" id="pwa-install-btn" style="background:#7c3aed;color:#fff" onclick="pwaTriggerInstall()">📱 Installer</button>
   </div>
 
   <div class="search-sort" id="search-sort">
@@ -1432,7 +1432,9 @@ function gdConnect() {
           gdSaveConfig();
           renderReglages();
           toast('✅ Connecté à Google Drive', 'success');
-          if(GD.autoSync) gdSave(false);
+          if(GD.autoSync) {
+            if(confirm('Sauvegarde automatique activée — sauvegarder maintenant sur Google Drive ?')) gdSave(false);
+          }
           checkDailyBackup();
         }
       }
@@ -7268,7 +7270,12 @@ window.addEventListener('appinstalled', () => {
   if (btn) btn.style.display = 'none';
 });
 function pwaTriggerInstall() {
-  if (_pwaPrompt) { _pwaPrompt.prompt(); _pwaPrompt.userChoice.then(() => { _pwaPrompt = null; }); }
+  if (_pwaPrompt) {
+    _pwaPrompt.prompt();
+    _pwaPrompt.userChoice.then(() => { _pwaPrompt = null; });
+  } else {
+    alert('Pour installer StockZone sans barre d\'URL :\nMenu Brave (⋮) → "Ajouter à l\'écran d\'accueil"\nPuis ouvre l\'app depuis l\'écran d\'accueil.');
+  }
 }
 </script>
 </body>
