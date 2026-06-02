@@ -501,6 +501,7 @@ body.vet-mode .main{padding-bottom:20px}
     <button class="act-btn" style="background:#0f766e;color:#fff" onclick="openCalcModal()">🧮 Calc</button>
     <button class="act-btn act-exp" onclick="showModal('export')">⬇ Export</button>
     <button class="act-btn" id="pwa-install-btn" style="background:#7c3aed;color:#fff" onclick="pwaTriggerInstall()">📱 Installer</button>
+    <button class="act-btn" id="fullscreen-btn" style="background:#0f766e;color:#fff" onclick="toggleFullscreen()">⛶ Plein écran</button>
   </div>
 
   <div class="search-sort" id="search-sort">
@@ -7268,6 +7269,18 @@ window.addEventListener('appinstalled', () => {
   _pwaPrompt = null;
   const btn = document.getElementById('pwa-install-btn');
   if (btn) btn.style.display = 'none';
+});
+function toggleFullscreen() {
+  const el = document.documentElement;
+  if (!document.fullscreenElement) {
+    (el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen || (()=>{})).call(el);
+  } else {
+    (document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen || (()=>{})).call(document);
+  }
+}
+document.addEventListener('fullscreenchange', () => {
+  const btn = document.getElementById('fullscreen-btn');
+  if (btn) btn.textContent = document.fullscreenElement ? '✕ Quitter' : '⛶ Plein écran';
 });
 function pwaTriggerInstall() {
   if (_pwaPrompt) {
