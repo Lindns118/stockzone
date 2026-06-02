@@ -501,7 +501,6 @@ body.vet-mode .main{padding-bottom:20px}
     <button class="act-btn" style="background:#0f766e;color:#fff" onclick="openCalcModal()">🧮 Calc</button>
     <button class="act-btn act-exp" onclick="showModal('export')">⬇ Export</button>
     <button class="act-btn" id="pwa-install-btn" style="background:#7c3aed;color:#fff" onclick="pwaTriggerInstall()">📱 Installer</button>
-    <button class="act-btn" id="fullscreen-btn" style="background:#0f766e;color:#fff" onclick="toggleFullscreen()">⛶ Plein écran</button>
   </div>
 
   <div class="search-sort" id="search-sort">
@@ -7254,6 +7253,9 @@ function unitOptions(selected) {
   <div id="vet-cat-tabs"></div>
 </div>
 <div id="vet-content"></div>
+
+<!-- FULLSCREEN FLOATING BUTTON -->
+<button id="fs-fab" onclick="toggleFullscreen()" style="position:fixed;bottom:80px;right:16px;z-index:9999;width:48px;height:48px;border-radius:50%;background:#1a1f6e;color:#fff;border:none;font-size:20px;box-shadow:0 4px 12px rgba(0,0,0,.3);cursor:pointer;display:flex;align-items:center;justify-content:center" title="Plein écran">⛶</button>
 
 <script>
 if ('serviceWorker' in navigator) {
