@@ -7242,5 +7242,10 @@ function unitOptions(selected) {
 </div>
 <div id="vet-content"></div>
 
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+</script>
 </body>
 </html>
