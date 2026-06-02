@@ -500,6 +500,7 @@ body.vet-mode .main{padding-bottom:20px}
     <button class="act-btn" id="add-group-btn" style="display:none;background:var(--orange-light);color:var(--orange);border:1.5px solid var(--orange)" onclick="openAddGroupModal()">＋ Groupe</button>
     <button class="act-btn" style="background:#0f766e;color:#fff" onclick="openCalcModal()">🧮 Calc</button>
     <button class="act-btn act-exp" onclick="showModal('export')">⬇ Export</button>
+    <button class="act-btn" id="pwa-install-btn" style="display:none;background:#7c3aed;color:#fff" onclick="pwaTriggerInstall()">📱 Installer</button>
   </div>
 
   <div class="search-sort" id="search-sort">
@@ -1366,18 +1367,26 @@ let S = (() => {
 const DRIVE_FILE_NAME = 'StockZone_backup.json';
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
 // Client ID Google — à remplacer par le vôtre (voir instructions dans Réglages)
+function getCookie(name) {
+  const m = document.cookie.match('(?:^|;)\\s*'+name+'=([^;]*)');
+  return m ? decodeURIComponent(m[1]) : '';
+}
+function setCookie(name, val) {
+  const exp = new Date(); exp.setFullYear(exp.getFullYear()+5);
+  document.cookie = name+'='+encodeURIComponent(val)+';expires='+exp.toUTCString()+';path=/;SameSite=Lax';
+}
 let GD = {
-  clientId: localStorage.getItem('sz_drive_client_id') || '',
+  clientId: localStorage.getItem('sz_drive_client_id') || getCookie('sz_drive_client_id') || '',
   token: null,
-  fileId: localStorage.getItem('sz_drive_file_id') || null,
+  fileId: localStorage.getItem('sz_drive_file_id') || getCookie('sz_drive_file_id') || null,
   autoSync: localStorage.getItem('sz_drive_auto') === '1',
   lastSync: localStorage.getItem('sz_drive_last') || null,
   status: 'off' // off | ok | err | syncing
 };
 
 function gdSaveConfig() {
-  if(GD.clientId) localStorage.setItem('sz_drive_client_id', GD.clientId);
-  if(GD.fileId) localStorage.setItem('sz_drive_file_id', GD.fileId);
+  if(GD.clientId) { localStorage.setItem('sz_drive_client_id', GD.clientId); setCookie('sz_drive_client_id', GD.clientId); }
+  if(GD.fileId)   { localStorage.setItem('sz_drive_file_id', GD.fileId);     setCookie('sz_drive_file_id', GD.fileId); }
   localStorage.setItem('sz_drive_auto', GD.autoSync ? '1' : '0');
   if(GD.lastSync) localStorage.setItem('sz_drive_last', GD.lastSync);
 }
@@ -7245,6 +7254,21 @@ function unitOptions(selected) {
 <script>
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+let _pwaPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  _pwaPrompt = e;
+  const btn = document.getElementById('pwa-install-btn');
+  if (btn) btn.style.display = '';
+});
+window.addEventListener('appinstalled', () => {
+  _pwaPrompt = null;
+  const btn = document.getElementById('pwa-install-btn');
+  if (btn) btn.style.display = 'none';
+});
+function pwaTriggerInstall() {
+  if (_pwaPrompt) { _pwaPrompt.prompt(); _pwaPrompt.userChoice.then(() => { _pwaPrompt = null; }); }
 }
 </script>
 </body>
