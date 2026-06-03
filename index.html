@@ -5727,7 +5727,7 @@ function setVetTab(tab) {
     vc.style.display = 'block';
     vc.scrollTop = 0;
     if (tab === 'packs') vc.innerHTML = buildVetPacksTabHTML();
-    else if (tab === 'distribution') { if (!distribState._keep) distribState = {packId:null,sizes:{},personName:''}; delete distribState._keep; vc.innerHTML = buildDistribHTML(); }
+    else if (tab === 'distribution') { if (!distribState._keep) { distribState = {packId:null,sizes:{},personName:''}; _donItems = []; } delete distribState._keep; vc.innerHTML = buildDistribHTML(); }
     else if (tab === 'personnes') vc.innerHTML = buildPersonnesHTML();
     else if (tab === 'dispo') showPackDispoView();
     else if (tab === 'chaussures') vc.innerHTML = buildChaussuresTabHTML();
@@ -5948,23 +5948,7 @@ function buildDistribHTML() {
     </label>
     <button class="distrib-btn" onclick="confirmDistrib()">✅ Enregistrer la distribution</button>` : ''}</div>`;
 
-  const donUnique = `<div class="vc-sec" style="margin-top:20px">🎁 Don unique</div>
-    <div class="dsz-card">
-      <select id="don-prod" class="fi" style="margin-bottom:8px" onchange="updateDonSizes()">
-        <option value="">Choisir un article…</option>
-        ${(S.zones.vetements?.products||[]).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}
-      </select>
-      <div id="don-size-area"></div>
-      <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
-        <label style="font-size:13px;color:#6b7280;flex-shrink:0">Qté :</label>
-        <input type="number" id="don-qty" class="fi" value="1" min="1" style="width:70px;padding:8px;text-align:center">
-      </div>
-      <label style="display:flex;align-items:center;gap:8px;margin-top:10px;cursor:pointer;font-size:13px;color:#6b7280">
-        <input type="checkbox" id="don-pre-inv" style="width:16px;height:16px;cursor:pointer">
-        Avant l'inventaire <span style="font-size:11px">(ne pas modifier le stock)</span>
-      </label>
-      <button style="width:100%;background:#5b21b6;color:#fff;border:none;border-radius:12px;padding:11px;font-size:14px;font-weight:600;cursor:pointer;margin-top:10px" onclick="confirmDonUnique()">Enregistrer le don unique</button>
-    </div>`;
+  const donUnique = `<div class="vc-sec" style="margin-top:20px">🎁 Don unique</div>${buildDonUniqueHTML()}`;
 
   return packsGrid + personSection + sizesSec + confirmBtn + donUnique;
 }
@@ -6103,6 +6087,63 @@ function updatePersonSizes(name, sizes) {
   Object.entries(sizes||{}).forEach(([k,v])=>{ if(v) person.sizes[k]=v; });
 }
 
+let _donItems = [];
+
+function buildDonUniqueHTML() {
+  const products = (S.zones.vetements?.products||[]);
+  const itemsHTML = _donItems.length ? `<div style="margin-bottom:10px">${_donItems.map((it,i)=>`
+    <div style="display:flex;align-items:center;gap:6px;padding:7px 10px;background:#f5f3ff;border-radius:8px;margin-bottom:4px">
+      <span style="flex:1;font-size:13px;font-weight:500">${esc(it.name)}${it.size?` <span style="color:#7c3aed;font-weight:700">${it.size}</span>`:''} <span style="color:#6b7280">× ${it.qty}</span></span>
+      <button onclick="removeDonItem(${i})" style="background:none;border:none;color:#ef4444;font-size:18px;line-height:1;cursor:pointer;padding:0 2px">×</button>
+    </div>`).join('')}</div>` : '';
+  const confirmHTML = _donItems.length ? `
+    <label style="display:flex;align-items:center;gap:8px;margin-top:10px;cursor:pointer;font-size:13px;color:#6b7280">
+      <input type="checkbox" id="don-pre-inv" style="width:16px;height:16px;cursor:pointer">
+      Avant l'inventaire <span style="font-size:11px">(ne pas modifier le stock)</span>
+    </label>
+    <button style="width:100%;background:#5b21b6;color:#fff;border:none;border-radius:12px;padding:11px;font-size:14px;font-weight:600;cursor:pointer;margin-top:10px" onclick="confirmDonUnique()">✅ Enregistrer le don (${_donItems.length} article${_donItems.length>1?'s':''})</button>` : '';
+  return `<div id="don-unique-section" class="dsz-card">
+    ${itemsHTML}
+    <select id="don-prod" class="fi" style="margin-bottom:8px" onchange="updateDonSizes()">
+      <option value="">Choisir un article…</option>
+      ${products.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}
+    </select>
+    <div id="don-size-area"></div>
+    <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+      <label style="font-size:13px;color:#6b7280;flex-shrink:0">Qté :</label>
+      <input type="number" id="don-qty" class="fi" value="1" min="1" style="width:70px;padding:8px;text-align:center">
+      <button onclick="addDonItem()" style="flex:1;background:#ede9fe;color:#5b21b6;border:none;border-radius:10px;padding:9px;font-size:13px;font-weight:600;cursor:pointer">+ Ajouter</button>
+    </div>
+    ${confirmHTML}
+  </div>`;
+}
+
+function refreshDonSection() {
+  const sec = document.getElementById('don-unique-section');
+  if (!sec) return;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = buildDonUniqueHTML();
+  sec.replaceWith(tmp.firstElementChild);
+}
+
+function addDonItem() {
+  const prodId = document.getElementById('don-prod')?.value;
+  if (!prodId) { toast('Sélectionnez un article','warning'); return; }
+  const product = (S.zones.vetements?.products||[]).find(p=>p.id===prodId);
+  if (!product) return;
+  const selBtn = document.querySelector('#don-sz-btns .sz-btn.sel');
+  const size = selBtn ? (selBtn.dataset.size||null) : null;
+  if (product.sized && !size) { toast('Sélectionnez une taille','warning'); return; }
+  const qty = Math.max(1, parseInt(document.getElementById('don-qty')?.value)||1);
+  _donItems.push({productId:prodId, name:product.name, qty, size});
+  refreshDonSection();
+}
+
+function removeDonItem(idx) {
+  _donItems.splice(idx,1);
+  refreshDonSection();
+}
+
 function updateDonSizes() {
   const prodId = document.getElementById('don-prod')?.value;
   const area = document.getElementById('don-size-area');
@@ -6123,34 +6164,37 @@ function selectDonSize(btn,size) {
 }
 
 function confirmDonUnique() {
-  const prodId = document.getElementById('don-prod')?.value;
+  if (!_donItems.length) { toast('Ajoutez au moins un article','warning'); return; }
   const personName = (document.getElementById('distrib-person')?.value||'').trim();
-  if (!prodId) { toast('Sélectionnez un article','warning'); return; }
   if (!personName) { toast('Saisissez un bénéficiaire','warning'); return; }
-  const selBtn = document.querySelector('#don-sz-btns .sz-btn.sel');
-  const size = selBtn ? (selBtn.dataset.size || null) : null;
-  const qty = Math.max(1, parseInt(document.getElementById('don-qty')?.value)||1);
-  const product = (S.zones.vetements?.products||[]).find(p=>p.id===prodId);
-  if (!product) return;
   const dateVal = parseDateInput(document.getElementById('distrib-date')?.value);
   const now = dateVal ? dateVal + 'T12:00:00.000Z' : nowIso();
   const preInv = document.getElementById('don-pre-inv')?.checked || false;
-  if (!preInv) {
-    const diff = Math.min(qty, product.qty);
-    if (diff > 0) {
-      product.qty = r2(product.qty - diff);
-      if (size && product.sizes && product.sizes[size] !== undefined) product.sizes[size] = Math.max(0,(product.sizes[size]||0)-diff);
-      product.history.push({id:uid(), type:'don', date:now, qty:diff, person:personName, size:size||undefined});
+  const allItems = [];
+  const sizeMap = {};
+  _donItems.forEach(it => {
+    const product = (S.zones.vetements?.products||[]).find(p=>p.id===it.productId);
+    if (!product) return;
+    if (!preInv) {
+      const diff = Math.min(it.qty, product.qty);
+      if (diff > 0) {
+        product.qty = r2(product.qty - diff);
+        if (it.size && product.sizes && product.sizes[it.size] !== undefined) product.sizes[it.size] = Math.max(0,(product.sizes[it.size]||0)-diff);
+        product.history.push({id:uid(), type:'don', date:now, qty:diff, person:personName, size:it.size||undefined});
+      }
     }
-  }
+    allItems.push({productId:it.productId, name:product.name, qty:it.qty, size:it.size});
+    if (it.size) sizeMap[it.productId] = it.size;
+  });
   if (!S.attributions) S.attributions = [];
   const donAttrId = uid();
-  S.attributions.push({id:donAttrId, person:personName, date:now, items:[{productId:prodId, name:product.name, qty, size}], preInventory: preInv||undefined});
-  if (size) { const sz={}; sz[prodId]=size; updatePersonSizes(personName,sz); }
+  S.attributions.push({id:donAttrId, person:personName, date:now, items:allItems, preInventory:preInv||undefined});
+  if (Object.keys(sizeMap).length) updatePersonSizes(personName, sizeMap);
+  _donItems = [];
   save(); renderProducts();
   setVetTab('distribution');
   toast(`✅ Don enregistré pour ${personName}`,'success');
-  openSignatureModal(donAttrId, `${product.name} — ${personName}`);
+  openSignatureModal(donAttrId, `Don — ${personName}`);
 }
 
 // ── STATUTS ──
