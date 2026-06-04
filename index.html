@@ -5093,6 +5093,23 @@ const DONS_PER_PAGE = 10;
 function renderDons() {
   const ev = document.getElementById('extra-view');
   if (!ev) return;
+  // Build shell with search input only once (preserves focus on subsequent calls)
+  if (!document.getElementById('dons-list')) {
+    ev.innerHTML = `<div style="padding:4px 0 80px">
+      <input type="search" id="dons-search" placeholder="🔍 Rechercher une personne…"
+        oninput="_donsQuery=this.value;_donsPage=0;renderDonsList()"
+        style="width:100%;padding:10px 14px;border-radius:11px;border:1.5px solid var(--gray2);background:#fff;font-size:14px;font-family:inherit;margin-bottom:12px;box-sizing:border-box">
+      <div id="dons-list"></div>
+    </div>`;
+  }
+  const inp = document.getElementById('dons-search');
+  if (inp && document.activeElement !== inp) inp.value = _donsQuery;
+  renderDonsList();
+}
+
+function renderDonsList() {
+  const el = document.getElementById('dons-list');
+  if (!el) return;
   const all = (S.attributions||[])
     .slice()
     .sort((a,b) => (a.date||'') < (b.date||'') ? 1 : -1);
@@ -5133,20 +5150,15 @@ function renderDons() {
     <button onclick="setDonsPage(${_donsPage+1})" ${_donsPage===pages-1?'disabled':''} style="padding:6px 14px;border-radius:8px;border:1.5px solid #e5e7eb;background:#fff;font-size:13px;cursor:pointer;color:#374151;${_donsPage===pages-1?'opacity:.4;cursor:default':''}">Suiv →</button>
   </div>` : '';
 
-  ev.innerHTML = `<div style="padding:4px 0 80px">
-    <input type="search" placeholder="🔍 Rechercher une personne…" value="${esc(_donsQuery)}"
-      oninput="_donsQuery=this.value;_donsPage=0;renderDons()"
-      style="width:100%;padding:10px 14px;border-radius:11px;border:1.5px solid var(--gray2);background:#fff;font-size:14px;font-family:inherit;margin-bottom:12px;box-sizing:border-box">
-    <div style="font-size:12px;color:#9ca3af;margin-bottom:10px">${total} don${total>1?'s':''} ${q?'trouvé'+(total>1?'s':''):'au total'}</div>
+  el.innerHTML = `<div style="font-size:12px;color:#9ca3af;margin-bottom:10px">${total} don${total>1?'s':''} ${q?'trouvé'+(total>1?'s':''):'au total'}</div>
     ${total === 0 ? '<div style="color:#9ca3af;font-size:14px;padding:20px 0;text-align:center">Aucun don enregistré</div>' : itemsHTML}
-    ${paginationHTML}
-  </div>`;
+    ${paginationHTML}`;
 }
 
 function setDonsPage(p) {
   _donsPage = p;
-  renderDons();
-  document.getElementById('extra-view')?.scrollIntoView({behavior:'smooth',block:'start'});
+  renderDonsList();
+  document.getElementById('dons-list')?.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 function deleteDonFromDons(attrId) {
