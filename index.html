@@ -487,6 +487,7 @@ body.vet-mode .main{padding-bottom:20px}
     <div class="zone-top">
       <div class="zone-icon-wrap" id="zh-icon">📦</div>
       <div><div class="zone-label">ZONE</div><div class="zone-name" id="zh-name">Entrepôt</div></div>
+      <button onclick="toggleFullscreen()" id="fullscreen-btn" style="margin-left:auto;background:rgba(255,255,255,.15);border:none;border-radius:10px;width:40px;height:40px;color:#fff;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0" title="Plein écran">⛶</button>
     </div>
     <div class="zone-stats-row">
       <div class="stat-pill"><div class="stat-pill-num" id="zh-count">0</div><div class="stat-pill-lbl">produits</div></div>
@@ -7648,7 +7649,6 @@ function unitOptions(selected) {
 <div id="vet-content"></div>
 
 <!-- FULLSCREEN FLOATING BUTTON -->
-<button id="fs-fab" onclick="toggleFullscreen()" style="position:fixed;bottom:80px;right:16px;z-index:9999;width:48px;height:48px;border-radius:50%;background:#1a1f6e;color:#fff;border:none;font-size:20px;box-shadow:0 4px 12px rgba(0,0,0,.3);cursor:pointer;display:flex;align-items:center;justify-content:center" title="Plein écran">⛶</button>
 
 <script>
 if ('serviceWorker' in navigator) {
