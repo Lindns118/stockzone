@@ -5179,9 +5179,10 @@ function deleteDonFromDons(attrId) {
     });
   }
   S.attributions.splice(attrIdx, 1);
+  _vetDonsSelected.delete(attrId);
   save();
   toast('✅ Distribution supprimée', 'success');
-  renderDons();
+  if (currentVetTab === 'dons-vet') renderVetDonsList(); else renderDons();
 }
 
 // ===== SETTINGS =====
@@ -5813,7 +5814,7 @@ function exitVetementsMode() {
 function buildVetNavTabs() {
   const tabs = document.getElementById('vet-cat-tabs');
   if (!tabs) return;
-  let html = [{id:'stock',icon:'🧥',lbl:'Zone'},{id:'packs',icon:'📦',lbl:'Packs'},{id:'distribution',icon:'🎁',lbl:'Distribution'},{id:'personnes',icon:'👥',lbl:'Personnes'},{id:'dispo',icon:'📊',lbl:'Dispo'},{id:'chaussures',icon:'👟',lbl:'Chaussures'}].map(t => {
+  let html = [{id:'stock',icon:'🧥',lbl:'Zone'},{id:'packs',icon:'📦',lbl:'Packs'},{id:'distribution',icon:'🎁',lbl:'Distribution'},{id:'personnes',icon:'👥',lbl:'Personnes'},{id:'dispo',icon:'📊',lbl:'Dispo'},{id:'chaussures',icon:'👟',lbl:'Chaussures'},{id:'dons-vet',icon:'📋',lbl:'Dons'}].map(t => {
     const active = currentVetTab===t.id ? ' active' : '';
     return `<button class="vet-nav-btn${active}" onclick="setVetTab('${t.id}')">${t.icon} ${t.lbl}</button>`;
   }).join('');
@@ -5845,8 +5846,183 @@ function setVetTab(tab) {
     else if (tab === 'personnes') vc.innerHTML = buildPersonnesHTML();
     else if (tab === 'dispo') showPackDispoView();
     else if (tab === 'chaussures') vc.innerHTML = buildChaussuresTabHTML();
+    else if (tab === 'dons-vet') { _vetDonsQuery=''; _vetDonsArticleQuery=''; _vetDonsPage=0; _vetDonsSelected=new Set(); vc.innerHTML = buildVetDonsTabHTML(); renderVetDonsList(); }
   }
   buildVetNavTabs();
+}
+
+// ===== VET DONS TAB =====
+let _vetDonsQuery = '';
+let _vetDonsArticleQuery = '';
+let _vetDonsPage = 0;
+let _vetDonsSelected = new Set();
+const VET_DONS_PER_PAGE = 10;
+
+function buildVetDonsTabHTML() {
+  return `<div style="padding-bottom:80px">
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <input type="search" id="vd-search-person" placeholder="🔍 Personne…"
+        oninput="_vetDonsQuery=this.value;_vetDonsPage=0;renderVetDonsList()"
+        style="flex:1;padding:9px 12px;border-radius:10px;border:1.5px solid var(--gray2);background:#fff;font-size:13px;font-family:inherit;box-sizing:border-box">
+      <input type="search" id="vd-search-art" placeholder="🔍 Article…"
+        oninput="_vetDonsArticleQuery=this.value;_vetDonsPage=0;renderVetDonsList()"
+        style="flex:1;padding:9px 12px;border-radius:10px;border:1.5px solid var(--gray2);background:#fff;font-size:13px;font-family:inherit;box-sizing:border-box">
+    </div>
+    <div id="vd-export-bar" style="display:none;margin-bottom:8px">
+      <button onclick="exportSelectedDonsPDF()" style="width:100%;background:#7c3aed;color:#fff;border:none;border-radius:10px;padding:10px;font-size:13px;font-weight:700;cursor:pointer">📄 Exporter PDF sélectionnés (<span id="vd-sel-count">0</span>)</button>
+    </div>
+    <div id="vd-list"></div>
+  </div>`;
+}
+
+function renderVetDonsList() {
+  const el = document.getElementById('vd-list');
+  if (!el) return;
+  const qp = _vetDonsQuery.trim().toLowerCase();
+  const qa = _vetDonsArticleQuery.trim().toLowerCase();
+  const all = (S.attributions||[])
+    .slice()
+    .sort((a,b) => (a.date||'') < (b.date||'') ? 1 : -1);
+  const filtered = all.filter(a => {
+    const matchPerson = !qp || (a.person||'').toLowerCase().includes(qp);
+    const matchArt = !qa || (a.items||[]).some(i => (i.name||'').toLowerCase().includes(qa));
+    return matchPerson && matchArt;
+  });
+  const total = filtered.length;
+  const pages = Math.max(1, Math.ceil(total / VET_DONS_PER_PAGE));
+  if (_vetDonsPage >= pages) _vetDonsPage = pages - 1;
+  const slice = filtered.slice(_vetDonsPage * VET_DONS_PER_PAGE, (_vetDonsPage + 1) * VET_DONS_PER_PAGE);
+
+  const allSliceIds = slice.map(a => a.id);
+  const allChecked = allSliceIds.length > 0 && allSliceIds.every(id => _vetDonsSelected.has(id));
+
+  const itemsHTML = slice.map(a => {
+    const date = fmtDate(a.date?.slice(0,10));
+    const items = (a.items||[]).map(i=>esc(i.name)+(i.size?` (${i.size})`:'')+(i.qty>1?` ×${i.qty}`:'')).join(', ');
+    const preInvBadge = a.preInventory ? `<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;background:#fef3c7;color:#d97706;margin-right:4px">avant inventaire</span>` : '';
+    const sigBadge = a.signature
+      ? `<button onclick="openSignatureModal('${a.id}','${esc(a.packName||'Don')} — ${esc(a.person)}')" style="background:#f5f3ff;border:none;border-radius:8px;padding:3px 10px;font-size:11px;font-weight:700;color:#7c3aed;cursor:pointer">✍️ Signé</button>`
+      : `<button onclick="openSignatureModal('${a.id}','${esc(a.packName||'Don')} — ${esc(a.person)}')" style="background:#f3f4f6;border:none;border-radius:8px;padding:3px 10px;font-size:11px;font-weight:600;color:#9ca3af;cursor:pointer">✍️ Signer</button>`;
+    const checked = _vetDonsSelected.has(a.id) ? 'checked' : '';
+    return `<div style="display:flex;gap:8px;align-items:flex-start;padding:10px 0;border-bottom:1px solid #f3f4f6">
+      <input type="checkbox" ${checked} onchange="toggleVetDonSel('${a.id}',this.checked)"
+        style="width:18px;height:18px;margin-top:3px;flex-shrink:0;cursor:pointer;accent-color:#7c3aed">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px;margin-bottom:4px">
+          <div>
+            <div style="font-weight:700;font-size:13px">${preInvBadge}${esc(a.packName||'Don')} — ${date}</div>
+            <div style="color:#0891b2;font-size:12px;font-weight:600">👤 ${esc(a.person||'—')}</div>
+            <div style="color:#6b7280;font-size:12px;margin-top:1px">${items}</div>
+          </div>
+          <button onclick="openEditAttrModal('${a.id}',null)" style="flex-shrink:0;background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer">✏️</button>
+        </div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          ${sigBadge}
+          <button onclick="printAttrSheet('${a.id}')" style="background:#f3f4f6;border:none;border-radius:8px;padding:3px 10px;font-size:11px;font-weight:600;color:#374151;cursor:pointer">📄 PDF</button>
+          <button onclick="deleteDonFromDons('${a.id}')" style="background:#fef2f2;border:none;border-radius:8px;padding:3px 10px;font-size:11px;font-weight:600;color:#ef4444;cursor:pointer">🗑</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const paginationHTML = pages > 1 ? `<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:12px">
+    <button onclick="setVetDonsPage(${_vetDonsPage-1})" ${_vetDonsPage===0?'disabled':''} style="padding:6px 14px;border-radius:8px;border:1.5px solid #e5e7eb;background:#fff;font-size:13px;cursor:pointer;${_vetDonsPage===0?'opacity:.4':''}">← Préc</button>
+    <span style="font-size:13px;color:#6b7280">Page ${_vetDonsPage+1} / ${pages}</span>
+    <button onclick="setVetDonsPage(${_vetDonsPage+1})" ${_vetDonsPage===pages-1?'disabled':''} style="padding:6px 14px;border-radius:8px;border:1.5px solid #e5e7eb;background:#fff;font-size:13px;cursor:pointer;${_vetDonsPage===pages-1?'opacity:.4':''}">Suiv →</button>
+  </div>` : '';
+
+  el.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+    <span style="font-size:12px;color:#9ca3af">${total} don${total>1?'s':''}</span>
+    ${total>0?`<label style="display:flex;align-items:center;gap:5px;font-size:12px;color:#6b7280;cursor:pointer">
+      <input type="checkbox" ${allChecked?'checked':''} onchange="toggleAllVetDons(this.checked,${JSON.stringify(allSliceIds)})" style="width:16px;height:16px;accent-color:#7c3aed"> Tout sélectionner
+    </label>`:''}
+  </div>
+  ${total===0 ? '<div style="color:#9ca3af;font-size:14px;padding:20px 0;text-align:center">Aucun don trouvé</div>' : itemsHTML}
+  ${paginationHTML}`;
+}
+
+function toggleVetDonSel(id, checked) {
+  if (checked) _vetDonsSelected.add(id); else _vetDonsSelected.delete(id);
+  const bar = document.getElementById('vd-export-bar');
+  const cnt = document.getElementById('vd-sel-count');
+  if (bar) bar.style.display = _vetDonsSelected.size > 0 ? '' : 'none';
+  if (cnt) cnt.textContent = _vetDonsSelected.size;
+}
+
+function toggleAllVetDons(checked, ids) {
+  ids.forEach(id => { if (checked) _vetDonsSelected.add(id); else _vetDonsSelected.delete(id); });
+  const bar = document.getElementById('vd-export-bar');
+  const cnt = document.getElementById('vd-sel-count');
+  if (bar) bar.style.display = _vetDonsSelected.size > 0 ? '' : 'none';
+  if (cnt) cnt.textContent = _vetDonsSelected.size;
+  renderVetDonsList();
+}
+
+function setVetDonsPage(p) {
+  _vetDonsPage = p;
+  renderVetDonsList();
+}
+
+function exportSelectedDonsPDF() {
+  const ids = [..._vetDonsSelected];
+  if (!ids.length) { toast('Sélectionnez au moins un don','warning'); return; }
+  const attrs = ids
+    .map(id => (S.attributions||[]).find(a=>a.id===id))
+    .filter(Boolean)
+    .sort((a,b) => (a.date||'') < (b.date||'') ? 1 : -1);
+  const css = `
+    *{box-sizing:border-box}
+    body{font-family:Arial,sans-serif;font-size:13px;color:#111;margin:0;padding:0}
+    .pb{padding:24px;max-width:620px;margin:0 auto;page-break-after:always}
+    .pb:last-child{page-break-after:avoid}
+    .header-row{display:flex;align-items:center;gap:14px;margin-bottom:18px;padding-bottom:14px;border-bottom:2px solid #7c3aed}
+    .avatar{width:50px;height:50px;border-radius:50%;background:#7c3aed;color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;flex-shrink:0}
+    .person-name{font-size:22px;font-weight:800;line-height:1.1}
+    .pack-lbl{font-size:13px;color:#7c3aed;font-weight:600;margin-top:2px}
+    table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:20px}
+    th,td{border:1px solid #ccc;padding:8px 10px;text-align:left}
+    th{background:#f5f3ff;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+    .field-row{display:flex;align-items:flex-end;gap:12px;margin-bottom:6px}
+    .field-lbl{font-size:12px;font-weight:700;color:#555;min-width:72px}
+    .field-val{font-size:13px;font-weight:600}
+    .sig-box{flex:1;border:1.5px solid #333;height:70px;display:block;border-radius:4px}
+    .foot{font-size:10px;color:#aaa;text-align:right;margin-top:10px}
+    @media print{body{padding:0}}`;
+  const now = new Date().toLocaleDateString('fr-FR');
+  const bodies = attrs.map(attr => {
+    const date = fmtDate(attr.date?.slice(0,10));
+    const signedDate = attr.signedAt ? fmtDate(attr.signedAt.slice(0,10)) : null;
+    const rows = (attr.items||[]).map(i =>
+      `<tr><td>${esc(i.name)}</td><td style="text-align:center;font-weight:700">${i.size||'—'}</td><td style="text-align:center">${i.qty}</td></tr>`
+    ).join('');
+    const sigBlock = attr.signature
+      ? `<div class="field-row" style="margin-top:14px;flex-direction:column;align-items:flex-start;gap:6px">
+           <span class="field-lbl">Signature${signedDate?' — signé le '+signedDate:''}</span>
+           <img src="${attr.signature}" style="max-width:60%;max-height:120px;border:1.5px solid #333;border-radius:4px;padding:4px;background:#fff">
+         </div>`
+      : `<div class="field-row" style="margin-top:14px"><span class="field-lbl">Signature</span><span class="sig-box"></span></div>`;
+    return `<div class="pb">
+      <div class="header-row">
+        <div class="avatar">${attr.person.charAt(0).toUpperCase()}</div>
+        <div>
+          <div class="person-name">${esc(attr.person)}</div>
+          <div class="pack-lbl">${esc(attr.packName||'Don')} · ${date}</div>
+        </div>
+      </div>
+      <table>
+        <tr><th>Article</th><th style="width:80px;text-align:center">Taille</th><th style="width:60px;text-align:center">Qté</th></tr>
+        ${rows}
+      </table>
+      <div class="field-row"><span class="field-lbl">Date</span><span class="field-val">${date}</span></div>
+      ${sigBlock}
+      <div class="foot">StockZone · Exporté le ${now}</div>
+    </div>`;
+  }).join('');
+  const w = window.open('', '_blank');
+  if (!w) { toast('Autorisez les pop-ups pour exporter','warning'); return; }
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Export Dons</title><style>${css}</style></head><body>${bodies}</body></html>`);
+  w.document.close();
+  setTimeout(() => w.print(), 400);
 }
 
 function buildChaussuresTabHTML() {
@@ -6827,7 +7003,8 @@ function saveEditAttr() {
   save();
   hideModal('modal-edit-attr');
   toast('✅ Don modifié','success');
-  if (currentZone === 'dons') renderDons();
+  if (currentVetTab === 'dons-vet') renderVetDonsList();
+  else if (currentZone === 'dons') renderDons();
   else if (_editPersonId) showPersonDetail(_editPersonId);
 }
 
