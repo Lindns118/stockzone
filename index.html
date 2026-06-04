@@ -7123,8 +7123,94 @@ function printPersonCard(personId) {
     <button onclick="${backFn}" style="background:transparent;border:none;color:#7c3aed;font-size:14px;font-weight:600;cursor:pointer;padding:0;margin-bottom:16px">← Retour</button>
     <div style="font-size:18px;font-weight:800;margin-bottom:4px">📄 Export PDF</div>
     <div style="font-size:13px;color:#6b7280;margin-bottom:16px">Choisissez le pack à exporter${!personId?' pour toutes les personnes':''}</div>
-    ${packs.length ? packOptions : '<div style="color:#9ca3af;font-size:13px;padding:20px 0;text-align:center">Aucun pack configuré</div>'}`;
+    ${packs.length ? packOptions : '<div style="color:#9ca3af;font-size:13px;padding:20px 0;text-align:center">Aucun pack configuré</div>'}
+    ${!personId ? `<div style="margin-top:20px">
+      <div style="font-size:14px;font-weight:700;color:#374151;margin-bottom:10px">📊 Tableau récapitulatif des tailles</div>
+      <div style="display:flex;gap:8px">
+        <button onclick="exportSizesTablePDF()" style="flex:1;background:#7c3aed;color:#fff;border:none;border-radius:12px;padding:13px;font-size:13px;font-weight:700;cursor:pointer">📄 PDF</button>
+        <button onclick="exportSizesTableCSV()" style="flex:1;background:#059669;color:#fff;border:none;border-radius:12px;padding:13px;font-size:13px;font-weight:700;cursor:pointer">📊 Excel</button>
+      </div>
+    </div>` : ''}`;
   vc.style.display = 'block';
+}
+
+function _getSizesTableData() {
+  const zd = S.zones.vetements;
+  const products = (zd?.products||[]).filter(p => p.sized);
+  const persons = (S.persons||[]).slice().sort((a,b) => {
+    const sOrder = {employe:0, ouvrier:1, team_leader:2, duty:3};
+    const sa = sOrder[a.statut||''] ?? 4;
+    const sb = sOrder[b.statut||''] ?? 4;
+    if (sa !== sb) return sa - sb;
+    return a.name.localeCompare(b.name, 'fr', {sensitivity:'base'});
+  });
+  return {products, persons};
+}
+
+function exportSizesTablePDF() {
+  const {products, persons} = _getSizesTableData();
+  if (!persons.length) { toast('Aucune personne','warning'); return; }
+  const now = new Date().toLocaleDateString('fr-FR');
+  const thCols = products.map(p => `<th style="writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap;padding:6px 4px;min-width:28px;font-size:10px">${esc(p.name)}</th>`).join('');
+  const statutLabels = {employe:'Employé', ouvrier:'Ouvrier', team_leader:'Team Leader', duty:'Duty'};
+  const statutColors = {employe:'#eff6ff', ouvrier:'#fffbeb', team_leader:'#f5f3ff', duty:'#fff7ed'};
+  let lastStatut = null;
+  const rows = persons.map(p => {
+    let groupRow = '';
+    const statut = p.statut || '__none__';
+    if (statut !== lastStatut) {
+      lastStatut = statut;
+      const lbl = statutLabels[statut] || 'Sans statut';
+      const bg = statutColors[statut] || '#f9fafb';
+      groupRow = `<tr><td colspan="${products.length+1}" style="background:${bg};font-weight:700;font-size:11px;padding:5px 8px;color:#374151;letter-spacing:.5px;text-transform:uppercase">${lbl}</td></tr>`;
+    }
+    const cells = products.map(pr => {
+      const sz = (p.sizes||{})[pr.id] || 'N/A';
+      const isNA = sz === 'N/A';
+      return `<td style="text-align:center;font-weight:${isNA?'400':'700'};color:${isNA?'#9ca3af':'#111'};font-size:12px">${sz}</td>`;
+    }).join('');
+    return groupRow + `<tr><td style="font-size:12px;font-weight:600;white-space:nowrap;padding:5px 8px">${esc(p.name)}</td>${cells}</tr>`;
+  }).join('');
+  const css = `
+    body{font-family:Arial,sans-serif;font-size:12px;color:#111;padding:16px}
+    h2{color:#7c3aed;margin-bottom:2px;font-size:16px}
+    .sub{color:#6b7280;font-size:11px;margin-bottom:14px}
+    table{width:100%;border-collapse:collapse;font-size:12px}
+    th,td{border:1px solid #ddd;padding:4px 6px;text-align:left}
+    th{background:#f5f3ff;font-weight:700}
+    tr:nth-child(even){background:#fafafa}
+    .foot{font-size:10px;color:#aaa;text-align:right;margin-top:10px}
+    @media print{body{padding:8px}@page{size:landscape}}`;
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Tableau tailles</title><style>${css}</style></head><body>
+    <h2>Tableau des tailles</h2>
+    <div class="sub">${persons.length} personnes · ${products.length} articles · Exporté le ${now}</div>
+    <table><thead><tr><th>Nom</th>${thCols}</tr></thead><tbody>${rows}</tbody></table>
+    <div class="foot">StockZone · Tableau des tailles · ${now}</div>
+  </body></html>`;
+  const w = window.open('', '_blank');
+  if (!w) { toast('Autorisez les pop-ups pour exporter','warning'); return; }
+  w.document.write(html);
+  w.document.close();
+  setTimeout(() => w.print(), 400);
+}
+
+function exportSizesTableCSV() {
+  const {products, persons} = _getSizesTableData();
+  if (!persons.length) { toast('Aucune personne','warning'); return; }
+  const statutLabels = {employe:'Employé', ouvrier:'Ouvrier', team_leader:'Team Leader', duty:'Duty'};
+  const csvEsc = v => `"${String(v||'').replace(/"/g,'""')}"`;
+  const header = ['Nom', 'Statut', ...products.map(p => p.name)].map(csvEsc).join(';');
+  const rows = persons.map(p => {
+    const statut = statutLabels[p.statut||''] || 'Sans statut';
+    const sizes = products.map(pr => (p.sizes||{})[pr.id] || 'N/A');
+    return [p.name, statut, ...sizes].map(csvEsc).join(';');
+  });
+  const csv = '﻿' + [header, ...rows].join('\r\n'); // BOM for Excel UTF-8
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'tailles_stockzone.csv'; a.click();
+  URL.revokeObjectURL(url);
 }
 
 function getStatutsForPack(packName) {
