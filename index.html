@@ -5889,6 +5889,7 @@ function renderVetDonsList() {
   const years = [...new Set(allAttrs.map(a => (a.date||'').slice(0,4)).filter(Boolean))].sort((a,b)=>b-a);
 
   const filtered = allAttrs.filter(a => {
+    if (!(a.items||[]).length) return false;
     const matchPerson = !qp || (a.person||'').toLowerCase().includes(qp);
     const matchArt = !qa || (a.items||[]).some(i => (i.name||'').toLowerCase().includes(qa));
     const matchYear = !_vetDonsYear || (a.date||'').startsWith(_vetDonsYear);
@@ -5977,10 +5978,19 @@ function setVetDonsPage(p) {
 }
 
 function exportDonsRecap() {
+  const qp = _vetDonsQuery.trim().toLowerCase();
+  const qa = _vetDonsArticleQuery.trim().toLowerCase();
   const allAttrs = (S.attributions||[]).slice().sort((a,b) => (a.date||'') > (b.date||'') ? 1 : -1);
-  const data = allAttrs.filter(a => !_vetDonsYear || (a.date||'').startsWith(_vetDonsYear));
+  const data = allAttrs.filter(a => {
+    if (!(a.items||[]).length) return false; // ignorer dons sans articles
+    const matchPerson = !qp || (a.person||'').toLowerCase().includes(qp);
+    const matchArt = !qa || (a.items||[]).some(i => (i.name||'').toLowerCase().includes(qa));
+    const matchYear = !_vetDonsYear || (a.date||'').startsWith(_vetDonsYear);
+    return matchPerson && matchArt && matchYear;
+  });
   if (!data.length) { toast('Aucun don à exporter','warning'); return; }
-  const titre = _vetDonsYear ? `Récapitulatif des dons — ${_vetDonsYear}` : 'Récapitulatif des dons — toutes années';
+  const filtreLabel = [_vetDonsYear||'toutes années', qp?`personne: ${qp}`:'', qa?`article: ${qa}`:''].filter(Boolean).join(' · ');
+  const titre = `Récapitulatif des dons — ${filtreLabel}`;
   const now = new Date().toLocaleDateString('fr-FR');
   const rows = data.map(a => {
     const date = fmtDate(a.date?.slice(0,10));
