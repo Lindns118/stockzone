@@ -7127,27 +7127,43 @@ function printPersonCard(personId) {
   vc.style.display = 'block';
 }
 
+function getStatutsForPack(packName) {
+  const lower = (packName||'').toLowerCase();
+  if (lower.includes('employ')) return ['employe'];
+  if (lower.includes('duty')) return ['duty'];
+  if (lower.includes('ouvrier') || lower.includes('ét') || lower.includes('et') || lower.includes('hiver')) return ['ouvrier', 'team_leader'];
+  return null; // pas de filtre
+}
+
 function printDistribSheet(personId, packId) {
   const pack = (S.vetPacks||[]).find(pk=>pk.id===packId);
   if (!pack) return;
   const zd = S.zones.vetements;
+  const allowedStatuts = personId ? null : getStatutsForPack(pack.name);
   const persons = personId
     ? [(S.persons||[]).find(p=>p.id===personId)].filter(Boolean)
-    : (S.persons||[]).slice().sort((a,b) => a.name.localeCompare(b.name, 'fr', {sensitivity:'base'}));
+    : (S.persons||[])
+        .filter(p => !allowedStatuts || allowedStatuts.includes(p.statut||''))
+        .sort((a,b) => a.name.localeCompare(b.name, 'fr', {sensitivity:'base'}));
   if (!persons.length) { toast('Aucune personne à exporter','warning'); return; }
   const now = new Date().toLocaleDateString('fr-FR');
   let body = '';
   persons.forEach(p => {
     const rows = pack.items.map(item => {
       const product = zd?.products?.find(pr=>pr.id===item.productId);
-      const sz = product?.sized ? ((p.sizes||{})[item.productId] || '___') : '—';
-      return `<tr><td>${item.name}</td><td style="text-align:center;font-weight:700;font-size:15px">${sz}</td><td style="text-align:center">${item.qty}</td></tr>`;
+      // Substitute gilet for team leaders
+      const subProd = getGiletSubstitute(item.productId, p.statut||'', zd?.products||[]);
+      const effectiveProd = subProd || product;
+      const effectiveName = effectiveProd ? effectiveProd.name : item.name;
+      const effectiveId = effectiveProd ? effectiveProd.id : item.productId;
+      const sz = product?.sized ? ((p.sizes||{})[effectiveId] || (p.sizes||{})[item.productId] || '___') : '—';
+      return `<tr><td>${esc(effectiveName)}</td><td style="text-align:center;font-weight:700;font-size:15px">${sz}</td><td style="text-align:center">${item.qty}</td></tr>`;
     }).join('');
     body += `<div class="pb">
       <div class="header-row">
         <div class="avatar">${p.name.charAt(0).toUpperCase()}</div>
         <div>
-          <div class="person-name">${p.name}</div>
+          <div class="person-name">${esc(p.name)}</div>
           <div class="pack-lbl">${pack.icon} ${pack.name}</div>
         </div>
       </div>
