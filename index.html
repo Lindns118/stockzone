@@ -5095,7 +5095,7 @@ function renderDons() {
   if (!ev) return;
   const all = (S.attributions||[])
     .slice()
-    .sort((a,b) => (a.date||'') < (b.date||'') ? -1 : 1);
+    .sort((a,b) => (a.date||'') < (b.date||'') ? 1 : -1);
   const q = _donsQuery.trim().toLowerCase();
   const filtered = q ? all.filter(a => (a.person||'').toLowerCase().includes(q)) : all;
   const total = filtered.length;
