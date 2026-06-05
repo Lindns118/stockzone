@@ -3055,14 +3055,7 @@ function hideModal(id) {
 }
 function overlayClose(e, id) { if(e.target===e.currentTarget) hideModal(id); }
 
-// Back button closes open modal
-window.addEventListener('popstate', function(e) {
-  // Find any open modal and close it
-  const openModal = document.querySelector('.modal-overlay:not(.hidden)');
-  if(openModal) {
-    openModal.classList.add('hidden');
-  }
-});
+// (modal closing handled inside _szHandleBack)
 
 function addInvRow() {
   const zd = S.zones[currentZone]||{products:[]};
@@ -5787,6 +5780,7 @@ function refreshVetPacksTab() {
 
 // ── VETEMENTS MODE ──
 function enterVetementsMode() {
+  _szPush();
   document.body.classList.add('vet-mode');
   vetCatFilter = 'all';
   const vc = document.getElementById('vet-content');
@@ -6805,6 +6799,7 @@ function openBulkDistribView() {
   if (_selectedPersonIds.size === 0) { toast('Sélectionnez au moins une personne','warning'); return; }
   const vc = document.getElementById('vet-content');
   if (!vc) return;
+  _szPush();
   const packs = (S.vetPacks||[]).filter(pk=>pk.items.length);
   const n = _selectedPersonIds.size;
   const packOptions = packs.map(pk => `
@@ -6935,6 +6930,7 @@ function showPersonDetail(personId) {
   if (!vc) return;
   _personnesScrollY = vc.scrollTop || 0;
   _personnesSearchQuery = document.getElementById('person-search')?.value || '';
+  _szPush();
   const zd = S.zones.vetements;
   const attrs = (S.attributions||[]).filter(a=>a.person.toLowerCase()===person.name.toLowerCase()).slice().reverse();
   const sizesHTML = (zd?.products||[]).filter(p=>p.sized).filter(prod => {
@@ -7013,6 +7009,7 @@ function distribToPersonTab(personId) {
 function openAddPersonView() {
   const vc = document.getElementById('vet-content');
   if (!vc) return;
+  _szPush();
   _newPersonSizes = {};
   _newPersonStatut = '';
   vc.innerHTML = `<button onclick="setVetTab('personnes')" style="background:transparent;border:none;color:#7c3aed;font-size:14px;font-weight:600;cursor:pointer;padding:0;margin-bottom:14px">← Personnes</button>
@@ -7245,6 +7242,7 @@ function deleteAttribution(attrId, personId) {
 function printPersonCard(personId) {
   const vc = document.getElementById('vet-content');
   if (!vc) return;
+  _szPush();
   const persons = personId
     ? [(S.persons||[]).find(p=>p.id===personId)].filter(Boolean)
     : (S.persons||[]).slice().sort((a,b) => a.name.localeCompare(b.name, 'fr', {sensitivity:'base'}));
@@ -7941,6 +7939,31 @@ function pwaTriggerInstall() {
     alert('Pour installer StockZone sans barre d\'URL :\nMenu Brave (⋮) → "Ajouter à l\'écran d\'accueil"\nPuis ouvre l\'app depuis l\'écran d\'accueil.');
   }
 }
+
+// ── BACK BUTTON (Android) ──
+let _szNavDepth = 0;
+function _szPush() { _szNavDepth++; history.pushState({sz:_szNavDepth}, ''); }
+function _szHandleBack() {
+  // Close any open modal first
+  const openModal = document.querySelector('.modal-overlay:not(.hidden)');
+  if (openModal) { openModal.classList.add('hidden'); history.pushState({sz:_szNavDepth}, ''); return; }
+  // Re-push so next back still lands here
+  history.pushState({sz:_szNavDepth}, '');
+  const inVet = document.body.classList.contains('vet-mode');
+  const vc = document.getElementById('vet-content');
+  const vcVisible = vc && vc.style.display !== 'none' && vc.innerHTML.trim() !== '';
+  if (inVet && vcVisible) {
+    // In a sub-view inside vêtements → back to current tab list
+    if (currentVetTab === 'personnes') setVetTab('personnes');
+    else setVetTab(currentVetTab);
+  } else if (inVet) {
+    exitVetementsMode();
+  }
+  // At top level: do nothing (prevent exit)
+}
+window.addEventListener('popstate', _szHandleBack);
+history.pushState({sz:0}, ''); // initial entry
+
 </script>
 </body>
 </html>
