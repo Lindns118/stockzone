@@ -5844,8 +5844,14 @@ function setVetTab(tab) {
     vc.scrollTop = 0;
     if (tab === 'packs') vc.innerHTML = buildVetPacksTabHTML();
     else if (tab === 'distribution') { if (!distribState._keep) { distribState = {packId:null,sizes:{},personName:''}; _donItems = []; } delete distribState._keep; vc.innerHTML = buildDistribHTML(); }
-    else if (tab === 'personnes') vc.innerHTML = buildPersonnesHTML();
-    else if (tab === 'dispo') showPackDispoView();
+    else if (tab === 'personnes') {
+      vc.innerHTML = buildPersonnesHTML();
+      const inp = document.getElementById('person-search');
+      if (inp && _personnesSearchQuery) inp.value = _personnesSearchQuery;
+      filterPersonCards(_personnesSearchQuery);
+      if (_personnesScrollY) { vc.scrollTop = _personnesScrollY; }
+    }
+    else if (tab === 'dispo') { _personnesScrollY=0; _personnesSearchQuery=''; showPackDispoView(); }
     else if (tab === 'chaussures') vc.innerHTML = buildChaussuresTabHTML();
     else if (tab === 'dons-vet') { _vetDonsQuery=''; _vetDonsArticleQuery=''; _vetDonsPage=0; _vetDonsSelected=new Set(); vc.innerHTML = buildVetDonsTabHTML(); renderVetDonsList(); }
   }
@@ -6727,10 +6733,14 @@ function buildPersonnesHTML() {
   </div>` : '';
   if (!allPersons.length) return addBtn + '<div style="text-align:center;color:#9ca3af;padding:30px 20px;font-size:14px">Aucune personne.<br>Elles sont créées automatiquement lors des distributions.</div>';
   const countByStatut = allPersons.reduce((acc, p) => { const k = p.statut||'none'; acc[k]=(acc[k]||0)+1; return acc; }, {});
+  const _fBtn = (id, label, color='#7c3aed') => {
+    const active = _personFilter === id || (id==='' && !_personFilter);
+    return `style="padding:5px 12px;border-radius:20px;border:2px solid ${active?color:'#e5e7eb'};background:${active?color:'#fff'};color:${active?'#fff':'#6b7280'};font-size:12px;font-weight:700;cursor:pointer"`;
+  };
   const filterBtns = `<div id="person-filter-btns" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
-    <button onclick="setPersonFilter('')" id="pfbtn-all" style="padding:5px 12px;border-radius:20px;border:2px solid #7c3aed;background:#7c3aed;color:#fff;font-size:12px;font-weight:700;cursor:pointer">Tous (${allPersons.length})</button>
-    ${STATUTS.map(s=>`<button onclick="setPersonFilter('${s.id}')" id="pfbtn-${s.id}" style="padding:5px 12px;border-radius:20px;border:2px solid #e5e7eb;background:#fff;color:#6b7280;font-size:12px;font-weight:700;cursor:pointer">${s.label}${countByStatut[s.id]?' ('+countByStatut[s.id]+')':''}</button>`).join('')}
-    <button onclick="setPersonFilter('none')" id="pfbtn-none" style="padding:5px 12px;border-radius:20px;border:2px solid #e5e7eb;background:#fff;color:#6b7280;font-size:12px;font-weight:700;cursor:pointer">Sans statut${countByStatut['none']?' ('+countByStatut['none']+')':''}</button>
+    <button onclick="setPersonFilter('')" id="pfbtn-all" ${_fBtn('')}>Tous (${allPersons.length})</button>
+    ${STATUTS.map(s=>`<button onclick="setPersonFilter('${s.id}')" id="pfbtn-${s.id}" ${_fBtn(s.id,s.label,s.color)}>${s.label}${countByStatut[s.id]?' ('+countByStatut[s.id]+')':''}</button>`).join('')}
+    <button onclick="setPersonFilter('none')" id="pfbtn-none" ${_fBtn('none','','#6b7280')}>Sans statut${countByStatut['none']?' ('+countByStatut['none']+')':''}</button>
   </div>`;
   const searchBar = `<div style="position:relative;margin-bottom:10px">
     <input id="person-search" class="fi" placeholder="🔍 Rechercher une personne…" oninput="filterPersonCards(this.value)" style="padding-left:12px">
@@ -6878,6 +6888,8 @@ function confirmBulkDistrib() {
 }
 
 let _personFilter = '';
+let _personnesScrollY = 0;
+let _personnesSearchQuery = '';
 function setPersonFilter(statutId) {
   _personFilter = statutId;
   // Update button styles
@@ -6919,6 +6931,9 @@ function filterPersonCards(query) {
 function showPersonDetail(personId) {
   const person = (S.persons||[]).find(p=>p.id===personId);
   if (!person) return;
+  const vc = document.getElementById('vet-content');
+  _personnesScrollY = vc?.scrollTop || 0;
+  _personnesSearchQuery = document.getElementById('person-search')?.value || '';
   const vc = document.getElementById('vet-content');
   if (!vc) return;
   const zd = S.zones.vetements;
