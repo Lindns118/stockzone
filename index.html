@@ -6723,6 +6723,7 @@ function buildPersonnesHTML() {
   const addBtn = `<button class="add-person-btn" onclick="openAddPersonView()">➕ Ajouter une personne</button>`;
   const topBtns = allPersons.length ? `<div style="display:flex;gap:8px;margin-bottom:10px">
     <button onclick="printPersonCard(null)" style="flex:1;background:#f3f4f6;border:none;border-radius:10px;padding:10px 8px;font-size:13px;font-weight:600;cursor:pointer">📄 Export tous PDF</button>
+    <button onclick="togglePersonSelMode()" id="person-sel-toggle" style="flex:1;background:${_personSelMode?'#7c3aed':'#f3f4f6'};color:${_personSelMode?'#fff':'#374151'};border:none;border-radius:10px;padding:10px 8px;font-size:13px;font-weight:600;cursor:pointer">${_personSelMode?'✕ Annuler':'☐ Sélectionner'}</button>
   </div>` : '';
   if (!allPersons.length) return addBtn + '<div style="text-align:center;color:#9ca3af;padding:30px 20px;font-size:14px">Aucune personne.<br>Elles sont créées automatiquement lors des distributions.</div>';
   const countByStatut = allPersons.reduce((acc, p) => { const k = p.statut||'none'; acc[k]=(acc[k]||0)+1; return acc; }, {});
@@ -6737,16 +6738,143 @@ function buildPersonnesHTML() {
   const cards = allPersons.map(p => {
     const attrCount = (S.attributions||[]).filter(a=>a.person.toLowerCase()===p.name.toLowerCase()).length;
     const knownSizes = Object.values(p.sizes||{}).filter(Boolean).length;
-    return `<div class="pcard" data-name="${esc(p.name.toLowerCase())}" data-statut="${esc(p.statut||'none')}" onclick="showPersonDetail('${p.id}')">
-      <div class="pcard-avatar">${p.name.charAt(0).toUpperCase()}</div>
+    const isSel = _selectedPersonIds.has(p.id);
+    const rightEl = _personSelMode
+      ? `<input type="checkbox" ${isSel?'checked':''} onclick="event.stopPropagation();togglePersonSel('${p.id}')" style="width:20px;height:20px;cursor:pointer;accent-color:#7c3aed;flex-shrink:0">`
+      : `<span class="pcard-arrow">›</span>`;
+    return `<div class="pcard" data-name="${esc(p.name.toLowerCase())}" data-statut="${esc(p.statut||'none')}" data-personid="${p.id}" onclick="${_personSelMode?`togglePersonSel('${p.id}')`:`showPersonDetail('${p.id}')`}" style="${isSel?'border-left:4px solid #7c3aed;background:#f5f3ff':''}">
+      <div class="pcard-avatar" style="${isSel?'background:linear-gradient(135deg,#5b21b6,#7c3aed)':''}">${p.name.charAt(0).toUpperCase()}</div>
       <div class="pcard-info">
         <div class="pcard-name">${esc(p.name)} ${statutBadge(p)}</div>
         <div class="pcard-sub">${attrCount} distribution${attrCount!==1?'s':''} · ${knownSizes} taille${knownSizes!==1?'s':''} connue${knownSizes!==1?'s':''}</div>
       </div>
-      <span class="pcard-arrow">›</span>
+      ${rightEl}
     </div>`;
   }).join('');
-  return topBtns + filterBtns + searchBar + addBtn + `<div id="person-cards-list">${cards}</div>`;
+  const selBar = _personSelMode ? `<div id="person-sel-bar" style="background:#7c3aed;color:#fff;border-radius:12px;padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:8px">
+    <span style="font-size:13px;font-weight:600">${_selectedPersonIds.size} sélectionné${_selectedPersonIds.size!==1?'s':''}</span>
+    <button onclick="openBulkDistribView()" ${_selectedPersonIds.size===0?'disabled':''}
+      style="background:#fff;color:#7c3aed;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;opacity:${_selectedPersonIds.size===0?'.4':'1'}">🎁 Distribuer un pack</button>
+  </div>` : '';
+  return topBtns + filterBtns + searchBar + addBtn + selBar + `<div id="person-cards-list">${cards}</div>`;
+}
+
+let _personSelMode = false;
+let _selectedPersonIds = new Set();
+let _bulkPackId = null;
+
+function togglePersonSelMode() {
+  _personSelMode = !_personSelMode;
+  _selectedPersonIds = new Set();
+  setVetTab('personnes');
+}
+
+function togglePersonSel(personId) {
+  if (_selectedPersonIds.has(personId)) _selectedPersonIds.delete(personId);
+  else _selectedPersonIds.add(personId);
+  // Update card visuals without full rebuild
+  const card = document.querySelector(`.pcard[data-personid="${personId}"]`);
+  if (card) {
+    const isSel = _selectedPersonIds.has(personId);
+    card.style.borderLeft = isSel ? '4px solid #7c3aed' : '';
+    card.style.background = isSel ? '#f5f3ff' : '';
+    const chk = card.querySelector('input[type=checkbox]');
+    if (chk) chk.checked = isSel;
+  }
+  // Update sel bar count
+  const bar = document.getElementById('person-sel-bar');
+  if (bar) {
+    const n = _selectedPersonIds.size;
+    bar.querySelector('span').textContent = `${n} sélectionné${n!==1?'s':''}`;
+    const btn = bar.querySelector('button');
+    if (btn) { btn.disabled = n===0; btn.style.opacity = n===0?'.4':'1'; }
+  }
+}
+
+function openBulkDistribView() {
+  if (_selectedPersonIds.size === 0) { toast('Sélectionnez au moins une personne','warning'); return; }
+  const vc = document.getElementById('vet-content');
+  if (!vc) return;
+  const packs = (S.vetPacks||[]).filter(pk=>pk.items.length);
+  const n = _selectedPersonIds.size;
+  const packOptions = packs.map(pk => `
+    <div onclick="selectBulkPack('${pk.id}')" id="bpk-${pk.id}" style="background:#fff;border:2px solid #e5e7eb;border-radius:12px;padding:14px 16px;cursor:pointer;display:flex;align-items:center;gap:12px;margin-bottom:10px;transition:border-color .15s">
+      <span style="font-size:24px">${pk.icon}</span>
+      <div><div style="font-weight:700;font-size:15px">${esc(pk.name)}</div><div style="font-size:12px;color:#6b7280">${pk.items.length} articles</div></div>
+      <span style="margin-left:auto;color:#9ca3af;font-size:18px" id="bpk-chk-${pk.id}">›</span>
+    </div>`).join('');
+  vc.innerHTML = `
+    <button onclick="returnToPersonSel()" style="background:transparent;border:none;color:#7c3aed;font-size:14px;font-weight:600;cursor:pointer;padding:0;margin-bottom:16px">← Retour</button>
+    <div style="font-size:18px;font-weight:800;margin-bottom:4px">🎁 Distribution groupée</div>
+    <div style="font-size:13px;color:#6b7280;margin-bottom:16px">${n} personne${n>1?'s':''} · tailles utilisées automatiquement</div>
+    <div style="margin-bottom:10px">
+      <label style="font-size:12px;color:#6b7280;font-weight:600;display:block;margin-bottom:4px">📅 Date</label>
+      <input type="text" id="bulk-date" class="fi" value="${todayFr()}" placeholder="JJ/MM/AAAA" inputmode="numeric" maxlength="10" oninput="autoFormatDate(this)">
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;margin-bottom:16px;cursor:pointer;font-size:13px;color:#6b7280">
+      <input type="checkbox" id="bulk-pre-inv" checked style="width:16px;height:16px;cursor:pointer;accent-color:#7c3aed">
+      Avant l'inventaire <span style="font-size:11px">(ne pas modifier le stock)</span>
+    </label>
+    <div style="font-size:14px;font-weight:700;color:#374151;margin-bottom:10px">Choisir le pack</div>
+    ${packs.length ? packOptions : '<div style="color:#9ca3af;font-size:13px">Aucun pack configuré</div>'}
+    <button id="bulk-confirm-btn" onclick="confirmBulkDistrib()" disabled style="width:100%;background:#5b21b6;color:#fff;border:none;border-radius:12px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px;opacity:.4">✅ Enregistrer pour ${n} personne${n>1?'s':''}</button>
+  `;
+  vc.style.display = 'block';
+  _bulkPackId = null;
+}
+
+function selectBulkPack(packId) {
+  _bulkPackId = packId;
+  document.querySelectorAll('[id^="bpk-"]').forEach(el => {
+    if (el.id === 'bpk-'+packId) { el.style.borderColor='#7c3aed'; el.style.background='#f5f3ff'; }
+    else if (el.id.startsWith('bpk-') && !el.id.includes('chk')) { el.style.borderColor='#e5e7eb'; el.style.background='#fff'; }
+  });
+  const btn = document.getElementById('bulk-confirm-btn');
+  if (btn) { btn.disabled=false; btn.style.opacity='1'; }
+}
+
+function returnToPersonSel() {
+  setVetTab('personnes');
+}
+
+function confirmBulkDistrib() {
+  if (!_bulkPackId) { toast('Sélectionnez un pack','warning'); return; }
+  const pack = (S.vetPacks||[]).find(pk=>pk.id===_bulkPackId);
+  if (!pack) return;
+  const zd = S.zones.vetements;
+  const dateVal = parseDateInput(document.getElementById('bulk-date')?.value);
+  const now = dateVal ? dateVal+'T12:00:00.000Z' : nowIso();
+  const preInv = document.getElementById('bulk-pre-inv')?.checked || false;
+  const persons = [..._selectedPersonIds].map(id=>(S.persons||[]).find(p=>p.id===id)).filter(Boolean);
+  if (!S.attributions) S.attributions = [];
+  persons.forEach(person => {
+    const personStatut = person.statut||'';
+    const items = pack.items.map(item => {
+      const subProd = getGiletSubstitute(item.productId, personStatut, zd?.products||[]);
+      const effectiveProd = subProd || (zd?.products||[]).find(p=>p.id===item.productId);
+      const effectiveId = effectiveProd ? effectiveProd.id : item.productId;
+      const sz = (person.sizes||{})[effectiveId] || (person.sizes||{})[item.productId] || null;
+      return {productId:effectiveId, name:effectiveProd?.name||item.name, qty:item.qty, size:sz||undefined};
+    });
+    if (!preInv) {
+      items.forEach(it => {
+        const product = (zd?.products||[]).find(p=>p.id===it.productId);
+        if (!product) return;
+        const diff = Math.min(it.qty, product.qty);
+        if (diff > 0) {
+          product.qty = r2(product.qty - diff);
+          if (it.size && product.sizes?.[it.size] !== undefined) product.sizes[it.size] = Math.max(0,(product.sizes[it.size]||0)-diff);
+          product.history.push({id:uid(), type:'don', date:now, qty:diff, person:person.name, size:it.size||undefined});
+        }
+      });
+    }
+    S.attributions.push({id:uid(), person:person.name, date:now, packId:_bulkPackId, packName:pack.name, items, preInventory:preInv||undefined});
+  });
+  save(); renderProducts();
+  const n = persons.length;
+  _personSelMode = false; _selectedPersonIds = new Set(); _bulkPackId = null;
+  setVetTab('personnes');
+  toast(`✅ ${n} distribution${n>1?'s':''} enregistrée${n>1?'s':''}`, 'success');
 }
 
 let _personFilter = '';
