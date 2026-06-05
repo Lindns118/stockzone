@@ -6932,10 +6932,9 @@ function showPersonDetail(personId) {
   const person = (S.persons||[]).find(p=>p.id===personId);
   if (!person) return;
   const vc = document.getElementById('vet-content');
-  _personnesScrollY = vc?.scrollTop || 0;
-  _personnesSearchQuery = document.getElementById('person-search')?.value || '';
-  const vc = document.getElementById('vet-content');
   if (!vc) return;
+  _personnesScrollY = vc.scrollTop || 0;
+  _personnesSearchQuery = document.getElementById('person-search')?.value || '';
   const zd = S.zones.vetements;
   const attrs = (S.attributions||[]).filter(a=>a.person.toLowerCase()===person.name.toLowerCase()).slice().reverse();
   const sizesHTML = (zd?.products||[]).filter(p=>p.sized).filter(prod => {
