@@ -6968,6 +6968,7 @@ function showPersonDetail(personId) {
       <button onclick="setVetTab('personnes')" style="background:transparent;border:none;color:#7c3aed;font-size:14px;font-weight:600;cursor:pointer;padding:0">← Personnes</button>
       <span style="flex:1"></span>
       <button onclick="printPersonCard('${personId}')" style="background:#f3f4f6;border:none;border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer;font-weight:600">📄 PDF</button>
+      <button onclick="deletePerson('${personId}')" style="background:#fee2e2;border:none;border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer;font-weight:600;color:#dc2626" title="Supprimer cette personne">🗑️</button>
     </div>
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
       <div class="pcard-avatar" style="width:52px;height:52px;font-size:22px">${person.name.charAt(0).toUpperCase()}</div>
@@ -7064,6 +7065,20 @@ function setPersonStatut(personId, statutId) {
   person.statut = statutId;
   save();
   showPersonDetail(personId);
+}
+
+function deletePerson(personId) {
+  const person = (S.persons||[]).find(p=>p.id===personId);
+  if (!person) return;
+  const attrCount = (S.attributions||[]).filter(a=>a.person.toLowerCase()===person.name.toLowerCase()).length;
+  const msg = attrCount > 0
+    ? `Supprimer ${person.name} ? Cette personne a ${attrCount} distribution${attrCount>1?'s':''} enregistrée${attrCount>1?'s':''}. Les distributions seront conservées.`
+    : `Supprimer ${person.name} ?`;
+  if (!confirm(msg)) return;
+  S.persons = (S.persons||[]).filter(p=>p.id!==personId);
+  saveState();
+  toast(`${person.name} supprimé(e)`);
+  setVetTab('personnes');
 }
 
 let _renamePersonId = null;
