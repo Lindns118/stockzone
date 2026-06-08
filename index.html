@@ -2410,7 +2410,8 @@ function renderHistory() {
   if (!currentProduct) return;
   const el = document.getElementById('tc-hist');
   const h = currentProduct.history||[];
-  if (!h.length) { el.innerHTML='<div class="empty-state" style="padding:28px 0"><div class="ei">📋</div><p>Aucun historique</p></div>'; return; }
+  const addBtn = `<div style="margin-bottom:10px"><button onclick="openQuickLivraison()" style="background:#dcfce7;border:none;border-radius:10px;padding:9px 16px;font-size:13px;font-weight:600;color:#16a34a;cursor:pointer;display:flex;align-items:center;gap:6px">🚚 + Livraison</button></div>`;
+  if (!h.length) { el.innerHTML=addBtn+'<div class="empty-state" style="padding:28px 0"><div class="ei">📋</div><p>Aucun historique</p></div>'; return; }
   el.innerHTML = [...h].map((h,i)=>({...h,_i:i})).sort((a,b)=>{const d=new Date(b.date)-new Date(a.date);return d!==0?d:b._i-a._i;}).map(item=>{
     const typeMap = {
       inventaire:       {icon:'📋', label:'Inventaire',        cls:'',      sign:''},
@@ -2437,6 +2438,17 @@ function renderHistory() {
       </div>
     </div>`;
   }).join('');
+  el.innerHTML = addBtn + el.innerHTML;
+}
+
+function openQuickLivraison() {
+  const tabBtn = document.querySelector('.tab-btn[onclick*="quick"]');
+  showTab('quick', tabBtn);
+  const livBtn = document.getElementById('qt-liv');
+  if (livBtn) quickSetType('livraison', livBtn);
+  document.getElementById('quick-date').value = today();
+  document.getElementById('quick-qty').value = 1;
+  document.getElementById('quick-qty').focus();
 }
 
 function showTab(tab, btn) {
@@ -2548,8 +2560,18 @@ function saveQuickEntry() {
   save();
 
   document.getElementById('pd-qty').textContent = currentProduct.qty;
-  const label = quickType === 'livraison' ? 'Livraison' : 'Inventaire';
-  toast(`✅ ${label} ajouté — stock : ${currentProduct.qty} ${currentProduct.unit}`, 'success');
+  if (quickType === 'livraison') {
+    const lastInv = (currentProduct.history||[])
+      .filter(h=>h.type==='inventaire'||h.type==='inventaire_base')
+      .sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
+    if (lastInv && date < lastInv.date) {
+      toast(`✅ Livraison enregistrée (antérieure à l'inventaire du ${fmtDate(lastInv.date)} — stock actuel inchangé)`, 'warning');
+    } else {
+      toast(`✅ Livraison ajoutée — stock : ${currentProduct.qty} ${currentProduct.unit}`, 'success');
+    }
+  } else {
+    toast(`✅ Inventaire ajouté — stock : ${currentProduct.qty} ${currentProduct.unit}`, 'success');
+  }
 
   // Switch to history tab
   document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('ta',i===0));
