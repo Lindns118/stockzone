@@ -2937,7 +2937,8 @@ function renderConsoTab() {
   for (let i=1;i<invs.length;i++) {
     const prev=invs[i-1], cur=invs[i];
     const livsBetween = p.history.filter(h=>h.type==='livraison'&&new Date(h.date)>new Date(prev.date)&&new Date(h.date)<=new Date(cur.date)).reduce((s,h)=>s+h.qty,0);
-    const cons = Math.max(0, r2(prev.qty + livsBetween - cur.qty));
+    const pretAdj = p.history.filter(h=>['pret','emprunt','retour_pret','retour_emprunt','vente'].includes(h.type)&&new Date(h.date)>new Date(prev.date)&&new Date(h.date)<=new Date(cur.date)).reduce((s,h)=>s+h.qty,0);
+    const cons = Math.max(0, r2(prev.qty + livsBetween + pretAdj - cur.qty));
     const ym = cur.date.slice(0,7); // YYYY-MM
     raw.push({ym, cons});
   }
