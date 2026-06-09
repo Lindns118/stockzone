@@ -840,6 +840,19 @@ body.vet-mode .main{padding-bottom:20px}
 </div>
 </div>
 
+<!-- SIZE EDIT POPOVER -->
+<div id="size-edit-pop" class="modal-overlay hidden" onclick="if(event.target===this)closeSizeEdit()">
+  <div style="background:#fff;border-radius:20px;padding:24px 20px;max-width:300px;width:88%;margin:auto;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.18)">
+    <div id="sep-label" style="font-size:16px;font-weight:700;margin-bottom:20px;color:#1e1b4b"></div>
+    <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:20px">
+      <button onclick="sizeEditStep(-1)" style="width:52px;height:52px;border-radius:14px;border:1.5px solid #e5e7eb;background:#f3f4f6;font-size:26px;cursor:pointer;font-weight:700;color:#374151;font-family:inherit">−</button>
+      <input type="number" id="sep-input" min="0" inputmode="numeric" onkeydown="if(event.key==='Enter')confirmSizeEdit()" style="width:90px;text-align:center;font-size:32px;font-weight:700;border:2px solid #7c3aed;border-radius:14px;padding:8px 4px;font-family:inherit;color:#1e1b4b">
+      <button onclick="sizeEditStep(1)" style="width:52px;height:52px;border-radius:14px;border:none;background:#7c3aed;color:#fff;font-size:26px;cursor:pointer;font-weight:700;font-family:inherit">+</button>
+    </div>
+    <button onclick="confirmSizeEdit()" style="width:100%;padding:14px;border:none;border-radius:14px;background:#7c3aed;color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">✓ Confirmer</button>
+  </div>
+</div>
+
 <!-- LIVRAISON -->
 <div id="modal-livraison" class="modal-overlay hidden" onclick="overlayClose(event,'modal-livraison')">
 <div class="modal-sheet">
@@ -2025,7 +2038,7 @@ function renderProducts() {
       // Sizes grid card
       const sizeCells = getProductSizes(p).map(s=>{
         const qty = (p.sizes&&p.sizes[s]) || 0;
-        return `<div class="size-cell ${qty===0?'size-zero':''}" style="flex:1;min-width:40px;text-align:center;padding:6px 3px;border-radius:10px;background:${qty===0?'#f3f4f6':'#e8eaff'};cursor:pointer;display:inline-block" onclick="event.stopPropagation();sizeStep('${p.id}','${s}',1)" oncontextmenu="event.preventDefault();event.stopPropagation();sizeStep('${p.id}','${s}',-1)">
+        return `<div class="size-cell ${qty===0?'size-zero':''}" style="flex:1;min-width:40px;text-align:center;padding:6px 3px;border-radius:10px;background:${qty===0?'#f3f4f6':'#e8eaff'};cursor:pointer;display:inline-block" onclick="event.stopPropagation();_szCellTap('${p.id}','${s}')" ontouchstart="event.stopPropagation();_szLpStart('${p.id}','${s}')" ontouchend="event.stopPropagation();_szLpEnd()" ontouchmove="_szLpEnd()" oncontextmenu="event.preventDefault();event.stopPropagation();openSizeEdit('${p.id}','${s}')">
           <span class="size-lbl" style="font-size:10px;font-weight:700;color:${qty===0?'#9ca3af':'#2d35a8'};display:block">${s}</span>
           <span class="size-qty" id="sqty-${p.id}-${s}" style="font-size:16px;font-weight:700;display:block">${qty}</span>
         </div>`;
@@ -2073,6 +2086,56 @@ function sizeStep(pid, size, delta) {
     toast(`${found.p.name} — ${size}: ${found.p.sizes[size]}`, 'success');
     renderProducts(); // refresh qty display on card
   }, 800);
+}
+
+// ── SIZE CELL LONG PRESS ──
+let _szLpTimer = null, _szLpFired = false;
+function _szLpStart(pid, size) {
+  _szLpFired = false;
+  _szLpTimer = setTimeout(() => { _szLpFired = true; openSizeEdit(pid, size); }, 450);
+}
+function _szLpEnd() { clearTimeout(_szLpTimer); }
+function _szCellTap(pid, size) { if (!_szLpFired) sizeStep(pid, size, 1); }
+
+let _sizeEditPid = null, _sizeEditSize = null;
+function openSizeEdit(pid, size) {
+  const found = findProduct(pid);
+  if (!found) return;
+  _sizeEditPid = pid; _sizeEditSize = size;
+  const cur = (found.p.sizes && found.p.sizes[size]) || 0;
+  document.getElementById('sep-label').textContent = `${found.p.name} — ${size}`;
+  const inp = document.getElementById('sep-input');
+  inp.value = cur;
+  document.getElementById('size-edit-pop').classList.remove('hidden');
+  setTimeout(() => { inp.select(); inp.focus(); }, 80);
+}
+function closeSizeEdit() {
+  document.getElementById('size-edit-pop').classList.add('hidden');
+  _sizeEditPid = null; _sizeEditSize = null;
+}
+function sizeEditStep(delta) {
+  const inp = document.getElementById('sep-input');
+  inp.value = Math.max(0, (parseInt(inp.value) || 0) + delta);
+  inp.focus();
+}
+function confirmSizeEdit() {
+  if (!_sizeEditPid || !_sizeEditSize) return;
+  const newVal = Math.max(0, parseInt(document.getElementById('sep-input').value) || 0);
+  const found = findProduct(_sizeEditPid);
+  if (!found) return;
+  if (!found.p.sizes) found.p.sizes = {};
+  found.p.sizes[_sizeEditSize] = newVal;
+  found.p.qty = Object.values(found.p.sizes).reduce((s,v)=>s+v, 0);
+  const _td = new Date().toISOString().split('T')[0];
+  const _hex = found.p.history.find(h=>h.date&&h.date.startsWith(_td)&&h.type==='inventaire');
+  if (_hex) { _hex.qty = found.p.qty; _hex.sizes = {...found.p.sizes}; }
+  else found.p.history.push({id:uid(), type:'inventaire', date:nowIso(), qty:found.p.qty, sizes:{...found.p.sizes}});
+  const el = document.getElementById(`sqty-${_sizeEditPid}-${_sizeEditSize}`);
+  if (el) { el.textContent = newVal; el.closest('.size-cell').classList.toggle('size-zero', newVal===0); }
+  save();
+  toast(`${found.p.name} — ${_sizeEditSize}: ${newVal}`, 'success');
+  renderProducts();
+  closeSizeEdit();
 }
 
 ;
