@@ -2038,7 +2038,7 @@ function renderProducts() {
       // Sizes grid card
       const sizeCells = getProductSizes(p).map(s=>{
         const qty = (p.sizes&&p.sizes[s]) || 0;
-        return `<div class="size-cell ${qty===0?'size-zero':''}" style="flex:1;min-width:40px;text-align:center;padding:6px 3px;border-radius:10px;background:${qty===0?'#f3f4f6':'#e8eaff'};cursor:pointer;display:inline-block" onclick="event.stopPropagation();_szCellTap('${p.id}','${s}')" ontouchstart="event.stopPropagation();_szLpStart('${p.id}','${s}')" ontouchend="event.stopPropagation();_szLpEnd()" ontouchmove="_szLpEnd()" oncontextmenu="event.preventDefault();event.stopPropagation();openSizeEdit('${p.id}','${s}')">
+        return `<div class="size-cell ${qty===0?'size-zero':''}" style="flex:1;min-width:40px;text-align:center;padding:6px 3px;border-radius:10px;background:${qty===0?'#f3f4f6':'#e8eaff'};cursor:pointer;display:inline-block" onclick="event.stopPropagation()" ontouchstart="event.stopPropagation();_szLpStart('${p.id}','${s}')" ontouchend="event.stopPropagation();_szLpEnd()" ontouchmove="_szLpEnd()" oncontextmenu="event.preventDefault();event.stopPropagation();openSizeEdit('${p.id}','${s}')">
           <span class="size-lbl" style="font-size:10px;font-weight:700;color:${qty===0?'#9ca3af':'#2d35a8'};display:block">${s}</span>
           <span class="size-qty" id="sqty-${p.id}-${s}" style="font-size:16px;font-weight:700;display:block">${qty}</span>
         </div>`;
@@ -2095,7 +2095,7 @@ function _szLpStart(pid, size) {
   _szLpTimer = setTimeout(() => { _szLpFired = true; openSizeEdit(pid, size); }, 450);
 }
 function _szLpEnd() { clearTimeout(_szLpTimer); }
-function _szCellTap(pid, size) { if (!_szLpFired) sizeStep(pid, size, 1); }
+
 
 let _sizeEditPid = null, _sizeEditSize = null;
 function openSizeEdit(pid, size) {
