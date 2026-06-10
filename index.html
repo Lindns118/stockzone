@@ -1918,7 +1918,7 @@ function renderProducts() {
   const cc = currentZone==='vetements'?'vc':currentZone==='office'?'oc':'';
   const today = new Date().toISOString().slice(0,10);
 
-  const makeStdCard = (p, extraClass='') => {
+  const makeStdCard = (p, extraClass='', groupName='') => {
     const isLow = p.seuil>0&&p.qty<=p.seuil;
     return `<div class="product-card ${cc}${extraClass}" draggable="true" data-pid="${p.id}"
         onclick="openDetail('${p.id}')"
@@ -1936,7 +1936,7 @@ function renderProducts() {
       </div>
       ${isLow?`<div><span class="alert-tag">⚠ Seuil bas (≤ ${p.seuil})</span></div>`:''}
       ${(()=>{
-        if ((p.groupe||'').toLowerCase() === 'bois' || (p.category||'').toLowerCase() === 'bois') {
+        if (groupName.toLowerCase() === 'bois' || (p.groupe||'').toLowerCase() === 'bois' || (p.category||'').toLowerCase() === 'bois') {
           if (p.qtyInt === undefined) { p.qtyInt = p.qty; p.qtyExt = 0; }
           const vI = pendingDualValues[p.id+'_int'] ?? p.qtyInt;
           const vE = pendingDualValues[p.id+'_ext'] ?? p.qtyExt;
@@ -2047,7 +2047,7 @@ function renderProducts() {
           </div>
         </div>`;
         if (isOpen && !isEmpty) {
-          html += `<div class="group-children">${gprods.map(p=>makeStdCard(p)).join('')}</div>`;
+          html += `<div class="group-children">${gprods.map(p=>makeStdCard(p,'',gname)).join('')}</div>`;
         }
       }
     });
