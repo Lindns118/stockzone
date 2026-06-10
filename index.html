@@ -2712,7 +2712,7 @@ function editHistItem(hid, e) {
   const item = currentProduct.history.find(h=>h.id===hid);
   if (!item) return;
   editHistTarget = {product: currentProduct, hid};
-  document.getElementById('eh-date').value = item.date||'';
+  document.getElementById('eh-date').value = (item.date||'').slice(0,10);
   document.getElementById('eh-qty').value = item.qty||'';
   document.getElementById('eh-four').value = item.fournisseur||'';
   document.getElementById('eh-notes').value = item.notes||'';
