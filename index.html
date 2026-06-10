@@ -116,6 +116,11 @@ body{font-family:'DM Sans',sans-serif;background:#eef0f7;color:var(--text);min-h
 .cs-input:focus{border-color:var(--blue)}
 .cs-save{width:40px;height:36px;border:none;border-radius:9px;background:var(--blue);color:#fff;font-size:16px;cursor:pointer;flex-shrink:0;transition:background .12s}
 .cs-save:active{background:#1a28a0}
+.dual-stepper{gap:4px}
+.dual-side{display:flex;align-items:center;gap:3px;flex:1;min-width:0}
+.dual-lbl{font-size:10px;font-weight:700;color:var(--text2);flex-shrink:0;width:22px;text-align:center}
+.dual-input{font-size:14px!important;padding:6px 2px!important;text-align:center;min-width:0}
+.dual-sep{width:1px;height:28px;background:var(--gray2);flex-shrink:0;margin:0 2px}
 .product-card:active{transform:scale(.98)}
 .product-card.vc{border-left-color:var(--purple)}
 .product-card.oc{border-left-color:var(--orange)}
@@ -1930,13 +1935,38 @@ function renderProducts() {
         <div style="text-align:right;flex-shrink:0"><div class="pc-qty${isLow?' low':''}">${p.qty}</div><div class="pc-unit">${esc(p.unit)}</div>${p.packQty?`<div style="font-size:10px;color:var(--text2);margin-top:1px">${Math.round(p.qty*p.packQty).toLocaleString('fr')} ${esc(p.packUnit||'u.')}</div>`:''}</div>
       </div>
       ${isLow?`<div><span class="alert-tag">⚠ Seuil bas (≤ ${p.seuil})</span></div>`:''}
-      <div class="card-stepper" onclick="event.stopPropagation()">
-        <button class="cs-btn cs-minus" onclick="cardStep('${p.id}',-1)">−</button>
-        <input type="number" id="cs-${p.id}" class="cs-input" value="${pendingCardValues[p.id]??p.qty}" min="0" max="999999"
-          oninput="pendingCardValues['${p.id}']=this.value;event.stopPropagation()" onchange="event.stopPropagation()" onclick="event.stopPropagation()" onfocus="event.stopPropagation()">
-        <button class="cs-btn cs-plus" onclick="cardStep('${p.id}',1)">+</button>
-        <button class="cs-save" onclick="cardSave('${p.id}')">💾</button>
-      </div>
+      ${(()=>{
+        if ((p.category||'').toLowerCase() === 'bois') {
+          if (p.qtyInt === undefined) { p.qtyInt = p.qty; p.qtyExt = 0; }
+          const vI = pendingDualValues[p.id+'_int'] ?? p.qtyInt;
+          const vE = pendingDualValues[p.id+'_ext'] ?? p.qtyExt;
+          return `<div class="card-stepper dual-stepper" onclick="event.stopPropagation()">
+            <div class="dual-side">
+              <span class="dual-lbl">Int.</span>
+              <button class="cs-btn cs-minus" onclick="cardStepDual('${p.id}','int',-1)">−</button>
+              <input type="number" id="csd-${p.id}-int" class="cs-input dual-input" value="${vI}" min="0" max="999999"
+                oninput="pendingDualValues['${p.id}_int']=this.value;event.stopPropagation()" onclick="event.stopPropagation()" onfocus="event.stopPropagation()">
+              <button class="cs-btn cs-plus" onclick="cardStepDual('${p.id}','int',1)">+</button>
+            </div>
+            <div class="dual-sep"></div>
+            <div class="dual-side">
+              <span class="dual-lbl">Ext.</span>
+              <button class="cs-btn cs-minus" onclick="cardStepDual('${p.id}','ext',-1)">−</button>
+              <input type="number" id="csd-${p.id}-ext" class="cs-input dual-input" value="${vE}" min="0" max="999999"
+                oninput="pendingDualValues['${p.id}_ext']=this.value;event.stopPropagation()" onclick="event.stopPropagation()" onfocus="event.stopPropagation()">
+              <button class="cs-btn cs-plus" onclick="cardStepDual('${p.id}','ext',1)">+</button>
+            </div>
+            <button class="cs-save" onclick="cardSaveDual('${p.id}')">💾</button>
+          </div>`;
+        }
+        return `<div class="card-stepper" onclick="event.stopPropagation()">
+          <button class="cs-btn cs-minus" onclick="cardStep('${p.id}',-1)">−</button>
+          <input type="number" id="cs-${p.id}" class="cs-input" value="${pendingCardValues[p.id]??p.qty}" min="0" max="999999"
+            oninput="pendingCardValues['${p.id}']=this.value;event.stopPropagation()" onchange="event.stopPropagation()" onclick="event.stopPropagation()" onfocus="event.stopPropagation()">
+          <button class="cs-btn cs-plus" onclick="cardStep('${p.id}',1)">+</button>
+          <button class="cs-save" onclick="cardSave('${p.id}')">💾</button>
+        </div>`;
+      })()}
     </div>`;
   };
 
@@ -2147,6 +2177,37 @@ function cardStep(pid, delta) {
   const nv = Math.max(0, r2(val+delta));
   input.value = nv;
   pendingCardValues[pid] = nv;
+}
+
+// ── DUAL ZONE (Bois) ──
+const pendingDualValues = {};
+function cardStepDual(pid, side, delta) {
+  const input = document.getElementById(`csd-${pid}-${side}`);
+  if (!input) return;
+  const nv = Math.max(0, r2((parseFloat(input.value)||0) + delta));
+  input.value = nv;
+  pendingDualValues[`${pid}_${side}`] = nv;
+}
+function cardSaveDual(pid) {
+  const found = findProduct(pid);
+  if (!found) return;
+  const p = found.p;
+  const inpI = document.getElementById(`csd-${pid}-int`);
+  const inpE = document.getElementById(`csd-${pid}-ext`);
+  if (!inpI || !inpE) return;
+  const qI = Math.max(0, parseFloat(inpI.value) || 0);
+  const qE = Math.max(0, parseFloat(inpE.value) || 0);
+  p.qtyInt = qI; p.qtyExt = qE;
+  p.qty = r2(qI + qE);
+  const td = new Date().toISOString().slice(0,10);
+  const hex = p.history.find(h=>h.date&&h.date.startsWith(td)&&h.type==='inventaire');
+  if (hex) { hex.qty = p.qty; hex.qtyInt = qI; hex.qtyExt = qE; }
+  else p.history.push({id:uid(), type:'inventaire', date:nowIso(), qty:p.qty, qtyInt:qI, qtyExt:qE});
+  recalcQty(p);
+  save();
+  delete pendingDualValues[`${pid}_int`]; delete pendingDualValues[`${pid}_ext`];
+  toast(`✅ ${esc(p.name)} — Int. ${qI} + Ext. ${qE} = ${p.qty} ${esc(p.unit)}`, 'success');
+  renderProducts();
 }
 
 function cardSave(pid) {
