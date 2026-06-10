@@ -1936,7 +1936,7 @@ function renderProducts() {
       </div>
       ${isLow?`<div><span class="alert-tag">⚠ Seuil bas (≤ ${p.seuil})</span></div>`:''}
       ${(()=>{
-        if ((p.category||'').toLowerCase() === 'bois') {
+        if ((p.groupe||'').toLowerCase() === 'bois' || (p.category||'').toLowerCase() === 'bois') {
           if (p.qtyInt === undefined) { p.qtyInt = p.qty; p.qtyExt = 0; }
           const vI = pendingDualValues[p.id+'_int'] ?? p.qtyInt;
           const vE = pendingDualValues[p.id+'_ext'] ?? p.qtyExt;
