@@ -5990,7 +5990,11 @@ function setVetTab(tab) {
       const inp = document.getElementById('person-search');
       if (inp && _personnesSearchQuery) inp.value = _personnesSearchQuery;
       filterPersonCards(_personnesSearchQuery);
-      if (_personnesScrollY) { requestAnimationFrame(() => { vc.scrollTop = _personnesScrollY; }); }
+      if (_personnesScrollY) {
+        const savedY = _personnesScrollY;
+        _personnesScrollY = 0;
+        setTimeout(() => { vc.scrollTop = savedY; }, 60);
+      }
     }
     else if (tab === 'dispo') { _personnesScrollY=0; _personnesSearchQuery=''; showPackDispoView(); }
     else if (tab === 'chaussures') vc.innerHTML = buildChaussuresTabHTML();
