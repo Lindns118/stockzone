@@ -5990,10 +5990,13 @@ function setVetTab(tab) {
       const inp = document.getElementById('person-search');
       if (inp && _personnesSearchQuery) inp.value = _personnesSearchQuery;
       filterPersonCards(_personnesSearchQuery);
-      if (_personnesScrollY) {
-        const savedY = _personnesScrollY;
-        _personnesScrollY = 0;
-        setTimeout(() => { vc.scrollTop = savedY; }, 60);
+      if (_personnesLastId) {
+        const lastId = _personnesLastId;
+        _personnesLastId = '';
+        requestAnimationFrame(() => {
+          const card = vc.querySelector(`.pcard[data-personid="${lastId}"]`);
+          if (card) card.scrollIntoView({block:'center', behavior:'instant'});
+        });
       }
     }
     else if (tab === 'dispo') { _personnesScrollY=0; _personnesSearchQuery=''; showPackDispoView(); }
@@ -7036,6 +7039,7 @@ function confirmBulkDistrib() {
 let _personFilter = '';
 let _personnesScrollY = 0;
 let _personnesSearchQuery = '';
+let _personnesLastId = '';
 function setPersonFilter(statutId) {
   _personFilter = statutId;
   // Update button styles
@@ -7082,6 +7086,7 @@ function showPersonDetail(personId) {
   if (!vc) return;
   _personnesScrollY = vc.scrollTop || 0;
   _personnesSearchQuery = document.getElementById('person-search')?.value || '';
+  _personnesLastId = personId;
   _szPush();
   const zd = S.zones.vetements;
   const attrs = (S.attributions||[]).filter(a=>a.person.toLowerCase()===person.name.toLowerCase()).slice().reverse();
