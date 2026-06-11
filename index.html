@@ -7061,6 +7061,7 @@ function setPersonFilter(statutId) {
 }
 
 function filterPersonCards(query) {
+  _personnesSearchQuery = query;
   const q = query.trim().toLowerCase();
   document.querySelectorAll('#person-cards-list .pcard').forEach(card => {
     const matchName = !q || card.dataset.name.includes(q);
