@@ -7117,6 +7117,7 @@ let _personFilter = '';
 let _personnesScrollY = 0;
 let _personnesSearchQuery = '';
 let _personnesLastId = '';
+let _szSizeExportStatuts = ['employe','ouvrier','team_leader','duty'];
 function setPersonFilter(statutId) {
   _personFilter = statutId;
   // Update button styles
@@ -7514,7 +7515,9 @@ function printPersonCard(personId) {
     <div style="font-size:13px;color:#6b7280;margin-bottom:16px">Choisissez le pack à exporter${!personId?' pour toutes les personnes':''}</div>
     ${packs.length ? packOptions : '<div style="color:#9ca3af;font-size:13px;padding:20px 0;text-align:center">Aucun pack configuré</div>'}
     ${!personId ? `<div style="margin-top:20px">
-      <div style="font-size:14px;font-weight:700;color:#374151;margin-bottom:10px">📊 Tableau récapitulatif des tailles</div>
+      <div style="font-size:14px;font-weight:700;color:#374151;margin-bottom:6px">📊 Tableau récapitulatif des tailles</div>
+      <div style="font-size:12px;color:#6b7280;margin-bottom:8px">Groupes à inclure :</div>
+      <div id="size-export-filters" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">${_szSizeStatutChipsHTML()}</div>
       <div style="display:flex;gap:8px">
         <button onclick="exportSizesTablePDF()" style="flex:1;background:#7c3aed;color:#fff;border:none;border-radius:12px;padding:13px;font-size:13px;font-weight:700;cursor:pointer">📄 PDF</button>
         <button onclick="exportSizesTableCSV()" style="flex:1;background:#059669;color:#fff;border:none;border-radius:12px;padding:13px;font-size:13px;font-weight:700;cursor:pointer">📊 Excel</button>
@@ -7523,16 +7526,40 @@ function printPersonCard(personId) {
   vc.style.display = 'block';
 }
 
+const _szStatutChipDefs = [
+  {k:'employe',     lbl:'Employé',     color:'#2563eb'},
+  {k:'ouvrier',     lbl:'Ouvrier',     color:'#d97706'},
+  {k:'team_leader', lbl:'Team Leader', color:'#7c3aed'},
+  {k:'duty',        lbl:'Duty',        color:'#059669'},
+];
+
+function _szSizeStatutChipsHTML() {
+  return _szStatutChipDefs.map(({k, lbl, color}) => {
+    const active = _szSizeExportStatuts.includes(k);
+    return `<button onclick="_szToggleSizeStatut('${k}')" style="padding:7px 13px;border-radius:20px;border:2px solid ${color};background:${active?color:'transparent'};color:${active?'#fff':color};font-size:12px;font-weight:700;cursor:pointer;transition:all .15s">${lbl}</button>`;
+  }).join('');
+}
+
+function _szToggleSizeStatut(k) {
+  const i = _szSizeExportStatuts.indexOf(k);
+  if (i === -1) _szSizeExportStatuts.push(k);
+  else _szSizeExportStatuts.splice(i, 1);
+  const el = document.getElementById('size-export-filters');
+  if (el) el.innerHTML = _szSizeStatutChipsHTML();
+}
+
 function _getSizesTableData() {
   const zd = S.zones.vetements;
   const products = (zd?.products||[]).filter(p => p.sized);
-  const persons = (S.persons||[]).slice().sort((a,b) => {
-    const sOrder = {employe:0, ouvrier:1, team_leader:2, duty:3};
-    const sa = sOrder[a.statut||''] ?? 4;
-    const sb = sOrder[b.statut||''] ?? 4;
-    if (sa !== sb) return sa - sb;
-    return a.name.localeCompare(b.name, 'fr', {sensitivity:'base'});
-  });
+  const persons = (S.persons||[])
+    .filter(p => _szSizeExportStatuts.includes(p.statut||''))
+    .slice().sort((a,b) => {
+      const sOrder = {employe:0, ouvrier:1, team_leader:2, duty:3};
+      const sa = sOrder[a.statut||''] ?? 4;
+      const sb = sOrder[b.statut||''] ?? 4;
+      if (sa !== sb) return sa - sb;
+      return a.name.localeCompare(b.name, 'fr', {sensitivity:'base'});
+    });
   return {products, persons};
 }
 
