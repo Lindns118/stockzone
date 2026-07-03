@@ -7584,7 +7584,8 @@ function _buildSizeRecapData(products, persons) {
       if (ia !== -1 && ib !== -1) return ia - ib;
       return a.localeCompare(b);
     });
-    return { name: pr.name, id: pr.id, sizeCounts, sortedSizes, unknown, total: persons.length };
+    const stockSizes = pr.sizes || {};
+    return { name: pr.name, id: pr.id, sizeCounts, sortedSizes, unknown, total: persons.length, stockSizes };
   });
 }
 
@@ -7616,13 +7617,28 @@ function exportSizesTablePDF() {
   // Recap section
   const recapData = _buildSizeRecapData(products, persons);
   const recapCards = recapData.map(pr => {
-    const sizeRows = pr.sortedSizes.map(s =>
-      `<tr><td style="padding:3px 8px;font-weight:700;color:#374151">${s}</td><td style="padding:3px 8px;text-align:center;font-weight:800;color:#7c3aed">${pr.sizeCounts[s]}</td></tr>`
-    ).join('');
-    const unknownRow = `<tr style="border-top:1px solid #e5e7eb"><td style="padding:3px 8px;color:#9ca3af;font-style:italic">Inconnu</td><td style="padding:3px 8px;text-align:center;color:#9ca3af;font-weight:700">${pr.unknown}</td></tr>`;
-    return `<div style="break-inside:avoid;display:inline-block;vertical-align:top;margin:0 12px 16px 0;min-width:110px">
+    const sizeRows = pr.sortedSizes.map(s => {
+      const stock = pr.stockSizes[s] || 0;
+      const stockColor = stock === 0 ? '#ef4444' : stock <= 2 ? '#d97706' : '#374151';
+      return `<tr>
+        <td style="padding:3px 8px;font-weight:700;color:#374151">${s}</td>
+        <td style="padding:3px 8px;text-align:center;font-weight:800;color:#7c3aed">${pr.sizeCounts[s]}</td>
+        <td style="padding:3px 8px;text-align:center;font-weight:700;color:${stockColor}">${stock}</td>
+      </tr>`;
+    }).join('');
+    const unknownRow = `<tr style="border-top:1px solid #e5e7eb">
+      <td style="padding:3px 8px;color:#9ca3af;font-style:italic">Inconnu</td>
+      <td style="padding:3px 8px;text-align:center;color:#9ca3af;font-weight:700">${pr.unknown}</td>
+      <td></td>
+    </tr>`;
+    return `<div style="break-inside:avoid;display:inline-block;vertical-align:top;margin:0 12px 16px 0;min-width:140px">
       <div style="font-weight:800;font-size:11px;color:#7c3aed;text-transform:uppercase;letter-spacing:.4px;padding:5px 8px;background:#f5f3ff;border-radius:6px 6px 0 0;border:1px solid #ddd;border-bottom:none">${esc(pr.name)}</div>
       <table style="width:100%;border-collapse:collapse;font-size:12px;border:1px solid #ddd;border-radius:0 0 6px 6px;overflow:hidden">
+        <thead><tr style="background:#f9fafb">
+          <th style="padding:3px 8px;text-align:left;font-size:10px;color:#6b7280">Taille</th>
+          <th style="padding:3px 8px;text-align:center;font-size:10px;color:#7c3aed">Nb pers.</th>
+          <th style="padding:3px 8px;text-align:center;font-size:10px;color:#374151">Stock</th>
+        </tr></thead>
         <tbody>${sizeRows}${unknownRow}</tbody>
       </table>
     </div>`;
@@ -7674,11 +7690,11 @@ function exportSizesTableCSV() {
   recapData.forEach(pr => {
     recapRows.push('');
     recapRows.push([csvEsc(pr.name)].join(';'));
-    recapRows.push([csvEsc('Taille'), csvEsc('Nombre')].join(';'));
+    recapRows.push([csvEsc('Taille'), csvEsc('Nombre'), csvEsc('Stock actuel')].join(';'));
     pr.sortedSizes.forEach(s => {
-      recapRows.push([csvEsc(s), pr.sizeCounts[s]].join(';'));
+      recapRows.push([csvEsc(s), pr.sizeCounts[s], pr.stockSizes[s]||0].join(';'));
     });
-    recapRows.push([csvEsc('Inconnu'), pr.unknown].join(';'));
+    recapRows.push([csvEsc('Inconnu'), pr.unknown, ''].join(';'));
   });
 
   const csv = '﻿' + [header, ...rows, ...recapRows].join('\r\n');
