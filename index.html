@@ -7536,6 +7536,27 @@ function _getSizesTableData() {
   return {products, persons};
 }
 
+function _buildSizeRecapData(products, persons) {
+  const sizeOrder = ['XXS','XS','S','M','L','XL','XXL','XXXL','3XL','4XL'];
+  return products.map(pr => {
+    const sizeCounts = {};
+    let unknown = 0;
+    persons.forEach(p => {
+      const sz = (p.sizes||{})[pr.id];
+      if (!sz) unknown++;
+      else sizeCounts[sz] = (sizeCounts[sz]||0) + 1;
+    });
+    const sortedSizes = Object.keys(sizeCounts).sort((a, b) => {
+      const na = parseInt(a), nb = parseInt(b);
+      if (!isNaN(na) && !isNaN(nb)) return na - nb;
+      const ia = sizeOrder.indexOf(a.toUpperCase()), ib = sizeOrder.indexOf(b.toUpperCase());
+      if (ia !== -1 && ib !== -1) return ia - ib;
+      return a.localeCompare(b);
+    });
+    return { name: pr.name, id: pr.id, sizeCounts, sortedSizes, unknown, total: persons.length };
+  });
+}
+
 function exportSizesTablePDF() {
   const {products, persons} = _getSizesTableData();
   if (!persons.length) { toast('Aucune personne','warning'); return; }
@@ -7560,9 +7581,26 @@ function exportSizesTablePDF() {
     }).join('');
     return groupRow + `<tr><td style="font-size:12px;font-weight:600;white-space:nowrap;padding:5px 8px">${esc(p.name)}</td>${cells}</tr>`;
   }).join('');
+
+  // Recap section
+  const recapData = _buildSizeRecapData(products, persons);
+  const recapCards = recapData.map(pr => {
+    const sizeRows = pr.sortedSizes.map(s =>
+      `<tr><td style="padding:3px 8px;font-weight:700;color:#374151">${s}</td><td style="padding:3px 8px;text-align:center;font-weight:800;color:#7c3aed">${pr.sizeCounts[s]}</td></tr>`
+    ).join('');
+    const unknownRow = `<tr style="border-top:1px solid #e5e7eb"><td style="padding:3px 8px;color:#9ca3af;font-style:italic">Inconnu</td><td style="padding:3px 8px;text-align:center;color:#9ca3af;font-weight:700">${pr.unknown}</td></tr>`;
+    return `<div style="break-inside:avoid;display:inline-block;vertical-align:top;margin:0 12px 16px 0;min-width:110px">
+      <div style="font-weight:800;font-size:11px;color:#7c3aed;text-transform:uppercase;letter-spacing:.4px;padding:5px 8px;background:#f5f3ff;border-radius:6px 6px 0 0;border:1px solid #ddd;border-bottom:none">${esc(pr.name)}</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;border:1px solid #ddd;border-radius:0 0 6px 6px;overflow:hidden">
+        <tbody>${sizeRows}${unknownRow}</tbody>
+      </table>
+    </div>`;
+  }).join('');
+
   const css = `
     body{font-family:Arial,sans-serif;font-size:12px;color:#111;padding:16px}
     h2{color:#7c3aed;margin-bottom:2px;font-size:16px}
+    h3{color:#374151;font-size:13px;margin:24px 0 10px;border-top:2px solid #e5e7eb;padding-top:14px}
     .sub{color:#6b7280;font-size:11px;margin-bottom:14px}
     table{width:100%;border-collapse:collapse;font-size:12px}
     th,td{border:1px solid #ddd;padding:4px 6px;text-align:left}
@@ -7574,6 +7612,8 @@ function exportSizesTablePDF() {
     <h2>Tableau des tailles</h2>
     <div class="sub">${persons.length} personnes · ${products.length} articles · Exporté le ${now}</div>
     <table><thead><tr><th>Nom</th>${thCols}</tr></thead><tbody>${rows}</tbody></table>
+    <h3>📊 Récapitulatif des tailles par produit</h3>
+    <div style="line-height:0">${recapCards}</div>
     <div class="foot">StockZone · Tableau des tailles · ${now}</div>
   </body></html>`;
   const w = window.open('', '_blank');
@@ -7594,7 +7634,23 @@ function exportSizesTableCSV() {
     const sizes = products.map(pr => (p.sizes||{})[pr.id] || 'N/A');
     return [p.name, statut, ...sizes].map(csvEsc).join(';');
   });
-  const csv = '﻿' + [header, ...rows].join('\r\n'); // BOM for Excel UTF-8
+
+  // Recap section
+  const recapData = _buildSizeRecapData(products, persons);
+  const recapRows = [];
+  recapRows.push('');
+  recapRows.push(csvEsc('RÉCAPITULATIF DES TAILLES PAR PRODUIT'));
+  recapData.forEach(pr => {
+    recapRows.push('');
+    recapRows.push([csvEsc(pr.name)].join(';'));
+    recapRows.push([csvEsc('Taille'), csvEsc('Nombre')].join(';'));
+    pr.sortedSizes.forEach(s => {
+      recapRows.push([csvEsc(s), pr.sizeCounts[s]].join(';'));
+    });
+    recapRows.push([csvEsc('Inconnu'), pr.unknown].join(';'));
+  });
+
+  const csv = '﻿' + [header, ...rows, ...recapRows].join('\r\n');
   const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
