@@ -6136,7 +6136,7 @@ function exportDonsRecap() {
   const qa = _vetDonsArticleQuery.trim().toLowerCase();
   const allAttrs = (S.attributions||[]).slice().sort((a,b) => (a.date||'') > (b.date||'') ? 1 : -1);
   const data = allAttrs.filter(a => {
-    if (!(a.items||[]).length) return false; // ignorer dons sans articles
+    if (!(a.items||[]).length) return false;
     const matchPerson = !qp || (a.person||'').toLowerCase().includes(qp);
     const matchArt = !qa || (a.items||[]).some(i => (i.name||'').toLowerCase().includes(qa));
     const matchYear = !_vetDonsYear || (a.date||'').startsWith(_vetDonsYear);
@@ -6146,33 +6146,48 @@ function exportDonsRecap() {
   const filtreLabel = [_vetDonsYear||'toutes années', qp?`personne: ${qp}`:'', qa?`article: ${qa}`:''].filter(Boolean).join(' · ');
   const titre = `Récapitulatif des dons — ${filtreLabel}`;
   const now = new Date().toLocaleDateString('fr-FR');
-  const rows = data.map(a => {
-    const date = fmtDate(a.date?.slice(0,10));
-    const items = (a.items||[]).map(i=>esc(i.name)+(i.size?` (${i.size})`:'')+(i.qty>1?` ×${i.qty}`:'')).join('<br>');
-    const preInv = a.preInventory ? '<br><span style="font-size:10px;color:#d97706;font-weight:700">avant inventaire</span>' : '';
-    const sig = a.signature ? '✅' : '—';
-    return `<tr>
-      <td style="white-space:nowrap">${date}</td>
-      <td style="font-weight:600">${esc(a.person||'—')}</td>
-      <td>${esc(a.packName||'Don')}${preInv}</td>
-      <td>${items}</td>
-      <td style="text-align:center">${sig}</td>
+
+  // Group by person, sort alphabetically
+  const byPerson = {};
+  data.forEach(a => {
+    const key = (a.person||'—').trim().toLowerCase();
+    if (!byPerson[key]) byPerson[key] = { person: (a.person||'—').trim(), attrs: [] };
+    byPerson[key].attrs.push(a);
+  });
+  const groups = Object.values(byPerson).sort((a,b) =>
+    a.person.localeCompare(b.person, 'fr', {sensitivity:'base'})
+  );
+
+  const rows = groups.map((g, gi) => {
+    g.attrs.sort((a,b) => (a.date||'') > (b.date||'') ? 1 : -1);
+    const donBlocks = g.attrs.map((a, ai) => {
+      const date = fmtDate(a.date?.slice(0,10));
+      const items = (a.items||[]).map(i=>esc(i.name)+(i.size?` (${i.size})`:'')+(i.qty>1?` ×${i.qty}`:'')).join(', ');
+      const preInv = a.preInventory ? ' <span style="font-size:10px;color:#d97706;font-weight:700">avant inventaire</span>' : '';
+      const sig = a.signature ? ' <span style="color:#16a34a;font-weight:700">✅</span>' : '';
+      const sep = ai > 0 ? 'border-top:1px dashed #d1d5db;padding-top:5px;margin-top:5px;' : '';
+      return `<div style="${sep}"><span style="font-weight:700;color:#374151">${date}</span> — ${esc(a.packName||'Don')}${preInv}${sig}<br><span style="color:#555">${items}</span></div>`;
+    }).join('');
+    const rowBg = gi % 2 === 0 ? '' : 'background:#fafafa';
+    return `<tr style="${rowBg}">
+      <td style="font-weight:700;white-space:nowrap;vertical-align:top;width:180px">${esc(g.person)}</td>
+      <td style="vertical-align:top">${donBlocks}</td>
     </tr>`;
   }).join('');
+
   const css = `body{font-family:Arial,sans-serif;font-size:12px;color:#111;padding:24px}
     h2{color:#7c3aed;margin-bottom:4px;font-size:18px}
     .sub{color:#6b7280;font-size:12px;margin-bottom:18px}
     table{width:100%;border-collapse:collapse}
     th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;vertical-align:top}
     th{background:#f5f3ff;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
-    tr:nth-child(even){background:#fafafa}
     .foot{font-size:10px;color:#aaa;text-align:right;margin-top:12px}
     @media print{body{padding:12px}}`;
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${titre}</title><style>${css}</style></head><body>
     <h2>${titre}</h2>
-    <div class="sub">${data.length} don${data.length>1?'s':''} · Exporté le ${now}</div>
+    <div class="sub">${groups.length} personne${groups.length>1?'s':''} · ${data.length} don${data.length>1?'s':''} · Exporté le ${now}</div>
     <table>
-      <tr><th>Date</th><th>Personne</th><th>Type</th><th>Articles</th><th>Signé</th></tr>
+      <tr><th style="width:180px">Personne</th><th>Dons</th></tr>
       ${rows}
     </table>
     <div class="foot">StockZone · ${titre}</div>
