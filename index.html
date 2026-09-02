@@ -577,6 +577,11 @@ body.vet-mode .main{padding-bottom:20px}
         <button class="stepper-btn stepper-plus" onclick="quickStep(1)">+</button>
       </div>
       <div class="quick-unit-lbl" id="quick-unit-lbl"></div>
+      <div id="quick-sizes-wrap" style="display:none;margin-top:12px">
+        <div class="fl" style="margin-bottom:8px;font-weight:600">Répartition par taille</div>
+        <div id="quick-sizes-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:8px"></div>
+        <div style="font-size:12px;color:var(--text2);margin-top:6px">Le total ci-dessus est calculé automatiquement</div>
+      </div>
       <div id="quick-extra-wrap" style="display:none;margin-top:10px;background:var(--gray);border-radius:10px;padding:10px">
         <div style="font-size:12px;color:var(--text2);margin-bottom:6px">+ unités supplémentaires</div>
         <div style="display:flex;align-items:center;gap:8px">
@@ -2629,6 +2634,33 @@ function quickSetType(type, btn) {
   document.getElementById('quick-qty-label').textContent = isLiv ? 'Quantité reçue' : 'Stock actuel';
   document.getElementById('quick-four-wrap').style.display = isLiv ? 'block' : 'none';
   document.getElementById('quick-qty').value = isLiv ? 1 : (currentProduct?.qty || 0);
+  // Size grid for sized products in livraison mode
+  const sizesWrap = document.getElementById('quick-sizes-wrap');
+  const sizesGrid = document.getElementById('quick-sizes-grid');
+  if (isLiv && currentProduct?.sized) {
+    const sizes = getProductSizes(currentProduct);
+    sizesGrid.innerHTML = sizes.map(s =>
+      `<div style="background:var(--gray);border-radius:8px;padding:6px 8px;text-align:center">
+        <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px">${s}</div>
+        <input type="number" min="0" value="0" class="fi" style="text-align:center;padding:4px 2px;width:100%;font-size:15px;font-weight:700"
+          oninput="quickSizesSum()" data-size="${s}" id="qs-${s}">
+      </div>`
+    ).join('');
+    sizesWrap.style.display = 'block';
+    document.getElementById('quick-qty').readOnly = true;
+    document.getElementById('quick-qty').value = 0;
+  } else {
+    sizesWrap.style.display = 'none';
+    document.getElementById('quick-qty').readOnly = false;
+  }
+}
+
+function quickSizesSum() {
+  let total = 0;
+  document.querySelectorAll('#quick-sizes-grid input[data-size]').forEach(inp => {
+    total += Math.max(0, parseFloat(inp.value)||0);
+  });
+  document.getElementById('quick-qty').value = total;
 }
 
 function quickStep(delta) {
@@ -2670,17 +2702,41 @@ function saveQuickEntry() {
 
   if(!date) { toast('Choisissez une date', 'error'); return; }
 
+  // Collect per-size quantities for sized livraisons
+  let livSizes = undefined;
+  if (quickType === 'livraison' && currentProduct.sized) {
+    const sizeInputs = document.querySelectorAll('#quick-sizes-grid input[data-size]');
+    if (sizeInputs.length > 0) {
+      livSizes = {};
+      sizeInputs.forEach(inp => {
+        const v = Math.max(0, parseFloat(inp.value)||0);
+        if (v > 0) livSizes[inp.dataset.size] = v;
+      });
+      if (!Object.keys(livSizes).length) livSizes = undefined;
+    }
+  }
+
   // Always create a NEW entry — never modify existing
   currentProduct.history.push({
     id: uid(),
     type: quickType,
     date,
     qty,
+    sizes: livSizes || undefined,
     notes: notes || undefined,
     fournisseur: (quickType==='livraison' && four) ? four : undefined
   });
 
-  recalcQty(currentProduct);
+  // For sized livraisons, update per-size stock
+  if (livSizes && currentProduct.sized) {
+    if (!currentProduct.sizes) currentProduct.sizes = {};
+    Object.entries(livSizes).forEach(([s, v]) => {
+      currentProduct.sizes[s] = (currentProduct.sizes[s] || 0) + v;
+    });
+    currentProduct.qty = Object.values(currentProduct.sizes).reduce((a,b)=>a+b, 0);
+  } else {
+    recalcQty(currentProduct);
+  }
   save();
 
   document.getElementById('pd-qty').textContent = currentProduct.qty;
