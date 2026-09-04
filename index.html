@@ -7998,6 +7998,23 @@ function printAttrSheet(attrId) {
   setTimeout(()=>w.print(), 400);
 }
 
+let _dispoSelectedPackIds = null; // null = all packs shown
+
+function _dispoTogglePack(id) {
+  const packs = (S.vetPacks||[]).filter(p=>p.items.length);
+  const allIds = packs.map(p=>p.id);
+  if (!_dispoSelectedPackIds) _dispoSelectedPackIds = [...allIds];
+  const idx = _dispoSelectedPackIds.indexOf(id);
+  if (idx >= 0) {
+    _dispoSelectedPackIds.splice(idx, 1);
+    if (_dispoSelectedPackIds.length === 0) _dispoSelectedPackIds = [...allIds]; // reset if all unchecked
+  } else {
+    _dispoSelectedPackIds.push(id);
+    if (_dispoSelectedPackIds.length === allIds.length) _dispoSelectedPackIds = null; // all = null
+  }
+  showPackDispoView();
+}
+
 function showPackDispoView() {
   const vc = document.getElementById('vet-content');
   if (!vc) return;
@@ -8010,11 +8027,20 @@ function showPackDispoView() {
     return;
   }
   const analysis = calcPacksAnalysis();
+  const allIds = analysis.map(r=>r.pack.id);
+  const sel = _dispoSelectedPackIds;
+  const packChips = analysis.length > 1 ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+    ${analysis.map(r => {
+      const active = !sel || sel.includes(r.pack.id);
+      return `<button onclick="_dispoTogglePack('${r.pack.id}')" style="border:none;border-radius:20px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;background:${active?'#1d4ed8':'#e5e7eb'};color:${active?'#fff':'#6b7280'}">${r.pack.icon} ${esc(r.pack.name)}</button>`;
+    }).join('')}
+  </div>` : '';
   const actionBtns = `<div style="display:flex;gap:8px;margin-bottom:16px">
     <button onclick="exportDispoList()" style="flex:1;background:#f3f4f6;border:none;border-radius:10px;padding:10px 8px;font-size:13px;font-weight:600;cursor:pointer">📋 Exporter liste</button>
     <button onclick="mailDispoList()" style="flex:1;background:#f3f4f6;border:none;border-radius:10px;padding:10px 8px;font-size:13px;font-weight:600;cursor:pointer">✉️ Envoyer par mail</button>
   </div>`;
-  const cards = analysis.map(r => {
+  const filteredAnalysis = sel ? analysis.filter(r=>sel.includes(r.pack.id)) : analysis;
+  const cards = filteredAnalysis.map(r => {
     const countColor = r.maxPacks > 0 ? '#16a34a' : '#ef4444';
     const countBg = r.maxPacks > 0 ? '#f0fdf4' : '#fef2f2';
     const personRows = r.personStatus.length
@@ -8067,7 +8093,7 @@ function showPackDispoView() {
       }
     </div>`;
   }).join('');
-  vc.innerHTML = `<div style="font-size:18px;font-weight:800;margin-bottom:14px">📊 Packs disponibles</div>` + actionBtns + cards;
+  vc.innerHTML = `<div style="font-size:18px;font-weight:800;margin-bottom:14px">📊 Packs disponibles</div>` + packChips + actionBtns + cards;
 }
 
 function calcPacksAnalysis() {
@@ -8218,19 +8244,26 @@ function _dispoText() {
   const analysis = calcPacksAnalysis();
   const date = new Date().toLocaleDateString('fr-FR');
   let t = `STOCK VÊTEMENTS — PACKS DISPONIBLES\n${date}\n\n`;
+  const sel = window._dispoSelectedPackIds;
   analysis.forEach(r => {
+    if (sel && sel.length && !sel.includes(r.pack.id)) return;
     t += `${r.pack.name} — ${r.maxPacks} dispo\n`;
     r.personStatus.forEach(ps => {
       t += `  ${ps.ok?'✓':'✗'} ${ps.person.name}${!ps.ok?' ('+ps.cant.join(', ')+')':''}\n`;
     });
-    if (r.eligible.length > 0) {
-      t += `  → Si distribué aux ${r.eligible.length} personne${r.eligible.length!==1?'s':''}:\n`;
-      if (r.missing.length) {
+    const useAll = r.eligible.length === 0 && r.personStatus.length > 0;
+    const simCount = useAll ? r.personStatus.length : r.eligible.length;
+    const simMissing = useAll ? r.missingForAll : r.missing;
+    const simRemaining = useAll ? r.remainingForAll : r.remaining;
+    if (simCount > 0) {
+      const label = useAll ? `Si distribué aux ${simCount} personnes` : `Si distribué aux ${simCount} ✓`;
+      t += `  → ${label}:\n`;
+      if (simMissing.length) {
         t += `  MANQUANTS:\n`;
-        r.missing.forEach(m => t+=`    - ${m.name}${m.size?' '+m.size:''}: ${m.qty} manquant${m.qty!==1?'s':''}\n`);
+        simMissing.forEach(m => t+=`    - ${m.name}${m.size?' '+m.size:''}: ${m.qty} manquant${m.qty!==1?'s':''}\n`);
       }
       t += `  Stock restant:\n`;
-      r.remaining.forEach(rem => {
+      simRemaining.forEach(rem => {
         if (!rem.sized) t+=`    - ${rem.name}: ${rem.qty}\n`;
         else t+=`    - ${rem.name}: ${rem.sizes.map(({s,qty})=>s+':'+qty).join(' ')}\n`;
       });
