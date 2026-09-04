@@ -8067,10 +8067,20 @@ function showPackDispoView() {
           : `<div style="font-size:12px">• ${rem.name} : ${rem.sizes.map(({s,qty})=>`<b style="color:${qty===0?'#ef4444':'#111'}">${s}:${qty}</b>`).join(' ')}</div>`
       ).join('');
       const label = useAll ? `Si distribué aux ${simCount} personnes` : `Si distribué aux ${simCount} ✅`;
+      // Extra block: if some are non-eligible, show what's ADDITIONALLY missing to serve everyone
+      const nonEligCount = r.personStatus.filter(ps=>!ps.ok).length;
+      let extraAllHTML = '';
+      if (!useAll && nonEligCount > 0 && r.missingForAll.length > 0) {
+        extraAllHTML = `<div style="margin-top:8px;background:#fffbeb;border-radius:8px;padding:8px 10px">
+          <div style="font-weight:700;color:#d97706;font-size:12px;margin-bottom:4px">📦 Pour servir tout le monde (${r.personStatus.length} pers.)</div>
+          ${r.missingForAll.map(m=>`<div style="font-size:12px;color:#b45309">• ${m.name}${m.size?' '+m.size:''} — ${m.qty} manquant${m.qty!==1?'s':''}</div>`).join('')}
+        </div>`;
+      }
       simHTML = `<div style="margin-top:10px;border-top:1px solid #f3f4f6;padding-top:10px">
         <div style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">${label}</div>
         ${missingHTML}
         <div>${remRows}</div>
+        ${extraAllHTML}
       </div>`;
     }
     return `<div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.08)">
@@ -8267,6 +8277,13 @@ function _dispoText() {
         if (!rem.sized) t+=`    - ${rem.name}: ${rem.qty}\n`;
         else t+=`    - ${rem.name}: ${rem.sizes.map(({s,qty})=>s+':'+qty).join(' ')}\n`;
       });
+      // If some are non-eligible, also show what's needed to serve everyone
+      const nonEligCount = r.personStatus.filter(ps=>!ps.ok).length;
+      if (!useAll && nonEligCount > 0 && r.missingForAll.length > 0) {
+        t += `  → Pour servir tout le monde (${r.personStatus.length} pers.):\n`;
+        t += `  MANQUANTS SUPPLÉMENTAIRES:\n`;
+        r.missingForAll.forEach(m => t+=`    - ${m.name}${m.size?' '+m.size:''}: ${m.qty} manquant${m.qty!==1?'s':''}\n`);
+      }
     }
     t += '\n';
   });
