@@ -8025,19 +8025,24 @@ function showPackDispoView() {
         </div>`).join('')
       : '<div style="font-size:12px;color:#9ca3af;padding:5px 0">Aucune personne enregistrée</div>';
     let simHTML = '';
-    if (r.eligible.length > 0) {
-      const missingHTML = r.missing.length
+    const useAll = r.eligible.length === 0 && r.personStatus.length > 0;
+    const simCount = useAll ? r.personStatus.length : r.eligible.length;
+    const simMissing = useAll ? r.missingForAll : r.missing;
+    const simRemaining = useAll ? r.remainingForAll : r.remaining;
+    if (simCount > 0) {
+      const missingHTML = simMissing.length
         ? `<div style="background:#fef2f2;border-radius:8px;padding:8px 10px;margin-bottom:8px">
             <div style="font-weight:700;color:#dc2626;font-size:12px;margin-bottom:4px">⚠ Manquants pour servir tout le monde</div>
-            ${r.missing.map(m=>`<div style="font-size:12px;color:#dc2626">• ${m.name}${m.size?' '+m.size:''} — ${m.qty} manquant${m.qty!==1?'s':''}</div>`).join('')}
+            ${simMissing.map(m=>`<div style="font-size:12px;color:#dc2626">• ${m.name}${m.size?' '+m.size:''} — ${m.qty} manquant${m.qty!==1?'s':''}</div>`).join('')}
           </div>` : '';
-      const remRows = r.remaining.map(rem =>
+      const remRows = simRemaining.map(rem =>
         !rem.sized
           ? `<div style="font-size:12px">• ${rem.name} : <b>${rem.qty}</b> restant${rem.qty!==1?'s':''}</div>`
           : `<div style="font-size:12px">• ${rem.name} : ${rem.sizes.map(({s,qty})=>`<b style="color:${qty===0?'#ef4444':'#111'}">${s}:${qty}</b>`).join(' ')}</div>`
       ).join('');
+      const label = useAll ? `Si distribué aux ${simCount} personnes` : `Si distribué aux ${simCount} ✅`;
       simHTML = `<div style="margin-top:10px;border-top:1px solid #f3f4f6;padding-top:10px">
-        <div style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Si distribué aux ${r.eligible.length} ✅</div>
+        <div style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">${label}</div>
         ${missingHTML}
         <div>${remRows}</div>
       </div>`;
@@ -8197,7 +8202,15 @@ function calcPacksAnalysis() {
         return {size, count: count === Infinity ? 0 : count};
       });
     }
-    return {pack, maxPacks, personStatus, eligible, missing, remaining, missingForAll, bySize};
+    const remainingForAll = pack.items.map(item => {
+      const product = zd?.products?.find(p=>p.id===item.productId);
+      if (!product) return null;
+      const s = sim2[item.productId]||{};
+      return product.sized
+        ? {name:item.name, sized:true, sizes: getProductSizes(product).map(sz=>({s:sz,qty:s[sz]||0}))}
+        : {name:item.name, sized:false, qty:s._qty||0};
+    }).filter(Boolean);
+    return {pack, maxPacks, personStatus, eligible, missing, remaining, missingForAll, remainingForAll, bySize};
   });
 }
 
