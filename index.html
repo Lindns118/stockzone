@@ -8123,7 +8123,67 @@ function showPackDispoView() {
       ${bufferInput}
     </div>`;
   }).join('');
-  vc.innerHTML = `<div style="font-size:18px;font-weight:800;margin-bottom:14px">📊 Packs disponibles</div>` + packChips + actionBtns + cards;
+  vc.innerHTML = `<div style="font-size:18px;font-weight:800;margin-bottom:14px">📊 Packs disponibles</div>` + packChips + actionBtns + cards + buildStockReserveHTML(analysis);
+}
+
+// ── RÉSERVE STOCK NOUVEAUX ENTRANTS ──
+let _stockReserveConfig = {}; // packId -> qty (nb de copies à garder en réserve)
+
+function setStockReserveQty(packId, val) {
+  _stockReserveConfig[packId] = Math.max(0, parseInt(val)||0);
+  showPackDispoView();
+}
+
+function buildStockReserveHTML(analysis) {
+  const zd = S.zones.vetements;
+  if (!zd || !analysis.length) return '';
+
+  // Aggregate totals: productId -> {name, sized, sizes:{sz: total}, qty: total}
+  const totals = {};
+  analysis.forEach(r => {
+    const qty = _stockReserveConfig[r.pack.id] || 0;
+    if (!qty) return;
+    r.pack.items.forEach(item => {
+      const product = zd?.products?.find(p=>p.id===item.productId);
+      if (!product) return;
+      if (!totals[item.productId]) totals[item.productId] = {name:product.name, sized:product.sized, sizes:{}, qty:0};
+      const needed = item.qty * qty;
+      if (!product.sized) {
+        totals[item.productId].qty += needed;
+      } else {
+        getProductSizes(product).forEach(sz => {
+          totals[item.productId].sizes[sz] = (totals[item.productId].sizes[sz]||0) + needed;
+        });
+      }
+    });
+  });
+
+  const packInputs = analysis.map(r => {
+    const qty = _stockReserveConfig[r.pack.id] || 0;
+    return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+      <span style="font-size:13px;flex:1">${r.pack.icon} ${esc(r.pack.name)}</span>
+      <span style="font-size:12px;color:#6b7280">×</span>
+      <input type="number" min="0" max="99" value="${qty}" onchange="setStockReserveQty('${r.pack.id}',this.value)" style="width:46px;border:1px solid #e5e7eb;border-radius:6px;padding:3px 6px;font-size:13px;font-weight:700;text-align:center">
+    </div>`;
+  }).join('');
+
+  const hasAny = Object.values(_stockReserveConfig).some(q=>q>0);
+  const totalRows = hasAny ? Object.values(totals).map(t => {
+    if (!t.sized) return `<div style="font-size:12px;padding:3px 0">• ${esc(t.name)} : <b>${t.qty}</b></div>`;
+    const szCells = Object.entries(t.sizes).filter(([,v])=>v>0).map(([sz,v])=>
+      `<b>${sz}</b>:<span style="color:#1d4ed8;font-weight:700">${v}</span>`).join('  ');
+    return `<div style="font-size:12px;padding:3px 0">• ${esc(t.name)} : ${szCells}</div>`;
+  }).join('') : '';
+
+  return `<div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.08)">
+    <div style="font-size:13px;font-weight:800;margin-bottom:10px">📦 Réserve nouveaux entrants</div>
+    <div style="font-size:12px;color:#6b7280;margin-bottom:10px">Nb de packs à avoir en stock :</div>
+    ${packInputs}
+    ${hasAny ? `<div style="margin-top:10px;border-top:1px solid #f3f4f6;padding-top:10px">
+      <div style="font-size:11px;font-weight:700;color:#1d4ed8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Articles nécessaires</div>
+      ${totalRows}
+    </div>` : `<div style="font-size:12px;color:#9ca3af;margin-top:6px;font-style:italic">Mettre une quantité > 0 pour voir les besoins</div>`}
+  </div>`;
 }
 
 function calcPacksAnalysis() {
