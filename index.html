@@ -8435,6 +8435,43 @@ function _dispoText() {
     }
     t += '\n';
   });
+
+  // Append reserve stock section (all packs with reserveQty > 0, regardless of filter)
+  const zd = S.zones?.vetements;
+  const reservePacks = analysis.filter(r=>(r.pack.reserveQty||0)>0);
+  if (reservePacks.length > 0 && zd) {
+    t += `────────────────────────────\n`;
+    t += `RÉSERVE STOCK\n`;
+    reservePacks.forEach(r => t += `  ${r.pack.icon} ${r.pack.name} × ${r.pack.reserveQty}\n`);
+    t += '\n';
+    // Aggregate totals
+    const totals = {};
+    reservePacks.forEach(r => {
+      const qty = r.pack.reserveQty;
+      r.pack.items.forEach(item => {
+        const product = zd?.products?.find(p=>p.id===item.productId);
+        if (!product) return;
+        if (!totals[item.productId]) totals[item.productId] = {name:product.name, sized:product.sized, sizes:{}, qty:0};
+        const needed = item.qty * qty;
+        if (!product.sized) {
+          totals[item.productId].qty += needed;
+        } else {
+          getProductSizes(product).forEach(sz => {
+            totals[item.productId].sizes[sz] = (totals[item.productId].sizes[sz]||0) + needed;
+          });
+        }
+      });
+    });
+    t += `Articles nécessaires:\n`;
+    Object.values(totals).forEach(tot => {
+      if (!tot.sized) {
+        t += `  - ${tot.name}: ${tot.qty}\n`;
+      } else {
+        const szParts = Object.entries(tot.sizes).filter(([,v])=>v>0).map(([sz,v])=>`${sz}:${v}`).join(' ');
+        t += `  - ${tot.name}: ${szParts}\n`;
+      }
+    });
+  }
   return t;
 }
 
