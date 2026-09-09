@@ -8391,7 +8391,7 @@ function calcPacksAnalysis() {
         }
       });
     }
-    return {pack, maxPacks, personStatus, eligible, missing, remaining, missingForAll, remainingForAll, bySize, bufferQty, missingBuffer};
+    return {pack, maxPacks, personStatus, eligible, missing, remaining, missingForAll, remainingForAll, bySize, bufferQty, missingBuffer, sim2Stock: sim2};
   });
 }
 
@@ -8444,33 +8444,61 @@ function _dispoText() {
     t += `RÉSERVE STOCK\n`;
     reservePacks.forEach(r => t += `  ${r.pack.icon} ${r.pack.name} × ${r.pack.reserveQty}\n`);
     t += '\n';
-    // Aggregate totals
-    const totals = {};
+    // Build remaining stock after distributing the selected (filtered) packs
+    // For each productId, take the minimum remaining across selected packs' sim2Stock
+    const selectedAnalysis = analysis.filter(r => !sel || !sel.length || sel.includes(r.pack.id));
+    const afterDistStock = {}; // {productId: {size: qty} or {_qty: qty}}
+    (zd.products||[]).forEach(p => {
+      afterDistStock[p.id] = p.sized ? {...(p.sizes||{})} : {_qty: p.qty};
+    });
+    selectedAnalysis.forEach(r => {
+      Object.entries(r.sim2Stock).forEach(([pid, stock]) => {
+        if (!afterDistStock[pid]) return;
+        if (stock._qty !== undefined) {
+          afterDistStock[pid]._qty = Math.min(afterDistStock[pid]._qty||0, stock._qty||0);
+        } else {
+          Object.entries(stock).forEach(([sz, qty]) => {
+            afterDistStock[pid][sz] = Math.min(afterDistStock[pid][sz]||0, qty||0);
+          });
+        }
+      });
+    });
+    // Compute deficit: needed for reserve minus remaining after distribution
+    const deficits = {};
     reservePacks.forEach(r => {
       const qty = r.pack.reserveQty;
       r.pack.items.forEach(item => {
         const product = zd?.products?.find(p=>p.id===item.productId);
         if (!product) return;
-        if (!totals[item.productId]) totals[item.productId] = {name:product.name, sized:product.sized, sizes:{}, qty:0};
+        if (!deficits[item.productId]) deficits[item.productId] = {name:product.name, sized:product.sized, sizes:{}, qty:0};
         const needed = item.qty * qty;
         if (!product.sized) {
-          totals[item.productId].qty += needed;
+          const rem = (afterDistStock[item.productId]||{})._qty || 0;
+          const deficit = Math.max(0, needed - rem);
+          deficits[item.productId].qty += deficit;
         } else {
           getProductSizes(product).forEach(sz => {
-            totals[item.productId].sizes[sz] = (totals[item.productId].sizes[sz]||0) + needed;
+            const rem = (afterDistStock[item.productId]||{})[sz] || 0;
+            const deficit = Math.max(0, needed - rem);
+            deficits[item.productId].sizes[sz] = (deficits[item.productId].sizes[sz]||0) + deficit;
           });
         }
       });
     });
-    t += `Articles nécessaires:\n`;
-    Object.values(totals).forEach(tot => {
-      if (!tot.sized) {
-        t += `  - ${tot.name}: ${tot.qty}\n`;
-      } else {
-        const szParts = Object.entries(tot.sizes).filter(([,v])=>v>0).map(([sz,v])=>`${sz}:${v}`).join(' ');
-        t += `  - ${tot.name}: ${szParts}\n`;
-      }
-    });
+    const hasDeficit = Object.values(deficits).some(d => !d.sized ? d.qty > 0 : Object.values(d.sizes).some(v=>v>0));
+    if (hasDeficit) {
+      t += `Articles à commander (après distribution stock hiver):\n`;
+      Object.values(deficits).forEach(tot => {
+        if (!tot.sized) {
+          if (tot.qty > 0) t += `  - ${tot.name}: ${tot.qty}\n`;
+        } else {
+          const szParts = Object.entries(tot.sizes).filter(([,v])=>v>0).map(([sz,v])=>`${sz}:${v}`).join(' ');
+          if (szParts) t += `  - ${tot.name}: ${szParts}\n`;
+        }
+      });
+    } else {
+      t += `Stock suffisant pour maintenir la réserve après distribution.\n`;
+    }
   }
   return t;
 }
