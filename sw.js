@@ -1,4 +1,4 @@
-const CACHE = 'stockzone-v16';
+const CACHE = 'stockzone-v17';
 const ASSETS = ['./', './index.html', './manifest.json', './icon.svg', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
