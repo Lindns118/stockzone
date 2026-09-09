@@ -8035,9 +8035,10 @@ function showPackDispoView() {
       return `<button onclick="_dispoTogglePack('${r.pack.id}')" style="border:none;border-radius:20px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;background:${active?'#1d4ed8':'#e5e7eb'};color:${active?'#fff':'#6b7280'}">${r.pack.icon} ${esc(r.pack.name)}</button>`;
     }).join('')}
   </div>` : '';
-  const actionBtns = `<div style="display:flex;gap:8px;margin-bottom:16px">
-    <button onclick="exportDispoList()" style="flex:1;background:#f3f4f6;border:none;border-radius:10px;padding:10px 8px;font-size:13px;font-weight:600;cursor:pointer">📋 Exporter liste</button>
-    <button onclick="mailDispoList()" style="flex:1;background:#f3f4f6;border:none;border-radius:10px;padding:10px 8px;font-size:13px;font-weight:600;cursor:pointer">✉️ Envoyer par mail</button>
+  const actionBtns = `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
+    <button onclick="exportDispoList()" style="flex:1;min-width:120px;background:#f3f4f6;border:none;border-radius:10px;padding:10px 8px;font-size:13px;font-weight:600;cursor:pointer">📋 Exporter liste</button>
+    <button onclick="mailDispoList()" style="flex:1;min-width:120px;background:#f3f4f6;border:none;border-radius:10px;padding:10px 8px;font-size:13px;font-weight:600;cursor:pointer">✉️ Envoyer par mail</button>
+    <button onclick="showDispoDistribMode()" style="width:100%;background:#1d4ed8;color:#fff;border:none;border-radius:10px;padding:10px 8px;font-size:13px;font-weight:600;cursor:pointer">🎯 Distribution en continu</button>
   </div>`;
   const filteredAnalysis = sel ? analysis.filter(r=>sel.includes(r.pack.id)) : analysis;
   const cards = filteredAnalysis.map(r => {
@@ -8123,88 +8124,109 @@ function calcPacksAnalysis() {
       if (canMake < maxPacks) maxPacks = canMake;
     });
     if (maxPacks === Infinity) maxPacks = 0;
+    // Helper: get effective product for a person (handles gilet TL substitution etc.)
+    function effProd(item, person) {
+      const base = zd?.products?.find(pr=>pr.id===item.productId);
+      if (!base) return null;
+      const sub = getGiletSubstitute(item.productId, person.statut||'', zd?.products||[]);
+      return {product: sub||base, isSubstitute: !!sub};
+    }
     const personStatus = persons.map(p => {
       const cant = [];
       pack.items.forEach(item => {
-        const product = zd?.products?.find(pr=>pr.id===item.productId);
-        if (!product) { cant.push(item.name+' (article manquant)'); return; }
+        const r = effProd(item, p);
+        if (!r) { cant.push(item.name+' (article manquant)'); return; }
+        const {product} = r;
         if (!product.sized) {
-          if (product.qty < item.qty) cant.push(`${item.name} (stock ${product.qty})`);
+          if (product.qty < item.qty) cant.push(`${product.name} (stock ${product.qty})`);
           return;
         }
-        const sz = (p.sizes||{})[item.productId];
-        if (!sz) { cant.push(item.name+' (taille inconnue)'); return; }
-        if (((product.sizes||{})[sz]||0) < item.qty) cant.push(`${item.name} ${sz} (stock ${(product.sizes||{})[sz]||0})`);
+        const sz = (p.sizes||{})[product.id];
+        if (!sz) { cant.push(product.name+' (taille inconnue)'); return; }
+        if (((product.sizes||{})[sz]||0) < item.qty) cant.push(`${product.name} ${sz} (stock ${(product.sizes||{})[sz]||0})`);
       });
       return {person:p, ok:cant.length===0, cant};
     });
     const eligible = personStatus.filter(ps=>ps.ok);
+    // Init sim for base + substitute products
+    function initSim(personList) {
+      const s = {};
+      pack.items.forEach(item => {
+        const base = zd?.products?.find(p=>p.id===item.productId);
+        if (!base) return;
+        if (!s[base.id]) s[base.id] = base.sized ? {...(base.sizes||{})} : {_qty: base.qty};
+      });
+      personList.forEach(({person}) => {
+        pack.items.forEach(item => {
+          const sub = getGiletSubstitute(item.productId, person.statut||'', zd?.products||[]);
+          if (sub && !s[sub.id]) s[sub.id] = sub.sized ? {...(sub.sizes||{})} : {_qty: sub.qty};
+        });
+      });
+      return s;
+    }
     // Simulate distribution to all eligible
-    const sim = {};
-    pack.items.forEach(item => {
-      const product = zd?.products?.find(p=>p.id===item.productId);
-      if (!product) return;
-      sim[item.productId] = product.sized ? {...(product.sizes||{})} : {_qty: product.qty};
-    });
+    const sim = initSim(eligible);
     const missing = [];
     eligible.forEach(({person}) => {
       pack.items.forEach(item => {
-        const product = zd?.products?.find(p=>p.id===item.productId);
-        if (!product) return;
+        const r = effProd(item, person);
+        if (!r) return;
+        const {product} = r;
+        const pid = product.id;
         if (!product.sized) {
-          sim[item.productId]._qty = (sim[item.productId]._qty||0) - item.qty;
-          if (sim[item.productId]._qty < 0) {
-            const ex = missing.find(m=>m.name===item.name&&!m.size);
-            if (ex) ex.qty += -sim[item.productId]._qty; else missing.push({name:item.name,size:null,qty:-sim[item.productId]._qty});
-            sim[item.productId]._qty = 0;
+          sim[pid]._qty = (sim[pid]._qty||0) - item.qty;
+          if (sim[pid]._qty < 0) {
+            const ex = missing.find(m=>m.name===product.name&&!m.size);
+            if (ex) ex.qty += -sim[pid]._qty; else missing.push({name:product.name,size:null,qty:-sim[pid]._qty});
+            sim[pid]._qty = 0;
           }
         } else {
-          const sz = (person.sizes||{})[item.productId];
+          const sz = (person.sizes||{})[pid];
           if (!sz) return;
-          sim[item.productId][sz] = (sim[item.productId][sz]||0) - item.qty;
-          if (sim[item.productId][sz] < 0) {
-            const ex = missing.find(m=>m.name===item.name&&m.size===sz);
-            if (ex) ex.qty += -sim[item.productId][sz]; else missing.push({name:item.name,size:sz,qty:-sim[item.productId][sz]});
-            sim[item.productId][sz] = 0;
+          sim[pid][sz] = (sim[pid][sz]||0) - item.qty;
+          if (sim[pid][sz] < 0) {
+            const ex = missing.find(m=>m.name===product.name&&m.size===sz);
+            if (ex) ex.qty += -sim[pid][sz]; else missing.push({name:product.name,size:sz,qty:-sim[pid][sz]});
+            sim[pid][sz] = 0;
           }
         }
       });
     });
-    const remaining = pack.items.map(item => {
-      const product = zd?.products?.find(p=>p.id===item.productId);
+    // Collect all displayed product IDs (base + substitutes used)
+    const simPids = new Set(pack.items.map(i=>i.productId));
+    eligible.forEach(({person}) => { pack.items.forEach(item => { const sub=getGiletSubstitute(item.productId,person.statut||'',zd?.products||[]); if(sub) simPids.add(sub.id); }); });
+    const remaining = [...simPids].map(pid => {
+      const product = zd?.products?.find(p=>p.id===pid);
       if (!product) return null;
-      const s = sim[item.productId]||{};
+      const s = sim[pid]||{};
       return product.sized
-        ? {name:item.name, sized:true, sizes: getProductSizes(product).map(sz=>({s:sz,qty:s[sz]||0}))}
-        : {name:item.name, sized:false, qty:s._qty||0};
+        ? {name:product.name, sized:true, sizes: getProductSizes(product).map(sz=>({s:sz,qty:s[sz]||0}))}
+        : {name:product.name, sized:false, qty:s._qty||0};
     }).filter(Boolean);
     // Simulate distribution to ALL persons (eligible + non-eligible) to find what to order
-    const sim2 = {};
-    pack.items.forEach(item => {
-      const product = zd?.products?.find(p=>p.id===item.productId);
-      if (!product) return;
-      sim2[item.productId] = product.sized ? {...(product.sizes||{})} : {_qty: product.qty};
-    });
+    const sim2 = initSim(personStatus);
     const missingForAll = [];
     personStatus.forEach(({person}) => {
       pack.items.forEach(item => {
-        const product = zd?.products?.find(p=>p.id===item.productId);
-        if (!product) return;
+        const r = effProd(item, person);
+        if (!r) return;
+        const {product} = r;
+        const pid = product.id;
         if (!product.sized) {
-          sim2[item.productId]._qty = (sim2[item.productId]._qty||0) - item.qty;
-          if (sim2[item.productId]._qty < 0) {
-            const ex = missingForAll.find(m=>m.name===item.name&&!m.size);
-            if (ex) ex.qty += -sim2[item.productId]._qty; else missingForAll.push({name:item.name,size:null,qty:-sim2[item.productId]._qty});
-            sim2[item.productId]._qty = 0;
+          sim2[pid]._qty = (sim2[pid]._qty||0) - item.qty;
+          if (sim2[pid]._qty < 0) {
+            const ex = missingForAll.find(m=>m.name===product.name&&!m.size);
+            if (ex) ex.qty += -sim2[pid]._qty; else missingForAll.push({name:product.name,size:null,qty:-sim2[pid]._qty});
+            sim2[pid]._qty = 0;
           }
         } else {
-          const sz = (person.sizes||{})[item.productId];
+          const sz = (person.sizes||{})[pid];
           if (!sz) return;
-          sim2[item.productId][sz] = (sim2[item.productId][sz]||0) - item.qty;
-          if (sim2[item.productId][sz] < 0) {
-            const ex = missingForAll.find(m=>m.name===item.name&&m.size===sz);
-            if (ex) ex.qty += -sim2[item.productId][sz]; else missingForAll.push({name:item.name,size:sz,qty:-sim2[item.productId][sz]});
-            sim2[item.productId][sz] = 0;
+          sim2[pid][sz] = (sim2[pid][sz]||0) - item.qty;
+          if (sim2[pid][sz] < 0) {
+            const ex = missingForAll.find(m=>m.name===product.name&&m.size===sz);
+            if (ex) ex.qty += -sim2[pid][sz]; else missingForAll.push({name:product.name,size:sz,qty:-sim2[pid][sz]});
+            sim2[pid][sz] = 0;
           }
         }
       });
@@ -8238,13 +8260,15 @@ function calcPacksAnalysis() {
         return {size, count: count === Infinity ? 0 : count};
       });
     }
-    const remainingForAll = pack.items.map(item => {
-      const product = zd?.products?.find(p=>p.id===item.productId);
+    const sim2Pids = new Set(pack.items.map(i=>i.productId));
+    personStatus.forEach(({person}) => { pack.items.forEach(item => { const sub=getGiletSubstitute(item.productId,person.statut||'',zd?.products||[]); if(sub) sim2Pids.add(sub.id); }); });
+    const remainingForAll = [...sim2Pids].map(pid => {
+      const product = zd?.products?.find(p=>p.id===pid);
       if (!product) return null;
-      const s = sim2[item.productId]||{};
+      const s = sim2[pid]||{};
       return product.sized
-        ? {name:item.name, sized:true, sizes: getProductSizes(product).map(sz=>({s:sz,qty:s[sz]||0}))}
-        : {name:item.name, sized:false, qty:s._qty||0};
+        ? {name:product.name, sized:true, sizes: getProductSizes(product).map(sz=>({s:sz,qty:s[sz]||0}))}
+        : {name:product.name, sized:false, qty:s._qty||0};
     }).filter(Boolean);
     return {pack, maxPacks, personStatus, eligible, missing, remaining, missingForAll, remainingForAll, bySize};
   });
@@ -8323,7 +8347,110 @@ function unitOptions(selected) {
   return units.map(u=>`<option${u===selected?' selected':''}>${esc(u)}</option>`).join('');
 }
 
+// ── DISTRIBUTION EN CONTINU ──
+let _distribContinu = {selectedPackIds: [], distributed: {}}; // distributed: {personId: [packId,...]}
+
+function showDispoDistribMode() {
+  const analysis = calcPacksAnalysis();
+  if (!analysis.length) { toast('Aucun pack configuré','warning'); return; }
+  // Default: select first 2 packs (or all if ≤2)
+  if (!_distribContinu.selectedPackIds.length) {
+    _distribContinu.selectedPackIds = analysis.slice(0,2).map(r=>r.pack.id);
+  }
+  _renderDistribContinu(analysis);
+  showModal('modal-distrib-continu');
+}
+
+function _renderDistribContinu(analysis) {
+  analysis = analysis || calcPacksAnalysis();
+  const sel = _distribContinu.selectedPackIds;
+  const dist = _distribContinu.distributed;
+
+  // Pack selector chips
+  const packChips = analysis.map(r => {
+    const active = sel.includes(r.pack.id);
+    return `<button onclick="_distribContiSelectPack('${r.pack.id}')" style="border:2px solid ${active?'#1d4ed8':'#e5e7eb'};border-radius:20px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer;background:${active?'#eff6ff':'#f9fafb'};color:${active?'#1d4ed8':'#9ca3af'}">${r.pack.icon} ${esc(r.pack.name)}</button>`;
+  }).join('');
+
+  // Merge all persons from selected packs (union, deduped by person id)
+  const selectedAnalysis = analysis.filter(r=>sel.includes(r.pack.id));
+  const personMap = {};
+  selectedAnalysis.forEach(r => {
+    r.personStatus.forEach(ps => {
+      if (!personMap[ps.person.id]) personMap[ps.person.id] = {person: ps.person, byPack:{}};
+      personMap[ps.person.id].byPack[r.pack.id] = ps;
+    });
+  });
+  const allPersons = Object.values(personMap).sort((a,b)=>a.person.name.localeCompare(b.person.name,'fr',{sensitivity:'base'}));
+
+  const rows = allPersons.map(({person, byPack}) => {
+    const givenPacks = dist[person.id] || [];
+    const allGiven = selectedAnalysis.every(r => givenPacks.includes(r.pack.id));
+    const packBadges = selectedAnalysis.map(r => {
+      const ps = byPack[r.pack.id];
+      const given = givenPacks.includes(r.pack.id);
+      const ok = ps?.ok;
+      const color = given ? '#16a34a' : ok ? '#1d4ed8' : '#dc2626';
+      const bg = given ? '#f0fdf4' : ok ? '#eff6ff' : '#fef2f2';
+      const icon = given ? '✓' : ok ? '✅' : '❌';
+      return `<button onclick="_distribContiGive('${person.id}','${r.pack.id}')" style="border:none;border-radius:8px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;background:${bg};color:${color}">${icon} ${esc(r.pack.name)}</button>`;
+    }).join('');
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f3f4f6;${allGiven?'opacity:.5':''}">
+      <span style="font-size:16px">${allGiven?'✅':'👤'}</span>
+      <div style="flex:1;font-size:13px;font-weight:600">${esc(person.name)}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end">${packBadges}</div>
+    </div>`;
+  }).join('');
+
+  const doneCount = allPersons.filter(({person})=>{
+    const gp = dist[person.id]||[];
+    return selectedAnalysis.every(r=>gp.includes(r.pack.id));
+  }).length;
+
+  document.getElementById('distrib-continu-body').innerHTML = `
+    <div style="font-size:13px;color:#6b7280;margin-bottom:10px">Sélectionner les packs à distribuer :</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">${packChips}</div>
+    <div style="font-size:12px;font-weight:700;color:#6b7280;margin-bottom:8px;display:flex;justify-content:space-between">
+      <span>PERSONNES</span>
+      <span>${doneCount}/${allPersons.length} distribué${doneCount!==1?'s':''}</span>
+    </div>
+    <div style="margin-bottom:12px">${rows||'<div style="text-align:center;color:#9ca3af;padding:20px;font-size:13px">Sélectionner au moins un pack</div>'}</div>
+    <button onclick="_distribContiReset()" style="width:100%;background:#fef2f2;color:#dc2626;border:none;border-radius:10px;padding:9px;font-size:12px;font-weight:600;cursor:pointer">↺ Réinitialiser les distributions</button>`;
+}
+
+function _distribContiSelectPack(packId) {
+  const idx = _distribContinu.selectedPackIds.indexOf(packId);
+  if (idx >= 0) _distribContinu.selectedPackIds.splice(idx, 1);
+  else _distribContinu.selectedPackIds.push(packId);
+  _renderDistribContinu();
+}
+
+function _distribContiGive(personId, packId) {
+  if (!_distribContinu.distributed[personId]) _distribContinu.distributed[personId] = [];
+  const arr = _distribContinu.distributed[personId];
+  const idx = arr.indexOf(packId);
+  if (idx >= 0) arr.splice(idx, 1); // toggle off
+  else arr.push(packId);
+  _renderDistribContinu();
+}
+
+function _distribContiReset() {
+  _distribContinu.distributed = {};
+  _renderDistribContinu();
+}
+
 </script>
+
+<!-- MODAL: DISTRIBUTION EN CONTINU -->
+<div id="modal-distrib-continu" class="modal-overlay hidden" onclick="overlayClose(event,'modal-distrib-continu')">
+<div class="modal-sheet">
+  <div class="mh-row">
+    <div><div class="m-title">🎯 Distribution en continu</div><div class="m-sub">Cochez chaque pack distribué par personne</div></div>
+    <button class="m-close" onclick="hideModal('modal-distrib-continu')">✕</button>
+  </div>
+  <div id="distrib-continu-body"></div>
+</div>
+</div>
 
 <!-- MODAL: PACKS VÊTEMENTS -->
 <div id="modal-vet-packs" class="modal-overlay hidden" onclick="overlayClose(event,'modal-vet-packs')">
