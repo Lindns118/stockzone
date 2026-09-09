@@ -8123,25 +8123,30 @@ function showPackDispoView() {
       ${bufferInput}
     </div>`;
   }).join('');
-  vc.innerHTML = `<div style="font-size:18px;font-weight:800;margin-bottom:14px">📊 Packs disponibles</div>` + packChips + actionBtns + cards + buildStockReserveHTML(analysis);
+  vc.innerHTML = `<div style="font-size:18px;font-weight:800;margin-bottom:14px">📊 Packs disponibles</div>` + packChips + actionBtns + cards + buildStockReserveHTML(analysis /* full, not filtered */);
 }
 
-// ── RÉSERVE STOCK NOUVEAUX ENTRANTS ──
-let _stockReserveConfig = {}; // packId -> qty (nb de copies à garder en réserve)
+// ── RÉSERVE STOCK ──
+// reserveQty stored in pack.reserveQty (persisted in S.vetPacks)
 
 function setStockReserveQty(packId, val) {
-  _stockReserveConfig[packId] = Math.max(0, parseInt(val)||0);
+  const pack = (S.vetPacks||[]).find(p=>p.id===packId);
+  if (!pack) return;
+  pack.reserveQty = Math.max(0, parseInt(val)||0);
+  saveState();
   showPackDispoView();
 }
 
-function buildStockReserveHTML(analysis) {
+function buildStockReserveHTML(fullAnalysis) {
+  // Always use FULL analysis (ignore chip filter) so ouvrier/employé reserve
+  // is always visible even when filtering on Pack hiver/été
   const zd = S.zones.vetements;
-  if (!zd || !analysis.length) return '';
+  if (!zd || !fullAnalysis.length) return '';
 
-  // Aggregate totals: productId -> {name, sized, sizes:{sz: total}, qty: total}
-  const totals = {};
-  analysis.forEach(r => {
-    const qty = _stockReserveConfig[r.pack.id] || 0;
+  // Aggregate totals across all packs that have reserveQty > 0
+  const totals = {}; // productId -> {name, sized, sizes:{sz:qty}, qty}
+  fullAnalysis.forEach(r => {
+    const qty = r.pack.reserveQty || 0;
     if (!qty) return;
     r.pack.items.forEach(item => {
       const product = zd?.products?.find(p=>p.id===item.productId);
@@ -8158,8 +8163,8 @@ function buildStockReserveHTML(analysis) {
     });
   });
 
-  const packInputs = analysis.map(r => {
-    const qty = _stockReserveConfig[r.pack.id] || 0;
+  const packInputs = fullAnalysis.map(r => {
+    const qty = r.pack.reserveQty || 0;
     return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
       <span style="font-size:13px;flex:1">${r.pack.icon} ${esc(r.pack.name)}</span>
       <span style="font-size:12px;color:#6b7280">×</span>
@@ -8167,22 +8172,23 @@ function buildStockReserveHTML(analysis) {
     </div>`;
   }).join('');
 
-  const hasAny = Object.values(_stockReserveConfig).some(q=>q>0);
+  const hasAny = fullAnalysis.some(r=>(r.pack.reserveQty||0)>0);
   const totalRows = hasAny ? Object.values(totals).map(t => {
-    if (!t.sized) return `<div style="font-size:12px;padding:3px 0">• ${esc(t.name)} : <b>${t.qty}</b></div>`;
-    const szCells = Object.entries(t.sizes).filter(([,v])=>v>0).map(([sz,v])=>
-      `<b>${sz}</b>:<span style="color:#1d4ed8;font-weight:700">${v}</span>`).join('  ');
-    return `<div style="font-size:12px;padding:3px 0">• ${esc(t.name)} : ${szCells}</div>`;
+    if (!t.sized) return `<div style="font-size:12px;padding:3px 0;border-bottom:1px solid #f9fafb">• ${esc(t.name)} : <b>${t.qty}</b></div>`;
+    const szCells = Object.entries(t.sizes).filter(([,v])=>v>0)
+      .map(([sz,v])=>`<span style="display:inline-block;background:#eff6ff;border-radius:4px;padding:1px 6px;margin:1px"><b style="color:#1e40af">${sz}</b>:<b style="color:#1d4ed8">${v}</b></span>`)
+      .join(' ');
+    return `<div style="font-size:12px;padding:4px 0;border-bottom:1px solid #f9fafb">• ${esc(t.name)} :<br><div style="margin-top:3px;margin-left:10px">${szCells}</div></div>`;
   }).join('') : '';
 
   return `<div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.08)">
-    <div style="font-size:13px;font-weight:800;margin-bottom:10px">📦 Réserve nouveaux entrants</div>
-    <div style="font-size:12px;color:#6b7280;margin-bottom:10px">Nb de packs à avoir en stock :</div>
+    <div style="font-size:13px;font-weight:800;margin-bottom:4px">📦 Réserve stock</div>
+    <div style="font-size:11px;color:#6b7280;margin-bottom:10px">Nb de packs complets à garder en stock (engagement + saisonnier)</div>
     ${packInputs}
     ${hasAny ? `<div style="margin-top:10px;border-top:1px solid #f3f4f6;padding-top:10px">
-      <div style="font-size:11px;font-weight:700;color:#1d4ed8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Articles nécessaires</div>
+      <div style="font-size:11px;font-weight:700;color:#1d4ed8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Articles nécessaires</div>
       ${totalRows}
-    </div>` : `<div style="font-size:12px;color:#9ca3af;margin-top:6px;font-style:italic">Mettre une quantité > 0 pour voir les besoins</div>`}
+    </div>` : `<div style="font-size:12px;color:#9ca3af;margin-top:4px;font-style:italic">Mettre une quantité > 0 pour voir les besoins</div>`}
   </div>`;
 }
 
