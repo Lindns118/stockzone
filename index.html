@@ -8046,7 +8046,7 @@ function showPackDispoView() {
   const actionBtns = `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px">
     <button onclick="exportDispoList()" style="flex:1;min-width:120px;background:#f3f4f6;border:none;border-radius:10px;padding:10px 8px;font-size:13px;font-weight:600;cursor:pointer">📋 Exporter liste</button>
     <button onclick="mailDispoList()" style="flex:1;min-width:120px;background:#f3f4f6;border:none;border-radius:10px;padding:10px 8px;font-size:13px;font-weight:600;cursor:pointer">✉️ Envoyer par mail</button>
-    <button onclick="exportDispoExcel()" style="flex:1;min-width:120px;background:#16a34a;color:#fff;border:none;border-radius:10px;padding:10px 8px;font-size:13px;font-weight:600;cursor:pointer">📊 Excel</button>
+    <button onclick="exportDispoExcel()" style="flex:1;min-width:120px;background:#16a34a;color:#fff;border:none;border-radius:10px;padding:10px 8px;font-size:13px;font-weight:600;cursor:pointer">📊 CSV / Excel</button>
     <button onclick="showDispoDistribMode()" style="width:100%;background:#1d4ed8;color:#fff;border:none;border-radius:10px;padding:10px 8px;font-size:13px;font-weight:600;cursor:pointer">🎯 Distribution en continu</button>
   </div>`;
   const filteredAnalysis = sel ? analysis.filter(r=>sel.includes(r.pack.id)) : analysis;
@@ -8518,26 +8518,25 @@ function exportDispoExcel() {
   const sel = _dispoSelectedPackIds;
   const filtered = sel ? analysis.filter(r=>sel.includes(r.pack.id)) : analysis;
   const SIZES_ORDER = ['XS','S','M','L','XL','2XL','3XL','4XL','5XL'];
-  const date = new Date().toLocaleDateString('fr-FR');
-  function th(cells) { return '<tr>' + cells.map(c=>`<th style="background:#1d4ed8;color:#fff;padding:6px 10px;border:1px solid #1e40af;white-space:nowrap">${c}</th>`).join('') + '</tr>'; }
-  function tr(cells, highlight) { const bg = highlight ? 'background:#fef9c3' : ''; return '<tr>' + cells.map(c=>`<td style="padding:5px 10px;border:1px solid #d1d5db;${bg}">${c===0||c?c:''}</td>`).join('') + '</tr>'; }
-  function table(rows) { return `<table style="border-collapse:collapse;font-size:13px;margin-bottom:28px">${rows}</table>`; }
-  function h2(t) { return `<h2 style="font-size:15px;font-weight:700;margin:20px 0 6px;color:#1d4ed8">${t}</h2>`; }
-  let body = `<h1 style="font-size:18px;font-weight:700;margin-bottom:4px">StockZone — Dispo vêtements</h1><p style="color:#6b7280;margin-bottom:20px">${date}</p>`;
+  const SEP = ';';
+  function csvVal(v) { const s = String(v===null||v===undefined?'':v); return s.includes(SEP)||s.includes('"')||s.includes('\n') ? '"'+s.replace(/"/g,'""')+'"' : s; }
+  function csvRow(cells) { return cells.map(csvVal).join(SEP) + '\r\n'; }
+  let csv = '﻿'; // BOM UTF-8 pour Excel
+  csv += csvRow(['StockZone — Dispo vêtements', new Date().toLocaleDateString('fr-FR')]);
+  csv += '\r\n';
   // One section per pack
   filtered.forEach(r => {
-    body += h2(r.pack.icon + ' ' + r.pack.name + ' — ' + r.maxPacks + ' dispo');
-    let rows = th(['Produit','Taille','Stock actuel','Restant (éligibles)','Manquants (éligibles)','Restant (tous)','Manquants (tous)']);
+    csv += csvRow([r.pack.name + ' — ' + r.maxPacks + ' dispo']);
+    csv += csvRow(['Produit','Taille','Stock actuel','Restant (éligibles)','Manquants (éligibles)','Restant (tous)','Manquants (tous)']);
     r.pack.items.forEach(item => {
       const product = zd?.products?.find(p=>p.id===item.productId);
       if (!product) return;
       if (!product.sized) {
-        const stockNow = product.qty;
         const rem1 = (r.sim1Stock[product.id]||{})._qty||0;
         const miss1 = r.missing.find(m=>m.name===product.name&&!m.size)?.qty||0;
         const rem2 = (r.sim2Stock[product.id]||{})._qty||0;
         const miss2 = r.missingForAll.find(m=>m.name===product.name&&!m.size)?.qty||0;
-        rows += tr([product.name,'—',stockNow,rem1,miss1||'',rem2,miss2||''], miss2>0);
+        csv += csvRow([product.name,'',product.qty,rem1,miss1||'',rem2,miss2||'']);
       } else {
         const sizes = getProductSizes(product).sort((a,b)=>{ const ia=SIZES_ORDER.indexOf(a),ib=SIZES_ORDER.indexOf(b); return (ia<0?99:ia)-(ib<0?99:ib); });
         sizes.forEach(sz => {
@@ -8546,7 +8545,7 @@ function exportDispoExcel() {
           const miss1 = r.missing.find(m=>m.name===product.name&&m.size===sz)?.qty||0;
           const rem2 = (r.sim2Stock[product.id]||{})[sz]||0;
           const miss2 = r.missingForAll.find(m=>m.name===product.name&&m.size===sz)?.qty||0;
-          rows += tr([product.name,sz,stockNow,rem1,miss1||'',rem2,miss2||''], miss2>0);
+          csv += csvRow([product.name,sz,stockNow,rem1,miss1||'',rem2,miss2||'']);
         });
         // Substitute (Gilet TL etc.)
         const subId = Object.keys(r.sim1Stock).find(pid => {
@@ -8563,16 +8562,16 @@ function exportDispoExcel() {
             const miss1 = r.missing.find(m=>m.name===sub.name&&m.size===sz)?.qty||0;
             const rem2 = (r.sim2Stock[subId]||{})[sz]||0;
             const miss2 = r.missingForAll.find(m=>m.name===sub.name&&m.size===sz)?.qty||0;
-            rows += tr([sub.name,sz,stockNow,rem1,miss1||'',rem2,miss2||''], miss2>0);
+            csv += csvRow([sub.name,sz,stockNow,rem1,miss1||'',rem2,miss2||'']);
           });
         }
       }
     });
     if (r.bufferQty > 0 && r.missingBuffer.length > 0) {
-      rows += `<tr><td colspan="7" style="padding:4px 10px;background:#f5f3ff;font-weight:700;border:1px solid #d1d5db">Réserve min (${r.bufferQty}×) — à commander</td></tr>`;
-      r.missingBuffer.forEach(m => rows += tr([m.name,m.size||'—','','','','',m.qty], true));
+      csv += csvRow(['Réserve min ('+r.bufferQty+'×) — à commander']);
+      r.missingBuffer.forEach(m => csv += csvRow([m.name,m.size||'','','','','',m.qty]));
     }
-    body += table(rows);
+    csv += '\r\n';
   });
   // Reserve stock section
   const reservePacks = analysis.filter(r=>(r.pack.reserveQty||0)>0);
@@ -8586,8 +8585,8 @@ function exportDispoExcel() {
         else Object.entries(stock).forEach(([sz,qty]) => { afterDistStock[pid][sz] = Math.min(afterDistStock[pid][sz]||0, qty||0); });
       });
     });
-    body += h2('📦 Réserve stock — Articles à commander après distribution');
-    let resRows = th(['Pack réserve','Qté','Produit','Taille','Besoin','Restant après distrib','À commander']);
+    csv += csvRow(['RÉSERVE STOCK — Articles à commander après distribution']);
+    csv += csvRow(['Pack réserve','Qté','Produit','Taille','Besoin','Restant après distrib','À commander']);
     reservePacks.forEach(r => {
       const qty = r.pack.reserveQty;
       r.pack.items.forEach(item => {
@@ -8596,26 +8595,22 @@ function exportDispoExcel() {
         const needed = item.qty * qty;
         if (!product.sized) {
           const rem = (afterDistStock[item.productId]||{})._qty||0;
-          const cmd = Math.max(0,needed-rem);
-          resRows += tr([r.pack.name,qty,product.name,'—',needed,rem,cmd||''], cmd>0);
+          csv += csvRow([r.pack.name,qty,product.name,'',needed,rem,Math.max(0,needed-rem)||'']);
         } else {
           const sizes = getProductSizes(product).sort((a,b)=>{ const ia=SIZES_ORDER.indexOf(a),ib=SIZES_ORDER.indexOf(b); return (ia<0?99:ia)-(ib<0?99:ib); });
           sizes.forEach(sz => {
             const rem = (afterDistStock[item.productId]||{})[sz]||0;
-            const cmd = Math.max(0,needed-rem);
-            resRows += tr([r.pack.name,qty,product.name,sz,needed,rem,cmd||''], cmd>0);
+            csv += csvRow([r.pack.name,qty,product.name,sz,needed,rem,Math.max(0,needed-rem)||'']);
           });
         }
       });
     });
-    body += table(resRows);
   }
-  const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>StockZone</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body>${body}</body></html>`;
-  const blob = new Blob([html], {type:'application/vnd.ms-excel;charset=utf-8'});
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `StockZone-Dispo-${new Date().toISOString().slice(0,10)}.xls`;
+  a.download = `StockZone-Dispo-${new Date().toISOString().slice(0,10)}.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
