@@ -505,6 +505,7 @@ body.vet-mode .main{padding-bottom:20px}
     <button class="act-btn act-liv" onclick="showModal('livraison')">🚚 Livraison</button>
     <button class="act-btn act-pret" onclick="showModal('pret')">🔄 Prêt</button>
     <button class="act-btn" id="attr-zone-btn" style="display:none;background:#7c3aed;color:#fff" onclick="switchZone('attributions')">👕 Attributions</button>
+    <button class="act-btn" id="vet-export-tailles-btn" style="display:none;background:#0f766e;color:#fff" onclick="exportVetTaillesCSV()">📊 Stock tailles</button>
     <button class="act-btn" id="add-group-btn" style="display:none;background:var(--orange-light);color:var(--orange);border:1.5px solid var(--orange)" onclick="openAddGroupModal()">＋ Groupe</button>
     <button class="act-btn" style="background:#0f766e;color:#fff" onclick="openCalcModal()">🧮 Calc</button>
     <button class="act-btn act-exp" onclick="showModal('export')">⬇ Export</button>
@@ -1811,6 +1812,8 @@ function switchZone(z) {
     // Show attribution button for vetements
     const attrBtn = document.getElementById('attr-zone-btn');
     if(attrBtn) attrBtn.style.display = z==='vetements' ? 'inline-flex' : 'none';
+    const vetExportBtn = document.getElementById('vet-export-tailles-btn');
+    if(vetExportBtn) vetExportBtn.style.display = z==='vetements' ? 'inline-flex' : 'none';
     // Show add-group button for all product zones
     const addGroupBtn = document.getElementById('add-group-btn');
     const isProductZone = ['entrepot','office','vetements'].includes(z) || (S.zones[z] !== undefined && !['stats','prets','alertes','reglages','attributions'].includes(z));
@@ -6017,6 +6020,46 @@ function buildVetNavTabs() {
     return `<button class="vet-nav-btn${active}" onclick="setVetTab('${t.id}')">${t.icon} ${t.lbl}</button>`;
   }).join('');
   tabs.innerHTML = html;
+}
+
+function exportVetTaillesCSV() {
+  const zd = S.zones?.vetements;
+  if (!zd) return;
+  const SIZES_ORDER = ['XS','S','M','L','XL','2XL','3XL','4XL','5XL'];
+  const SEP = ';';
+  function csvVal(v) { const s = String(v===null||v===undefined?'':v); return s.includes(SEP)||s.includes('"')||s.includes('\n') ? '"'+s.replace(/"/g,'""')+'"' : s; }
+  function csvRow(cells) { return cells.map(csvVal).join(SEP) + '\r\n'; }
+  let csv = '﻿'; // BOM UTF-8
+  csv += csvRow(['StockZone — Stock vêtements par taille', new Date().toLocaleDateString('fr-FR')]);
+  csv += '\r\n';
+  csv += csvRow(['Catégorie','Article','Taille','Quantité en stock','Seuil alerte']);
+  const products = (zd.products||[]).slice().sort((a,b)=>{
+    const ca = (a.cat||''), cb = (b.cat||'');
+    return ca.localeCompare(cb) || (a.name||'').localeCompare(b.name||'');
+  });
+  products.forEach(p => {
+    if (!p.sized) {
+      csv += csvRow([p.cat||'', p.name, '', p.qty||0, p.seuil||'']);
+    } else {
+      const sizes = getProductSizes(p).sort((a,b)=>{ const ia=SIZES_ORDER.indexOf(a),ib=SIZES_ORDER.indexOf(b); return (ia<0?99:ia)-(ib<0?99:ib); });
+      sizes.forEach(sz => {
+        csv += csvRow([p.cat||'', p.name, sz, (p.sizes||{})[sz]||0, p.seuil||'']);
+      });
+      // Total row for sized products
+      const total = sizes.reduce((s,sz)=>s+((p.sizes||{})[sz]||0), 0);
+      csv += csvRow([p.cat||'', p.name, 'TOTAL', total, '']);
+      csv += '\r\n';
+    }
+  });
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `StockZone-Vetements-${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 3000);
 }
 
 function setVetTab(tab) {
