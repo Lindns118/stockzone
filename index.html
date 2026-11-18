@@ -755,6 +755,12 @@ table.inv-tbl input.sz-inp:focus{border-color:var(--blue);background:#fff}
         <input type="number" id="ps-seuil" class="fi fi-sm" placeholder="0" min="0" step="any">
         <select id="ps-unit" class="fi fi-unit"></select>
       </div>
+      <label class="fl">Prix unitaire <span style="font-size:11px;color:var(--text2);font-weight:400">(par unité de stock — même prix que l'onglet Fournisseur)</span></label>
+      <div class="form-row" style="margin-bottom:4px">
+        <input type="number" id="ps-prix" class="fi" min="0" step="0.01" inputmode="decimal" placeholder="0,00" oninput="psUpdateValeur()">
+        <select id="ps-devise" class="fi fi-unit" onchange="psUpdateValeur()"><option value="EUR">€ EUR</option><option value="USD">$ USD</option><option value="GBP">£ GBP</option><option value="CHF">CHF</option></select>
+      </div>
+      <div id="ps-valeur" style="font-size:12px;color:var(--text2);margin-bottom:14px"></div>
       <label class="fl">Nom affiché <span style="font-size:11px;color:var(--text2)">(usage quotidien)</span></label>
       <input type="text" id="ps-name" class="fi" maxlength="100" style="margin-bottom:11px" autocomplete="off">
       <label class="fl">Nom officiel <span style="font-size:11px;color:var(--text2)">(commande/achat — non affiché)</span></label>
@@ -2604,6 +2610,8 @@ function openDetail(id) {
     const lines = [];
     if(found.p.packQty) lines.push(`= ${Math.round(found.p.qty * found.p.packQty).toLocaleString('fr')} ${found.p.packUnit||'unités'}`);
     if(found.p.paletteQty) lines.push(`/ ${r2(found.p.qty / found.p.paletteQty)} palettes`);
+    const _pr=getProductPrice(found.p);
+    if(_pr) lines.push(`💶 ${fmtMoney(found.p.qty*_pr.prix,_pr.devise)}`);
     convEl.textContent = lines.join(' · ');
   }
   // Reset tabs to hist
@@ -2612,6 +2620,7 @@ function openDetail(id) {
   renderHistory();
   // Prefill params
   document.getElementById('ps-seuil').value = found.p.seuil||'';
+  psLoadPrix();
   document.getElementById('ps-unit').innerHTML = unitOptions(found.p.unit);
   document.getElementById('ps-name').value = found.p.name;
   document.getElementById('ps-cat').value = found.p.category;
@@ -2734,6 +2743,7 @@ function showTab(tab, btn) {
   if(tab==='conso') renderConsoTab();
   if(tab==='cmd') initCmdTab();
   if(tab==='fournisseur') populateSupDirSelect();
+  if(tab==='params') psLoadPrix();
 }
 
 // ===== QUICK ENTRY =====
@@ -3096,6 +3106,7 @@ function _showPhotoOverlay(src) {
 function saveParams() {
   if (!currentProduct) return;
   currentProduct.seuil = parseFloat(document.getElementById('ps-seuil').value)||0;
+  savePrixFromParams();
   currentProduct.unit = document.getElementById('ps-unit').value;
   const newName = document.getElementById('ps-name').value.trim();
   const newCat = document.getElementById('ps-cat').value.trim();
@@ -3170,6 +3181,37 @@ function getProductSuppliers(p) {
   if (p.suppliers && p.suppliers.length) return p.suppliers;
   if (p.supplier && Object.keys(p.supplier).length) return [p.supplier];
   return [];
+}
+
+const DEVISE_SYM={EUR:'€',USD:'$',GBP:'£',CHF:'CHF'};
+function _priceIdx(p){const sups=getProductSuppliers(p);const i=sups.findIndex(x=>x&&parseFloat(x.prix)>0);return i;}
+function getProductPrice(p){const sups=getProductSuppliers(p);const i=_priceIdx(p);return i<0?null:{prix:parseFloat(sups[i].prix),devise:sups[i].devise||'EUR'};}
+function fmtMoney(v,dev){return (Math.round((v||0)*100)/100).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+(DEVISE_SYM[dev||'EUR']||dev);}
+function psLoadPrix(){
+  if(!currentProduct) return;
+  const pr=getProductPrice(currentProduct);
+  const a=document.getElementById('ps-prix'),b=document.getElementById('ps-devise');
+  if(a) a.value=pr?pr.prix:'';
+  if(b) b.value=pr?pr.devise:'EUR';
+  psUpdateValeur();
+}
+function psUpdateValeur(){
+  const el=document.getElementById('ps-valeur'); if(!el||!currentProduct) return;
+  const prix=parseFloat(document.getElementById('ps-prix')?.value)||0;
+  const dev=document.getElementById('ps-devise')?.value||'EUR';
+  el.innerHTML=prix>0?`💶 Valeur du stock : ${currentProduct.qty} × ${fmtMoney(prix,dev)} = <b style="color:var(--text)">${fmtMoney(currentProduct.qty*prix,dev)}</b>`:'';
+}
+function savePrixFromParams(){
+  const prix=parseFloat(document.getElementById('ps-prix')?.value)||0;
+  const dev=document.getElementById('ps-devise')?.value||'EUR';
+  const p=currentProduct;
+  const had=getProductPrice(p);
+  if(!prix&&!had) return;
+  if(!p.suppliers){p.suppliers=p.supplier?[p.supplier]:[];delete p.supplier;}
+  let i=_priceIdx(p); if(i<0) i=0;
+  while(p.suppliers.length<=i) p.suppliers.push({});
+  const sup=p.suppliers[i];
+  if(prix>0){sup.prix=prix;sup.devise=dev;} else {delete sup.prix; if(sup.devise==='EUR') delete sup.devise;}
 }
 
 function loadSupFields(p, idx) {
@@ -3678,6 +3720,18 @@ function doExport(fmt) {
 
 function doImport() { document.getElementById('import-file').click(); }
 
+function _impSizes(o){
+  if(!o||typeof o!=='object'||Array.isArray(o)) return undefined;
+  const r={};
+  Object.entries(o).slice(0,40).forEach(([k,v])=>{const n=parseFloat(v);if(String(k).length<=10&&isFinite(n))r[String(k)]=n;});
+  return Object.keys(r).length?r:undefined;
+}
+function _impSupplier(x){
+  const o={};
+  [['societe',150],['mail',200],['mailcc',200],['contact',100],['tel',30],['ref',100],['devise',5]].forEach(([k,n])=>{if(x[k])o[k]=String(x[k]).slice(0,n);});
+  const pr=parseFloat(x.prix); if(isFinite(pr)&&pr>0) o.prix=pr;
+  return o;
+}
 function importJSON(e) {
   const file=e.target.files[0];
   if(!file) return;
@@ -3733,34 +3787,36 @@ function importJSON(e) {
           category: (p.category||'Général').slice(0,60),
           qty: Math.max(0, parseFloat(p.qty)||0),
           unit: (p.unit||'pièces').slice(0,30),
-          seuil: Math.max(0, parseInt(p.seuil)||0),
+          seuil: Math.max(0, parseFloat(p.seuil)||0),
           sized: p.sized || false,
-          sizes: p.sizes || undefined,
+          sizes: _impSizes(p.sizes),
+          ...(p.officialName ? {officialName: String(p.officialName).slice(0,150)} : {}),
+          ...(Number.isFinite(p.ordre) ? {ordre: p.ordre} : {}),
+          ...(typeof p.photo === 'string' && /^data:image\/(png|jpe?g|webp|gif);base64,/.test(p.photo) && p.photo.length < 3e6 ? {photo: p.photo} : {}),
+          ...(Array.isArray(p.suppliers) ? {suppliers: p.suppliers.filter(x=>x&&typeof x==='object').slice(0,10).map(_impSupplier)} : {}),
           ...(p.groupe ? {groupe: String(p.groupe).slice(0,60)} : {}),
           ...(p.packQty && p.packQty > 0 ? {packQty: parseInt(p.packQty)} : {}),
           ...(p.packUnit ? {packUnit: String(p.packUnit).slice(0,30)} : {}),
           ...(p.paletteQty && p.paletteQty > 0 ? {paletteQty: parseInt(p.paletteQty)} : {}),
           ...(p.paletteUnit ? {paletteUnit: String(p.paletteUnit).slice(0,30)} : {}),
-          ...(p.supplier && typeof p.supplier==='object' ? {supplier: {
-            ...(p.supplier.societe ? {societe:String(p.supplier.societe).slice(0,150)} : {}),
-            ...(p.supplier.mail ? {mail:String(p.supplier.mail).slice(0,200)} : {}),
-            ...(p.supplier.contact ? {contact:String(p.supplier.contact).slice(0,100)} : {}),
-            ...(p.supplier.tel ? {tel:String(p.supplier.tel).slice(0,30)} : {}),
-            ...(p.supplier.prix ? {prix:parseFloat(p.supplier.prix)} : {}),
-            ...(p.supplier.devise ? {devise:String(p.supplier.devise).slice(0,5)} : {}),
-            ...(p.supplier.ref ? {ref:String(p.supplier.ref).slice(0,100)} : {}),
-          }} : {}),
+          ...(!Array.isArray(p.suppliers) && p.supplier && typeof p.supplier==='object' ? {supplier: _impSupplier(p.supplier)} : {}),
           history: Array.isArray(p.history) ? p.history.filter(h =>
             h && typeof h === 'object' &&
-            ['inventaire','inventaire_base','livraison','attribution','pret','emprunt','retour_pret','retour_emprunt','vente'].includes(h.type) &&
+            ['inventaire','inventaire_base','livraison','attribution','pret','emprunt','retour_pret','retour_emprunt','vente','don'].includes(h.type) &&
             typeof h.qty === 'number' && isFinite(h.qty)
           ).map(h => ({
             id: h.id || uid(),
             type: h.type,
-            date: typeof h.date === 'string' ? h.date.slice(0,10) : today(),
+            date: typeof h.date === 'string' && /^\d{4}-\d{2}-\d{2}/.test(h.date) ? h.date.slice(0,30) : today(),
             qty: parseFloat(h.qty)||0,
             ...(h.fournisseur ? {fournisseur: String(h.fournisseur).slice(0,100)} : {}),
-            ...(h.notes ? {notes: String(h.notes).slice(0,500)} : {})
+            ...(h.notes ? {notes: String(h.notes).slice(0,500)} : {}),
+            ...(_impSizes(h.sizes) ? {sizes: _impSizes(h.sizes)} : {}),
+            ...(h.size ? {size: String(h.size).slice(0,10)} : {}),
+            ...(h.person ? {person: String(h.person).slice(0,100)} : {}),
+            ...(h.pretId ? {pretId: String(h.pretId).slice(0,40)} : {}),
+            ...(Number.isFinite(h.qtyInt) ? {qtyInt: h.qtyInt} : {}),
+            ...(Number.isFinite(h.qtyExt) ? {qtyExt: h.qtyExt} : {})
           })) : []
         }));
 
@@ -4825,11 +4881,24 @@ function exportConsoXLSX() {
   // 1. Résumé
   {
     const rows=top('Résumé par produit');
-    rows.push(H(['Produit','Catégorie','Zone','Unité','Stock actuel','Total livré','Total consommé','Nb jours analysés','Moy. / jour','Moy. / mois','Jours de stock restants']));
-    items.forEach(it=>rows.push([it.p.name,it.p.category||'',it.z.name,it.p.unit||'',
+    rows.push(H(['Produit','Catégorie','Zone','Unité','Stock actuel','Total livré','Total consommé','Nb jours analysés','Moy. / jour','Moy. / mois','Jours de stock restants','Prix unitaire','Devise','Valeur du stock','Coût livré','Coût consommé']));
+    const sums={},devs=new Set();let anyPrice=false;
+    items.forEach(it=>{
+      const pr=getProductPrice(it.p);
+      const m=v=>pr?{v:r2x(v*pr.prix),s:'dec'}:{v:'',s:'dec'};
+      if(pr){anyPrice=true;devs.add(pr.devise);['val','liv','cons'].forEach((k,i)=>sums[k]=(sums[k]||0)+[Math.max(0,it.p.qty),it.totLiv,it.totCons][i]*pr.prix);}
+      rows.push([it.p.name,it.p.category||'',it.z.name,it.p.unit||'',
       {v:r2x(it.p.qty),s:'int'},{v:r2x(it.totLiv),s:'int'},{v:r2x(it.totCons),s:'int'},{v:it.totDays||'',s:'int'},
-      {v:r2x(it.perDay),s:'dec'},{v:r2x(it.perDay*30.44,1),s:'dec1'},it.left===''?{v:'',s:'int'}:{v:it.left,s:'int'}]));
-    sheets.push({name:'Résumé',rows,cols:[28,16,14,10,13,13,15,14,12,12,15],freeze:4,filter:{row:4,cols:11}});
+      {v:r2x(it.perDay),s:'dec'},{v:r2x(it.perDay*30.44,1),s:'dec1'},it.left===''?{v:'',s:'int'}:{v:it.left,s:'int'},
+      pr?{v:pr.prix,s:'dec'}:{v:'—',s:'warn'},pr?pr.devise:'',m(Math.max(0,it.p.qty)),m(it.totLiv),m(it.totCons)]);
+    });
+    if(anyPrice){
+      const one=devs.size===1;
+      const t=k=>one?{v:r2x(sums[k]),s:'totalDec'}:{v:'',s:'total'};
+      rows.push([{v:'TOTAL',s:'total'},...Array(10).fill({v:'',s:'total'}),{v:'',s:'total'},{v:one?[...devs][0]:'devises mixtes',s:'total'},t('val'),t('liv'),t('cons')]);
+      if(items.some(it=>!getProductPrice(it.p))) rows.push([{v:'— = pas de prix renseigné (fiche produit → ⚙️ Options) : non compté dans le total',s:'sub'}]);
+    }
+    sheets.push({name:'Résumé',rows,cols:[28,16,14,10,13,13,15,14,12,12,15,13,8,15,13,15],freeze:4,filter:{row:4,cols:16}});
   }
   // 2. Par période
   if(periods.length){
@@ -5086,6 +5155,29 @@ function exportCmpSizeYearCSV(pid) {
 }
 
 
+function buildStockValueCard(zones){
+  const byDev={},perZone=[];let missing=0,priced=0;
+  zones.forEach(([k,z])=>{
+    const zv={};
+    z.products.forEach(p=>{
+      const pr=getProductPrice(p);
+      if(!pr){missing++;return;}
+      priced++;
+      const v=Math.max(0,p.qty||0)*pr.prix;
+      byDev[pr.devise]=(byDev[pr.devise]||0)+v; zv[pr.devise]=(zv[pr.devise]||0)+v;
+    });
+    if(Object.keys(zv).length) perZone.push({z,zv});
+  });
+  if(!priced) return `<div class="chart-card"><div class="cc-title">💶 Valeur du stock</div><p style="font-size:13px;color:var(--text2);margin:0">Aucun prix renseigné. Ajoutez un prix unitaire dans la fiche produit → ⚙️ Options.</p></div>`;
+  const tot=Object.entries(byDev).map(([d,v])=>fmtMoney(v,d)).join(' + ');
+  return `<div class="chart-card">
+    <div class="cc-title">💶 Valeur du stock</div>
+    <div style="font-size:24px;font-weight:800;color:var(--blue);margin:2px 0 8px">${tot}</div>
+    ${perZone.map(({z,zv})=>`<div style="display:flex;justify-content:space-between;font-size:13px;padding:5px 0;border-bottom:1px solid var(--gray2)"><span>${z.icon} ${esc(z.name)}</span><b>${Object.entries(zv).map(([d,v])=>fmtMoney(v,d)).join(' + ')}</b></div>`).join('')}
+    ${missing?`<div style="font-size:11px;color:var(--text2);margin-top:6px">${priced} produit(s) avec prix · ${missing} sans prix (non comptés)</div>`:''}
+  </div>`;
+}
+
 function renderStats() {
   const ev=document.getElementById('extra-view');
   const zones=Object.entries(S.zones);
@@ -5136,6 +5228,7 @@ function renderStats() {
 
     <!-- VUE GLOBALE -->
     <div id="sp-overview" class="stats-panel active">
+      ${buildStockValueCard(zones)}
       <div class="chart-card">
         <div class="cc-title">Répartition du stock actuel</div>
         <div class="donut-row">
