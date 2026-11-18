@@ -4639,7 +4639,7 @@ function renderConsoTable(){
   <p style="font-size:11px;color:var(--text2);margin-top:8px;text-align:right">🔴 &gt;130% de la moyenne du produit &nbsp;🟡 dans la normale &nbsp;— aucune</p>`;
 }
 
-function exportConsoCSV() {
+function buildConsoExport() {
   const zk=document.getElementById('tbl-zone')?.value||'all';
   const cat=document.getElementById('tbl-cat')?.value||'all';
   const period=document.getElementById('tbl-period')?.value||'month';
@@ -4668,7 +4668,7 @@ function exportConsoCSV() {
       items.push({p,z});
     });
   });
-  if(!items.length){toast('Aucun produit à exporter','error');return;}
+  if(!items.length) return null;
   items.sort((x,y)=>x.p.name.localeCompare(y.p.name,'fr'));
 
   // --- Calculs par produit ---
@@ -4721,59 +4721,157 @@ function exportConsoCSV() {
     return true;
   });
 
-  let csv='﻿';
-  csv+=cr(['StockZone — Export consommation']);
-  csv+=cr(['Exporté le',new Date().toLocaleDateString('fr-FR')]);
-  csv+=cr(['Période',(fromDate||toDate)?`${fromDate?fd(fromDate):'début'} → ${toDate?fd(toDate):"aujourd'hui"}`:'Tout l\'historique']);
-  if(filterLivraisons) csv+=cr(['Filtre','Seuls les inventaires et livraisons de cette période sont pris en compte']);
-  csv+=cr(['Produits',items.length]);
-  csv+='\r\n';
+  return {items,periods,period,fromDate,toDate,filterLivraisons};
+}
+
+// ===== XLSX (généré sans bibliothèque) =====
+const _crcTable=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0;}return t;})();
+function _crc32(u8){let c=0xFFFFFFFF;for(let i=0;i<u8.length;i++)c=_crcTable[(c^u8[i])&0xFF]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
+function _zipStore(files){
+  const enc=new TextEncoder(),parts=[],central=[];let off=0;
+  const u16=v=>[v&255,(v>>>8)&255],u32=v=>[v&255,(v>>>8)&255,(v>>>16)&255,(v>>>24)&255];
+  files.forEach(f=>{
+    const name=enc.encode(f.name),data=enc.encode(f.data),crc=_crc32(data);
+    const loc=new Uint8Array([...u32(0x04034b50),...u16(20),...u16(0x0800),...u16(0),...u16(0),...u16(0x21),...u32(crc),...u32(data.length),...u32(data.length),...u16(name.length),...u16(0)]);
+    parts.push(loc,name,data);
+    central.push(new Uint8Array([...u32(0x02014b50),...u16(20),...u16(20),...u16(0x0800),...u16(0),...u16(0),...u16(0x21),...u32(crc),...u32(data.length),...u32(data.length),...u16(name.length),...u16(0),...u16(0),...u16(0),...u16(0),...u32(0),...u32(off)]),name);
+    off+=loc.length+name.length+data.length;
+  });
+  const cdSize=central.reduce((t,x)=>t+x.length,0);
+  const end=new Uint8Array([...u32(0x06054b50),...u16(0),...u16(0),...u16(files.length),...u16(files.length),...u32(cdSize),...u32(off),...u16(0)]);
+  return new Blob([...parts,...central,end],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+// sheets: [{name, cols:[largeurs], rows:[[cellule…]], freeze:n°ligne, filter:{row,cols}}]
+// cellule : valeur simple ou {v, s:'title'|'sub'|'head'|'int'|'dec'|'dec1'|'date'|'total'|'totalInt'|'totalDec'|'warn'|'section'}
+function buildXlsx(sheets){
+  const ST={'':0,title:1,head:2,int:3,dec:4,date:5,total:6,totalInt:7,totalDec:8,warn:9,section:10,sub:11,dec1:12,txt:13};
+  const esc=t=>String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'');
+  const colL=i=>{let s='';i++;while(i){const m=(i-1)%26;s=String.fromCharCode(65+m)+s;i=Math.floor((i-1)/26);}return s;};
+  const sheetXml=sh=>{
+    let x='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>';
+    x+='<sheetViews><sheetView workbookViewId="0">'+(sh.freeze?`<pane ySplit="${sh.freeze}" topLeftCell="A${sh.freeze+1}" activePane="bottomLeft" state="frozen"/>`:'')+'</sheetView></sheetViews>';
+    if(sh.cols&&sh.cols.length) x+='<cols>'+sh.cols.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join('')+'</cols>';
+    x+='<sheetData>';
+    sh.rows.forEach((row,ri)=>{
+      x+=`<row r="${ri+1}">`;
+      (row||[]).forEach((c,ci)=>{
+        const inTable=sh.freeze&&ri+1>sh.freeze&&ci<(sh.rows[sh.freeze-1]||[]).length;
+        if((c===null||c===undefined||c==='')&&!inTable)return;
+        const o=(c!==null&&typeof c==='object'&&!(c instanceof Date))?c:{v:c};
+        let v=o.v,s=ST[o.s||'']||0,ref=colL(ci)+(ri+1);
+        if(!o.s&&sh.freeze&&ri+1>sh.freeze) s=ST.txt;
+        if(v===null||v===undefined||v===''){ if(s) x+=`<c r="${ref}" s="${s}"/>`; return; }
+        if(v instanceof Date){ v=(Date.UTC(v.getFullYear(),v.getMonth(),v.getDate())-Date.UTC(1899,11,30))/86400000; if(!o.s)s=ST.date; }
+        if(typeof v==='number'&&isFinite(v)) x+=`<c r="${ref}" s="${s}"><v>${v}</v></c>`;
+        else x+=`<c r="${ref}" s="${s}" t="inlineStr"><is><t xml:space="preserve">${esc(v)}</t></is></c>`;
+      });
+      x+='</row>';
+    });
+    x+='</sheetData>';
+    if(sh.filter) x+=`<autoFilter ref="A${sh.filter.row}:${colL(sh.filter.cols-1)}${sh.filter.row}"/>`;
+    x+='<pageMargins left="0.5" right="0.5" top="0.6" bottom="0.6" header="0.3" footer="0.3"/><pageSetup orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>';
+    return x;
+  };
+  const styles='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+   +'<numFmts count="3"><numFmt numFmtId="164" formatCode="dd/mm/yyyy"/><numFmt numFmtId="165" formatCode="#,##0.00"/><numFmt numFmtId="166" formatCode="#,##0.0"/></numFmts>'
+   +'<fonts count="6"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="15"/><color rgb="FF1A1F6E"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><sz val="10"/><color rgb="FFB45309"/><name val="Calibri"/></font><font><sz val="10"/><color rgb="FF6B7280"/><name val="Calibri"/></font></fonts>'
+   +'<fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1E2799"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EAFF"/><bgColor indexed="64"/></patternFill></fill></fills>'
+   +'<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFD1D5DB"/></left><right style="thin"><color rgb="FFD1D5DB"/></right><top style="thin"><color rgb="FFD1D5DB"/></top><bottom style="thin"><color rgb="FFD1D5DB"/></bottom><diagonal/></border></borders>'
+   +'<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="14">'
+   +'<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+   +'<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>'
+   +'<xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment wrapText="1" vertical="center"/></xf>'
+   +'<xf numFmtId="3" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"/>'
+   +'<xf numFmtId="165" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"/>'
+   +'<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"/>'
+   +'<xf numFmtId="0" fontId="3" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>'
+   +'<xf numFmtId="3" fontId="3" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1"/>'
+   +'<xf numFmtId="165" fontId="3" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1"/>'
+   +'<xf numFmtId="0" fontId="4" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1"/>'
+   +'<xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1"/>'
+   +'<xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1"/>'
+   +'<xf numFmtId="166" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"/>'
+   +'<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/>'
+   +'</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+  const files=[
+    {name:'[Content_Types].xml',data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+sheets.map((_,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')+'</Types>'},
+    {name:'_rels/.rels',data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'},
+    {name:'xl/workbook.xml',data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'+sheets.map((sh,i)=>`<sheet name="${esc(sh.name.replace(/[\\\/?*\[\]:]/g,'').slice(0,31))}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join('')+'</sheets></workbook>'},
+    {name:'xl/_rels/workbook.xml.rels',data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+sheets.map((_,i)=>`<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join('')+`<Relationship Id="rId${sheets.length+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`},
+    {name:'xl/styles.xml',data:styles},
+    ...sheets.map((sh,i)=>({name:`xl/worksheets/sheet${i+1}.xml`,data:sheetXml(sh)}))
+  ];
+  return _zipStore(files);
+}
+function downloadBlob(blob,name){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download=name;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+}
+
+function exportConsoXLSX() {
+  const d=buildConsoExport();
+  if(!d){toast('Aucun produit à exporter','error');return;}
+  const {items,periods,period,fromDate,toDate,filterLivraisons}=d;
+  const D=t=>{const m=(t||'').slice(0,10).match(/^(\d{4})-(\d{2})-(\d{2})$/);return m?new Date(+m[1],+m[2]-1,+m[3]):t;};
+  const r2x=(v,n=2)=>v===''||v===null||v===undefined||!isFinite(v)?'':Math.round(v*10**n)/10**n;
+  const H=a=>a.map(v=>({v,s:'head'}));
+  const fdT=t=>t?t.slice(8,10)+'/'+t.slice(5,7)+'/'+t.slice(0,4):'';
+  const periodeTxt=(fromDate||toDate)?`${fromDate?fdT(fromDate):'début'} → ${toDate?fdT(toDate):"aujourd'hui"}`:"Tout l'historique";
+  const top=title=>[[{v:title,s:'title'}],[{v:`Exporté le ${new Date().toLocaleDateString('fr-FR')} · ${periodeTxt}${filterLivraisons?' · seuls les inventaires/livraisons de la période':''} · ${items.length} produit(s)`,s:'sub'}],[]];
+  const sheets=[];
 
   // 1. Résumé
-  csv+=cr(['1. RÉSUMÉ PAR PRODUIT']);
-  csv+=cr(['Produit','Catégorie','Zone','Unité','Stock actuel','Total livré','Total consommé','Nb jours analysés','Moy. / jour','Moy. / mois','Jours de stock restants']);
-  items.forEach(it=>csv+=cr([it.p.name,it.p.category||'',it.z.name,it.p.unit||'',num(it.p.qty),num(it.totLiv),num(it.totCons),it.totDays||'',num(it.perDay),num(it.perDay*30.44,1),it.left]));
-  csv+='\r\n';
-
-  // 2. Conso par période
-  if(periods.length){
-    const lbl={month:'MOIS',week:'SEMAINE',quarter:'TRIMESTRE',year:'ANNÉE'}[period]||'PÉRIODE';
-    csv+=cr([`2. CONSOMMATION PAR ${lbl}`]);
-    csv+=cr(['Produit','Unité',...periods.map(pk=>ymLabel(pk,period)),'Total']);
-    items.forEach(it=>{
-      const vals=periods.map(pk=>it.grouped[pk]||0);
-      csv+=cr([it.p.name,it.p.unit||'',...vals.map(v=>num(v)),num(vals.reduce((t,v)=>t+v,0))]);
-    });
-    const tots=periods.map(pk=>items.reduce((t,it)=>t+(it.grouped[pk]||0),0));
-    csv+=cr(['TOTAL','',...tots.map(v=>num(v)),num(tots.reduce((t,v)=>t+v,0))]);
-    csv+='\r\n';
+  {
+    const rows=top('Résumé par produit');
+    rows.push(H(['Produit','Catégorie','Zone','Unité','Stock actuel','Total livré','Total consommé','Nb jours analysés','Moy. / jour','Moy. / mois','Jours de stock restants']));
+    items.forEach(it=>rows.push([it.p.name,it.p.category||'',it.z.name,it.p.unit||'',
+      {v:r2x(it.p.qty),s:'int'},{v:r2x(it.totLiv),s:'int'},{v:r2x(it.totCons),s:'int'},{v:it.totDays||'',s:'int'},
+      {v:r2x(it.perDay),s:'dec'},{v:r2x(it.perDay*30.44,1),s:'dec1'},it.left===''?{v:'',s:'int'}:{v:it.left,s:'int'}]));
+    sheets.push({name:'Résumé',rows,cols:[28,16,14,10,13,13,15,14,12,12,15],freeze:4,filter:{row:4,cols:11}});
   }
-
+  // 2. Par période
+  if(periods.length){
+    const lbl={month:'mois',week:'semaine',quarter:'trimestre',year:'année'}[period]||'période';
+    const rows=top('Consommation par '+lbl);
+    rows.push(H(['Produit','Unité',...periods.map(pk=>ymLabel(pk,period)),'Total']));
+    items.forEach(it=>{
+      const vals=periods.map(pk=>r2x(it.grouped[pk]||0));
+      rows.push([it.p.name,it.p.unit||'',...vals.map(v=>({v,s:'int'})),{v:r2x(vals.reduce((t,v)=>t+v,0)),s:'totalInt'}]);
+    });
+    const tots=periods.map(pk=>r2x(items.reduce((t,it)=>t+(it.grouped[pk]||0),0)));
+    rows.push([{v:'TOTAL',s:'total'},{v:'',s:'total'},...tots.map(v=>({v,s:'totalInt'})),{v:r2x(tots.reduce((t,v)=>t+v,0)),s:'totalInt'}]);
+    sheets.push({name:'Par '+lbl,rows,cols:[28,10,...periods.map(()=>11),12],freeze:4});
+  }
   // 3. Livraisons
-  csv+=cr(['3. DÉTAIL DES LIVRAISONS']);
-  csv+=cr(['Produit','Date','Quantité','Unité','Détail tailles','Fournisseur']);
-  let nLiv=0;
-  items.forEach(it=>it.livs.forEach(h=>{nLiv++;csv+=cr([it.p.name,fd(h.date),num(h.qty),it.p.unit||'',h.sizes?Object.entries(h.sizes).map(([sz,q])=>sz+' : '+q).join(' / '):(it.p.sized?'non détaillé':''),h.fournisseur||h.notes||'']);}));
-  if(!nLiv) csv+=cr(['Aucune livraison sur la période']);
-  csv+='\r\n';
-
-  // 4. Détail entre inventaires
-  csv+=cr(['4. DÉTAIL ENTRE INVENTAIRES']);
-  csv+=cr(['Produit','Du','Au','Nb jours','Stock début','+ Livré','Stock fin','= Consommé','Moy. / jour','Moy. / mois']);
-  items.forEach(it=>{
-    if(!it.intervals.length){csv+=cr([it.p.name,it.fromDons?'(calculé sur les distributions)':'Pas assez d\'inventaires (2 minimum)']);return;}
-    it.intervals.forEach(r=>csv+=cr([it.p.name,fd(r.prev.date),fd(r.cur.date),r.days,num(r.prev.qty),num(r.livTot),num(r.cur.qty),num(r.cons),num(r.cons/r.days),num(r.cons/r.days*30.44,1)]));
-  });
-  csv+='\r\n';
-
+  {
+    const rows=top('Détail des livraisons');
+    rows.push(H(['Produit','Date','Quantité','Unité','Détail tailles','Fournisseur']));
+    let n=0;
+    items.forEach(it=>it.livs.forEach(h=>{n++;rows.push([it.p.name,{v:D(h.date),s:'date'},{v:r2x(h.qty),s:'int'},it.p.unit||'',
+      h.sizes?Object.entries(h.sizes).map(([sz,q])=>sz+' : '+q).join('  /  '):(it.p.sized?{v:'non détaillé',s:'warn'}:''),h.fournisseur||h.notes||'']);}));
+    if(!n) rows.push(['Aucune livraison sur la période']);
+    sheets.push({name:'Livraisons',rows,cols:[28,12,11,10,30,22],freeze:4,filter:n?{row:4,cols:6}:null});
+  }
+  // 4. Entre inventaires
+  {
+    const rows=top('Détail entre inventaires');
+    rows.push(H(['Produit','Du','Au','Nb jours','Stock début','+ Livré','Stock fin','= Consommé','Moy. / jour','Moy. / mois']));
+    items.forEach(it=>{
+      if(!it.intervals.length){rows.push([it.p.name,{v:it.fromDons?'Calculé sur les distributions (pas d\'inventaires)':'Pas assez d\'inventaires (2 minimum)',s:'warn'}]);return;}
+      it.intervals.forEach(r=>rows.push([it.p.name,{v:D(r.prev.date),s:'date'},{v:D(r.cur.date),s:'date'},{v:r.days,s:'int'},
+        {v:r2x(r.prev.qty),s:'int'},{v:r2x(r.livTot),s:'int'},{v:r2x(r.cur.qty),s:'int'},{v:r2x(r.cons),s:'int'},{v:r2x(r.cons/r.days),s:'dec'},{v:r2x(r.cons/r.days*30.44,1),s:'dec1'}]));
+    });
+    sheets.push({name:'Entre inventaires',rows,cols:[28,12,12,10,12,10,12,13,12,12],freeze:4});
+  }
   // 5. Par taille
   const sized=items.filter(it=>it.p.sized);
   if(sized.length){
-    csv+=cr(['5. CONSOMMATION PAR TAILLE']);
-    csv+=cr(['Produit','Taille','Stock actuel','Total consommé','Nb jours analysés','Moy. / jour','Moy. / mois','Jours de stock restants','Remarque']);
+    const rows=top('Consommation par taille');
+    rows.push(H(['Produit','Taille','Stock actuel','Total consommé','Nb jours analysés','Moy. / jour','Moy. / mois','Jours de stock restants','Remarque']));
     sized.forEach(it=>{
-      const p=it.p;
-      const sInvs=it.intervals.filter(r=>r.prev.sizes&&r.cur.sizes);
+      const p=it.p,sInvs=it.intervals.filter(r=>r.prev.sizes&&r.cur.sizes);
       getProductSizes(p).forEach(sz=>{
         let tc=0,td=0,skipped=0;
         sInvs.forEach(r=>{
@@ -4781,23 +4879,14 @@ function exportConsoCSV() {
           const lvs=r.lv.reduce((t,h)=>t+((h.sizes||{})[sz]||0),0);
           tc+=Math.max(0,((r.prev.sizes||{})[sz]||0)+lvs-((r.cur.sizes||{})[sz]||0));td+=r.days;
         });
-        const st=(p.sizes||{})[sz]||0;
-        const pd=td?tc/td:0;
+        const st=(p.sizes||{})[sz]||0,pd=td?tc/td:0;
         const note=!sInvs.length?'Pas d\'inventaire par taille':skipped?`${skipped} période(s) ignorée(s) : livraison sans détail de taille`:'';
-        csv+=cr([p.name,sz,num(st),td?num(tc):'',td||'',td?num(pd):'',td?num(pd*30.44,1):'',pd>0?Math.round(st/pd):'',note]);
+        rows.push([p.name,sz,{v:st,s:'int'},{v:td?r2x(tc):'',s:'int'},{v:td||'',s:'int'},{v:td?r2x(pd):'',s:'dec'},{v:td?r2x(pd*30.44,1):'',s:'dec1'},{v:pd>0?Math.round(st/pd):'',s:'int'},note?{v:note,s:'warn'}:'']);
       });
     });
-    csv+='\r\n';
+    sheets.push({name:'Par taille',rows,cols:[28,8,12,14,14,12,12,15,44],freeze:4});
   }
-
-  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download='conso_stockzone_'+new Date().toISOString().slice(0,10)+'.csv';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+  downloadBlob(buildXlsx(sheets),'conso_stockzone_'+new Date().toISOString().slice(0,10)+'.xlsx');
 }
 
 function exportConsoPrint() {
@@ -5108,7 +5197,7 @@ function renderStats() {
         </details>
         <div id="conso-tbl-wrap"></div>
         <div style="display:flex;gap:8px;margin-top:10px">
-          <button onclick="exportConsoCSV()" style="padding:8px 14px;border:1.5px solid var(--blue);background:var(--blue-light,#eef2ff);color:var(--blue);border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">📥 Export CSV / Excel</button>
+          <button onclick="exportConsoXLSX()" style="padding:8px 14px;border:1.5px solid var(--blue);background:var(--blue-light,#eef2ff);color:var(--blue);border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">📥 Export Excel</button>
           <button onclick="exportConsoPrint()" style="padding:8px 14px;border:1.5px solid #6b7280;background:#f9fafb;color:#374151;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">🖨 Imprimer / PDF</button>
         </div>
       </div>
