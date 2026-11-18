@@ -828,7 +828,8 @@ body.vet-mode .main{padding-bottom:20px}
     <button class="m-close" onclick="hideModal('modal-edit-hist')">✕</button>
   </div>
   <div class="fg"><label class="fl">Date</label><input type="date" id="eh-date" class="fi"></div>
-  <div class="fg"><label class="fl">Quantité</label><input type="number" id="eh-qty" class="fi" min="0"></div>
+  <div class="fg"><label class="fl">Quantité</label><input type="number" id="eh-qty" class="fi" min="0" oninput="if(document.getElementById('eh-sizes-wrap').style.display!=='none')ehSizesSum()"></div>
+  <div class="fg" id="eh-sizes-wrap" style="display:none"><label class="fl">Détail par taille <span id="eh-sizes-sum" style="font-weight:400;text-transform:none"></span></label><div id="eh-sizes-grid" style="display:flex;flex-wrap:wrap;gap:6px"></div></div>
   <div class="fg"><label class="fl">Fournisseur (si livraison)</label><input type="text" id="eh-four" class="fi" maxlength="100" placeholder="Optionnel" autocomplete="off"></div>
   <div class="fg"><label class="fl">Notes</label><input type="text" id="eh-notes" class="fi" maxlength="500" placeholder="Optionnel" autocomplete="off"></div>
   <button class="btn-primary" onclick="saveHistEdit()" style="margin-top:6px">✅ Sauvegarder</button>
@@ -2557,11 +2558,17 @@ function renderHistory() {
     };
     const t = typeMap[item.type] || {icon:'📋', label:item.type, cls:'', sign:''};
     const sub = item.fournisseur?` · ${esc(item.fournisseur)}`:(item.notes?` · ${esc(item.notes)}`:'');
+    let sizesLine = '';
+    if (item.type==='livraison' && currentProduct.sized) {
+      sizesLine = item.sizes && Object.keys(item.sizes).length
+        ? `<div style="font-size:11px;color:var(--text2);margin-top:2px">${Object.entries(item.sizes).map(([sz,q])=>`${esc(sz)}:${q}`).join(' · ')}</div>`
+        : `<div style="font-size:11px;color:#d97706;font-weight:600;margin-top:2px">⚠ tailles à compléter</div>`;
+    }
     return `<div class="hist-item${t.cls}">
       <div class="hist-icon">${t.icon}</div>
       <div style="flex:1;min-width:0">
         <div class="hist-type">${t.label}</div>
-        <div class="hist-date">${fmtDate(item.date)}${sub}</div>
+        <div class="hist-date">${fmtDate(item.date)}${sub}</div>${sizesLine}
       </div>
       <div class="hist-qty${t.sign?' pos':''}">${t.sign}${item.qty}</div>
       <div class="hist-actions">
@@ -2775,7 +2782,25 @@ function editHistItem(hid, e) {
   document.getElementById('eh-qty').value = item.qty||'';
   document.getElementById('eh-four').value = item.fournisseur||'';
   document.getElementById('eh-notes').value = item.notes||'';
+  const szWrap = document.getElementById('eh-sizes-wrap');
+  if (item.type==='livraison' && currentProduct.sized) {
+    document.getElementById('eh-sizes-grid').innerHTML = getProductSizes(currentProduct).map(sz=>
+      `<label style="display:flex;flex-direction:column;align-items:center;font-size:11px;font-weight:600;color:var(--text2)">${esc(sz)}<input type="number" class="fi eh-sz" data-sz="${esc(sz)}" min="0" inputmode="numeric" placeholder="0" value="${(item.sizes||{})[sz]||''}" style="width:56px;text-align:center;padding:6px 4px" oninput="ehSizesSum()"></label>`).join('');
+    szWrap.style.display = '';
+    ehSizesSum();
+  } else {
+    szWrap.style.display = 'none';
+    document.getElementById('eh-sizes-grid').innerHTML = '';
+  }
   document.getElementById('modal-edit-hist').classList.remove('hidden');
+}
+
+function ehSizesSum() {
+  const tot = [...document.querySelectorAll('#eh-sizes-grid .eh-sz')].reduce((a,i)=>a+Math.max(0,parseInt(i.value)||0),0);
+  const qty = parseFloat(document.getElementById('eh-qty').value)||0;
+  const el = document.getElementById('eh-sizes-sum');
+  el.textContent = tot ? `— total ${tot} / ${qty}` : '';
+  el.style.color = tot && tot!==qty ? '#dc2626' : '';
 }
 
 function saveHistEdit() {
@@ -2785,11 +2810,20 @@ function saveHistEdit() {
   if (!item) return;
   const newQty = parseFloat(document.getElementById('eh-qty').value);
   if (isNaN(newQty)||newQty<0) { toast('⚠ Quantité invalide','error'); return; }
+  let newSizes = null;
+  const szInputs = document.querySelectorAll('#eh-sizes-grid .eh-sz');
+  if (item.type==='livraison' && product.sized && szInputs.length) {
+    newSizes = {};
+    szInputs.forEach(i=>{const q=Math.max(0,parseInt(i.value)||0); if(q>0) newSizes[i.dataset.sz]=q;});
+    const tot = Object.values(newSizes).reduce((a,v)=>a+v,0);
+    if (tot && tot!==newQty) { toast(`⚠ Total des tailles (${tot}) ≠ quantité (${newQty})`,'error'); return; }
+  }
   item.date = document.getElementById('eh-date').value || item.date;
   item.qty = newQty;
   if (item.type==='livraison') item.fournisseur = document.getElementById('eh-four').value.trim()||undefined;
   const notes = document.getElementById('eh-notes').value.trim();
   if (notes) item.notes = notes; else delete item.notes;
+  if (newSizes) { if (Object.keys(newSizes).length) item.sizes = newSizes; else delete item.sizes; }
   // Recalculate current qty from most recent inventory entry
   recalcQty(product);
   save();
