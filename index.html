@@ -4193,8 +4193,9 @@ function calcConso(product, period='month', opts={}) {
     .sort((a,b)=>new Date(a.date)-new Date(b.date));
   if(filterLivraisons&&(fromDate||toDate)){
     invs=invs.filter(h=>{
-      if(fromDate&&h.date<fromDate)return false;
-      if(toDate&&h.date>toDate)return false;
+      const d=h.date.slice(0,10);
+      if(fromDate&&d<fromDate)return false;
+      if(toDate&&d>toDate)return false;
       return true;
     });
   }
@@ -4203,7 +4204,7 @@ function calcConso(product, period='month', opts={}) {
     const prev=invs[i-1],cur=invs[i];
     const livs=product.history
       .filter(h=>h.type==='livraison'&&new Date(h.date)>new Date(prev.date)&&new Date(h.date)<=new Date(cur.date)
-        &&(!filterLivraisons||(!fromDate||h.date>=fromDate))&&(!filterLivraisons||(!toDate||h.date<=toDate)))
+        &&(!filterLivraisons||((!fromDate||h.date.slice(0,10)>=fromDate)&&(!toDate||h.date.slice(0,10)<=toDate))))
       .reduce((s,h)=>s+h.qty,0);
     const pretAdj=product.history
       .filter(h=>['pret','emprunt','retour_pret','retour_emprunt','vente'].includes(h.type)&&new Date(h.date)>new Date(prev.date)&&new Date(h.date)<=new Date(cur.date))
@@ -4592,15 +4593,15 @@ function exportConsoCSV() {
 
   // --- SECTION 2: Détail des livraisons ---
   csv+=cr(['=== DÉTAIL DES LIVRAISONS ===']);
-  csv+=cr(['Produit','Zone','Catégorie','Date','Quantité reçue','Notes']);
+  csv+=cr(['Produit','Zone','Catégorie','Date','Quantité reçue','Fournisseur']);
   allRows.forEach(({p,z})=>{
     let livs=p.history.filter(h=>h.type==='livraison'&&h.date);
     if(filterLivraisons){
-      if(fromDate) livs=livs.filter(h=>h.date>=fromDate);
-      if(toDate) livs=livs.filter(h=>h.date<=toDate);
+      if(fromDate) livs=livs.filter(h=>h.date.slice(0,10)>=fromDate);
+      if(toDate) livs=livs.filter(h=>h.date.slice(0,10)<=toDate);
     }
     livs.sort((a,b)=>a.date.localeCompare(b.date));
-    livs.forEach(h=>csv+=cr([p.name,z.name,p.category||'',h.date.slice(0,10),h.qty,h.notes||'']));
+    livs.forEach(h=>csv+=cr([p.name,z.name,p.category||'',h.date.slice(0,10),h.qty,h.fournisseur||h.notes||'']));
   });
   csv+='\r\n';
 
@@ -4612,8 +4613,8 @@ function exportConsoCSV() {
       .filter(h=>(h.type==='inventaire'||h.type==='inventaire_base')&&h.date&&/^\d{4}-\d{2}-\d{2}/.test(h.date))
       .sort((a,b)=>new Date(a.date)-new Date(b.date));
     if(filterLivraisons){
-      if(fromDate) invs=invs.filter(h=>h.date>=fromDate);
-      if(toDate) invs=invs.filter(h=>h.date<=toDate);
+      if(fromDate) invs=invs.filter(h=>h.date.slice(0,10)>=fromDate);
+      if(toDate) invs=invs.filter(h=>h.date.slice(0,10)<=toDate);
     }
     if(invs.length<2){
       // No pairs: show overall average from dons if available
@@ -4635,8 +4636,8 @@ function exportConsoCSV() {
       const prev=invs[i-1],cur=invs[i];
       let livs=p.history.filter(h=>h.type==='livraison'&&new Date(h.date)>new Date(prev.date)&&new Date(h.date)<=new Date(cur.date));
       if(filterLivraisons){
-        if(fromDate) livs=livs.filter(h=>h.date>=fromDate);
-        if(toDate) livs=livs.filter(h=>h.date<=toDate);
+        if(fromDate) livs=livs.filter(h=>h.date.slice(0,10)>=fromDate);
+        if(toDate) livs=livs.filter(h=>h.date.slice(0,10)<=toDate);
       }
       const livsTotal=livs.reduce((s,h)=>s+h.qty,0);
       const pretAdj=p.history.filter(h=>['pret','emprunt','retour_pret','retour_emprunt','vente'].includes(h.type)&&new Date(h.date)>new Date(prev.date)&&new Date(h.date)<=new Date(cur.date)).reduce((s,h)=>s+h.qty,0);
