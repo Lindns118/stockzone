@@ -474,6 +474,31 @@ body.vet-mode .main{padding-bottom:20px}
 .p-sz-name{flex:1;font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .p-hist-item{padding:8px 0;border-bottom:1px solid #f3f4f6;font-size:13px}
 .add-person-btn{width:100%;background:#7c3aed;color:#fff;border:none;border-radius:12px;padding:12px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:14px;display:flex;align-items:center;justify-content:center;gap:8px}
+/* ===== STATS FILTRE PRODUITS ===== */
+.stats-filters select{padding:8px 10px;border-radius:10px;border:1.5px solid var(--gray2);background:var(--gray);font-size:13px;font-family:inherit;outline:none;color:var(--text);transition:border-color .18s;cursor:pointer}
+.stats-filters select:focus{border-color:var(--blue);background:#fff}
+.prod-filter-details{margin-bottom:12px}
+.prod-filter-summary{list-style:none;padding:8px 14px;border-radius:10px;border:1.5px solid var(--gray2);background:var(--gray);font-size:13px;font-weight:500;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none}
+.prod-filter-summary::-webkit-details-marker{display:none}
+.prod-filter-panel{border:1.5px solid var(--gray2);border-radius:10px;margin-top:4px;background:#fff;max-height:220px;overflow-y:auto}
+.pfp-header{display:flex;gap:8px;padding:8px 12px;border-bottom:1px solid var(--gray2);position:sticky;top:0;background:#fff;z-index:1}
+.pfp-header button{flex:1;padding:5px 8px;border-radius:8px;border:1.5px solid var(--gray2);background:var(--gray);font-size:12px;cursor:pointer;font-family:inherit}
+.pfp-item{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--gray2,#f3f4f6);font-size:13px;cursor:pointer}
+.pfp-item:last-child{border-bottom:none}
+.pfp-item input[type=checkbox]{width:16px;height:16px;accent-color:var(--blue);flex-shrink:0;cursor:pointer}
+.date-range-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.date-range-row label{font-size:12px;color:var(--text2);flex-shrink:0}
+.date-range-row input[type=date]{padding:6px 10px;border-radius:10px;border:1.5px solid var(--gray2);background:var(--gray);font-size:12px;font-family:inherit;color:var(--text);outline:none}
+.date-range-row input[type=date]:focus{border-color:var(--blue);background:#fff}
+.prod-filter-summary{justify-content:space-between}
+.prod-filter-details[open] .prod-filter-summary{border-color:var(--blue);background:#fff}
+.prod-filter-panel{max-height:320px}
+.pfp-search{width:100%;box-sizing:border-box;padding:8px 10px;border-radius:8px;border:1.5px solid var(--gray2);font-size:14px;font-family:inherit;outline:none;background:var(--gray)}
+.pfp-search:focus{border-color:var(--blue);background:#fff}
+.pfp-top{position:sticky;top:0;background:#fff;z-index:1;padding:8px 10px;border-bottom:1px solid var(--gray2);display:flex;flex-direction:column;gap:6px}
+.pfp-top .pfp-header{position:static;padding:0;border:none}
+.pfp-only{width:100%;padding:7px 8px;border-radius:8px;border:1.5px solid var(--blue);background:var(--blue-light,#eef2ff);color:var(--blue);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+.pfp-empty{padding:14px;text-align:center;color:var(--text2);font-size:13px}
 </style>
 </head>
 <body>
@@ -3736,21 +3761,6 @@ function genHTMLReport(prods) {
 .stats-tab{flex:1;padding:9px 4px;border:none;border-radius:9px;background:none;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--text2);transition:all .18s}
 .stats-tab.sta{background:#fff;color:var(--blue);box-shadow:0 1px 4px rgba(0,0,0,.12)}
 .stats-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
-.stats-filters select{padding:8px 10px;border-radius:10px;border:1.5px solid var(--gray2);background:var(--gray);font-size:13px;font-family:inherit;outline:none;color:var(--text);transition:border-color .18s;cursor:pointer}
-.stats-filters select:focus{border-color:var(--blue);background:#fff}
-.prod-filter-details{margin-bottom:12px}
-.prod-filter-summary{list-style:none;padding:8px 14px;border-radius:10px;border:1.5px solid var(--gray2);background:var(--gray);font-size:13px;font-weight:500;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none}
-.prod-filter-summary::-webkit-details-marker{display:none}
-.prod-filter-panel{border:1.5px solid var(--gray2);border-radius:10px;margin-top:4px;background:#fff;max-height:220px;overflow-y:auto}
-.pfp-header{display:flex;gap:8px;padding:8px 12px;border-bottom:1px solid var(--gray2);position:sticky;top:0;background:#fff;z-index:1}
-.pfp-header button{flex:1;padding:5px 8px;border-radius:8px;border:1.5px solid var(--gray2);background:var(--gray);font-size:12px;cursor:pointer;font-family:inherit}
-.pfp-item{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--gray2,#f3f4f6);font-size:13px;cursor:pointer}
-.pfp-item:last-child{border-bottom:none}
-.pfp-item input[type=checkbox]{width:16px;height:16px;accent-color:var(--blue);flex-shrink:0;cursor:pointer}
-.date-range-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
-.date-range-row label{font-size:12px;color:var(--text2);flex-shrink:0}
-.date-range-row input[type=date]{padding:6px 10px;border-radius:10px;border:1.5px solid var(--gray2);background:var(--gray);font-size:12px;font-family:inherit;color:var(--text);outline:none}
-.date-range-row input[type=date]:focus{border-color:var(--blue);background:#fff}
 .tbl-wrap{overflow-x:auto;border-radius:12px;box-shadow:var(--shadow)}
 table.conso-tbl{width:100%;border-collapse:collapse;font-size:12px;background:#fff}
 table.conso-tbl thead tr{background:var(--blue);color:#fff}
@@ -4401,16 +4411,45 @@ function renderProdFilter(){
   });
   prods.sort((a,b)=>a.localeCompare(b,'fr'));
   for(const n of [...selectedProds]) if(!prods.includes(n)) selectedProds.delete(n);
-  panel.innerHTML=`<div class="pfp-header">
-    <button onclick="selectedProds.clear();_prodFilterNoneMode=false;renderProdFilter();renderConsoTable()">✓ Tous</button>
-    <button onclick="prodFilterNone()">✗ Aucun</button>
+  const q=(document.getElementById('pfp-search')?.value)||'';
+  panel.innerHTML=`<div class="pfp-top">
+    <input type="search" id="pfp-search" class="pfp-search" placeholder="🔍 Écrire un produit…" value="${esc(q)}" oninput="pfpFilter()" autocomplete="off">
+    <button class="pfp-only" id="pfp-only" style="display:none" onclick="pfpSelectOnlyVisible()"></button>
+    <div class="pfp-header">
+      <button onclick="selectedProds.clear();_prodFilterNoneMode=false;renderProdFilter();renderConsoTable()">✓ Tous</button>
+      <button onclick="prodFilterNone()">✗ Aucun</button>
+    </div>
   </div>`+
   prods.map(n=>{
     const chk=!_prodFilterNoneMode&&(selectedProds.size===0||selectedProds.has(n));
     return `<label class="pfp-item"><input type="checkbox" ${chk?'checked':''} onchange="onProdChk('${n.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;')}',this.checked)"><span>${esc(n)}</span></label>`;
-  }).join('');
+  }).join('')+'<div class="pfp-empty" id="pfp-empty" style="display:none">Aucun produit trouvé</div>';
+  pfpFilter();
   updateProdFilterSummary(prods.length);
 }
+function pfpNorm(t){return (t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();}
+function pfpFilter(){
+  const q=pfpNorm(document.getElementById('pfp-search')?.value);
+  let n=0;
+  document.querySelectorAll('#prod-filter-panel .pfp-item').forEach(l=>{
+    const show=!q||pfpNorm(l.textContent).includes(q);
+    l.style.display=show?'':'none'; if(show) n++;
+  });
+  const empty=document.getElementById('pfp-empty'); if(empty) empty.style.display=n?'none':'';
+  const only=document.getElementById('pfp-only');
+  if(only){ only.style.display=q&&n?'':'none'; only.textContent=`✓ Uniquement ${n===1?'ce produit':'ces '+n+' produits'}`; }
+}
+function pfpSelectOnlyVisible(){
+  const items=[...document.querySelectorAll('#prod-filter-panel .pfp-item')];
+  const vis=items.filter(l=>l.style.display!=='none').map(l=>l.querySelector('span').textContent);
+  if(!vis.length) return;
+  selectedProds.clear();
+  _prodFilterNoneMode=false;
+  if(vis.length<items.length) vis.forEach(n=>selectedProds.add(n));
+  const inp=document.getElementById('pfp-search'); if(inp) inp.value='';
+  renderProdFilter();renderConsoTable();
+}
+
 function prodFilterNone(){
   selectedProds.clear();
   _prodFilterNoneMode=true;
