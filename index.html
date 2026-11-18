@@ -4890,8 +4890,103 @@ function renderCompareTable(){
       <td colspan="2"></td>
     </tr></tfoot>
   </table></div>
-  <p style="font-size:11px;color:var(--text2);margin-top:8px">Rythme = consommation moyenne mensuelle estimée sur la période.</p>`;
+  <p style="font-size:11px;color:var(--text2);margin-top:8px">Rythme = consommation moyenne mensuelle estimée sur la période.</p>${found.sized?'<div id="cmp-size-year" style="margin-top:18px"></div>':''}`;
+  if(found.sized) renderCmpSizeYear(found);
 }
+let _cmpSizeYear=null;
+function calcSizeMonthly(p, year) {
+  const sizes=getProductSizes(p);
+  const months={}; // m(1-12) -> {sz:qty}
+  const covered=new Array(13).fill(0); // days covered per month
+  const unknown=new Array(13).fill(false);
+  const yStart=new Date(Date.UTC(year,0,1)), yEnd=new Date(Date.UTC(year+1,0,1));
+  const invs=p.history.filter(h=>(h.type==='inventaire'||h.type==='inventaire_base')&&h.sizes&&h.date&&/^\d{4}-\d{2}-\d{2}/.test(h.date))
+    .sort((a,b)=>new Date(a.date)-new Date(b.date));
+  function eachDay(from,to,fn){ // days in (from,to]
+    const d0=new Date(Date.UTC(from.getUTCFullYear(),from.getUTCMonth(),from.getUTCDate())+86400000);
+    const d1=new Date(Date.UTC(to.getUTCFullYear(),to.getUTCMonth(),to.getUTCDate()));
+    for(let d=d0;d<=d1;d=new Date(d.getTime()+86400000)) if(d>=yStart&&d<yEnd) fn(d.getUTCMonth()+1);
+  }
+  for(let i=1;i<invs.length;i++){
+    const prev=invs[i-1],cur=invs[i];
+    const a=new Date(prev.date),b=new Date(cur.date);
+    if(b<=yStart||a>=yEnd) continue;
+    const livs=p.history.filter(h=>h.type==='livraison'&&new Date(h.date)>a&&new Date(h.date)<=b);
+    const days=Math.max(1,Math.round((Date.UTC(b.getUTCFullYear(),b.getUTCMonth(),b.getUTCDate())-Date.UTC(a.getUTCFullYear(),a.getUTCMonth(),a.getUTCDate()))/86400000));
+    if(livs.some(h=>!h.sizes)){ eachDay(a,b,m=>unknown[m]=true); continue; }
+    const perDay={};
+    sizes.forEach(sz=>{
+      const liv=livs.reduce((t,h)=>t+((h.sizes||{})[sz]||0),0);
+      perDay[sz]=Math.max(0,((prev.sizes||{})[sz]||0)+liv-((cur.sizes||{})[sz]||0))/days;
+    });
+    eachDay(a,b,m=>{
+      covered[m]++;
+      months[m]=months[m]||{};
+      sizes.forEach(sz=>{months[m][sz]=(months[m][sz]||0)+perDay[sz];});
+    });
+  }
+  // Distributions par taille hors période couverte par des inventaires
+  const cFrom=invs.length>=2?new Date(invs[0].date):null, cTo=invs.length>=2?new Date(invs[invs.length-1].date):null;
+  p.history.filter(h=>h.type==='don'&&h.size&&h.qty>0&&h.date&&h.date.slice(0,4)===String(year)).forEach(h=>{
+    const d=new Date(h.date);
+    if(cFrom&&d>=cFrom&&d<=cTo) return;
+    const m=parseInt(h.date.slice(5,7));
+    months[m]=months[m]||{};
+    months[m][h.size]=(months[m][h.size]||0)+h.qty;
+    if(!covered[m]) covered[m]=new Date(year,m,0).getDate();
+  });
+  return {sizes,months,covered,unknown};
+}
+
+function renderCmpSizeYear(p) {
+  const el=document.getElementById('cmp-size-year'); if(!el) return;
+  const years=[...new Set(p.history.filter(h=>h.date).map(h=>parseInt(h.date.slice(0,4))))].filter(y=>y>2000).sort();
+  const nowY=new Date().getFullYear();
+  if(!years.includes(nowY)) years.push(nowY);
+  if(!_cmpSizeYear||!years.includes(_cmpSizeYear)) _cmpSizeYear=nowY;
+  const y=_cmpSizeYear;
+  const {sizes,months,covered,unknown}=calcSizeMonthly(p,y);
+  const MN=['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+  const daysCov=covered.reduce((a,v)=>a+v,0);
+  const monthsCov=covered.filter(v=>v>0).length;
+  const rows=sizes.map(sz=>{
+    const vals=MN.map((_,i)=>months[i+1]?.[sz]||0);
+    const tot=vals.reduce((a,v)=>a+v,0);
+    const day=daysCov?tot/daysCov:0;
+    const stock=(p.sizes||{})[sz]||0;
+    return {sz,vals,tot,mo:monthsCov?tot/monthsCov:0,day,stock,left:day>0?Math.round(stock/day):null};
+  });
+  const totVals=MN.map((_,i)=>rows.reduce((a,r)=>a+r.vals[i],0));
+  const grand=rows.reduce((a,r)=>a+r.tot,0);
+  const gDay=daysCov?grand/daysCov:0;
+  const cell=(v,i)=>unknown[i+1]&&!v?'<td class="num" style="color:#d97706" title="Livraison sans détail de taille">?</td>':(covered[i+1]?`<td class="num">${Math.round(v)}</td>`:'<td class="num zero">—</td>');
+  const leftCell=v=>v==null?'<td class="num">—</td>':`<td class="num" style="font-weight:600;color:${v<=7?'#ef4444':v<=30?'#f59e0b':'#16a34a'}">${v}j</td>`;
+  el.innerHTML=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <div class="cc-title" style="margin:0">Récap annuel par taille</div>
+      <select onchange="_cmpSizeYear=parseInt(this.value);renderCmpSizeYear(findProduct('${p.id}').p)" style="padding:5px 8px;border-radius:8px;border:1.5px solid var(--gray2);font-size:13px">${years.map(v=>`<option${v===y?' selected':''}>${v}</option>`).join('')}</select>
+      <button onclick="exportCmpSizeYearCSV('${p.id}')" style="margin-left:auto;padding:6px 12px;border:1.5px solid var(--blue);background:var(--blue-light,#eef2ff);color:var(--blue);border-radius:10px;font-size:12px;font-weight:600;cursor:pointer">📥 CSV</button>
+    </div>
+    <div class="tbl-wrap"><table class="conso-tbl" id="cmp-size-year-tbl">
+      <thead><tr><th>Taille</th>${MN.map(m=>`<th class="num">${m}</th>`).join('')}<th class="num" style="background:#0f1454">Total</th><th class="num">Moy./mois</th><th class="num">Moy./jour</th><th class="num">Stock</th><th class="num">Jours restants</th></tr></thead>
+      <tbody>${rows.map(r=>`<tr><td style="font-weight:700">${esc(r.sz)}</td>${r.vals.map(cell).join('')}<td class="num"><span class="sum-badge">${Math.round(r.tot)}</span></td><td class="num">${r2(r.mo)}</td><td class="num">${r2(r.day)}</td><td class="num">${r.stock}</td>${leftCell(r.left)}</tr>`).join('')}</tbody>
+      <tfoot><tr><td>Total</td>${totVals.map((v,i)=>covered[i+1]?`<td class="num">${Math.round(v)}</td>`:(unknown[i+1]?'<td class="num">?</td>':'<td class="num">—</td>')).join('')}<td class="num">${Math.round(grand)}</td><td class="num">${monthsCov?r2(grand/monthsCov):0}</td><td class="num">${r2(gDay)}</td><td class="num">${p.qty}</td>${leftCell(gDay>0?Math.round(p.qty/gDay):null)}</tr></tfoot>
+    </table></div>
+    <p style="font-size:11px;color:var(--text2);margin-top:6px">Calculé entre inventaires par taille, réparti par jour quand plusieurs mois les séparent. <span style="color:#d97706">?</span> = livraison sans détail de taille (à compléter dans l'historique).</p>`;
+}
+
+function exportCmpSizeYearCSV(pid) {
+  const tbl=document.getElementById('cmp-size-year-tbl'); if(!tbl) return;
+  const p=findProduct(pid)?.p;
+  const cv=v=>/[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;
+  let csv='﻿'+[ (p?p.name:'')+' — récap '+_cmpSizeYear ].map(cv).join(';')+'\r\n';
+  tbl.querySelectorAll('tr').forEach(tr=>{csv+=[...tr.querySelectorAll('th,td')].map(td=>cv(td.textContent.trim())).join(';')+'\r\n';});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download=`recap_tailles_${(p?.name||'produit').replace(/[^\w-]+/g,'_')}_${_cmpSizeYear}.csv`;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+}
+
 
 function renderStats() {
   const ev=document.getElementById('extra-view');
