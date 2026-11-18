@@ -3348,16 +3348,46 @@ function addLivRow() {
   const dlId='dl'+uid();
   const div=document.createElement('div');
   div.className='prod-input-row';
+  div.style.flexWrap='wrap';
   div.innerHTML=`
     <datalist id="${dlId}">${zd.products.map(p=>`<option value="${esc(p.name)}">${esc(p.groupe ? p.groupe+' › '+p.name : p.name)}</option>`).join('')}</datalist>
-    <input class="fi" style="flex:2;min-width:0" placeholder="Nom du produit" list="${dlId}" maxlength="100" autocomplete="off">
-    <input type="number" class="fi fi-sm" placeholder="Qté" min="1">
-    <select class="fi fi-unit">
+    <input class="fi liv-name" style="flex:2;min-width:0" placeholder="Nom du produit" list="${dlId}" maxlength="100" autocomplete="off" oninput="livRowCheckSizes(this.closest('.prod-input-row'))" onchange="livRowCheckSizes(this.closest('.prod-input-row'))">
+    <input type="number" class="fi fi-sm liv-qty" placeholder="Qté" min="1">
+    <select class="fi fi-unit liv-unit">
     </select>
     <button class="pir-del" onclick="this.parentElement.remove()">✕</button>
+    <div class="liv-sizes" style="display:none;flex-basis:100%;flex-wrap:wrap;gap:6px;margin-top:4px"></div>
   `;
   div.querySelector('select').innerHTML = unitOptions('pièces');
   document.getElementById('liv-rows').appendChild(div);
+}
+
+function livFindProduct(name) {
+  const zd=S.zones[currentZone]||{products:[]};
+  const n=(name||'').trim().toLowerCase();
+  return n ? zd.products.find(p=>p.name.toLowerCase()===n) : null;
+}
+
+function livRowCheckSizes(row) {
+  const p=livFindProduct(row.querySelector('.liv-name').value);
+  const box=row.querySelector('.liv-sizes');
+  const qtyInp=row.querySelector('.liv-qty');
+  const sized=!!(p&&p.sized);
+  if(box.dataset.pid===(sized?p.id:'')) return;
+  box.dataset.pid=sized?p.id:'';
+  if(!sized){
+    box.style.display='none'; box.innerHTML='';
+    qtyInp.readOnly=false; qtyInp.style.background='';
+    return;
+  }
+  box.innerHTML=getProductSizes(p).map(sz=>`<label style="display:flex;flex-direction:column;align-items:center;font-size:11px;font-weight:600;color:var(--text2)">${esc(sz)}<input type="number" class="fi liv-sz" data-sz="${esc(sz)}" min="0" inputmode="numeric" placeholder="0" style="width:52px;text-align:center;padding:6px 4px" oninput="livRowSumSizes(this.closest('.prod-input-row'))"></label>`).join('');
+  box.style.display='flex';
+  qtyInp.readOnly=true; qtyInp.style.background='var(--gray2)'; qtyInp.value='';
+}
+
+function livRowSumSizes(row) {
+  const tot=[...row.querySelectorAll('.liv-sz')].reduce((s,i)=>s+(Math.max(0,parseInt(i.value)||0)),0);
+  row.querySelector('.liv-qty').value=tot||'';
 }
 
 function saveLivraison() {
@@ -3367,11 +3397,24 @@ function saveLivraison() {
   if(!rows.length){toast('⚠ Ajoutez au moins un produit','error');return;}
   let n=0;
   rows.forEach(row=>{
-    const ins=row.querySelectorAll('input,select');
-    const name=ins[0].value.trim().slice(0,100), qty=parseFloat(ins[1].value), unit=ins[2].value;
-    if(!name||!isFinite(qty)||qty<=0||qty>1e9) return;
+    const name=row.querySelector('.liv-name').value.trim().slice(0,100);
+    const unit=row.querySelector('.liv-unit').value;
     const zd=S.zones[currentZone];
     let p=zd.products.find(p=>p.name.toLowerCase()===name.toLowerCase());
+    if(p&&p.sized){
+      const sizes={};
+      row.querySelectorAll('.liv-sz').forEach(i=>{const q=Math.max(0,parseInt(i.value)||0);if(q>0)sizes[i.dataset.sz]=q;});
+      const qty=Object.values(sizes).reduce((a,v)=>a+v,0);
+      if(!qty||qty>1e9) return;
+      if(!p.sizes) p.sizes={};
+      Object.entries(sizes).forEach(([sz,q])=>{p.sizes[sz]=(p.sizes[sz]||0)+q;});
+      p.qty+=qty; if(unit) p.unit=unit;
+      p.history.push({id:uid(),type:'livraison',date,qty,sizes,fournisseur:four||undefined});
+      n++;
+      return;
+    }
+    const qty=parseFloat(row.querySelector('.liv-qty').value);
+    if(!name||!isFinite(qty)||qty<=0||qty>1e9) return;
     if(p){
       p.qty+=qty; if(unit) p.unit=unit;
       p.history.push({id:uid(),type:'livraison',date,qty,fournisseur:four||undefined});
@@ -4593,7 +4636,7 @@ function exportConsoCSV() {
 
   // --- SECTION 2: Détail des livraisons ---
   csv+=cr(['=== DÉTAIL DES LIVRAISONS ===']);
-  csv+=cr(['Produit','Zone','Catégorie','Date','Quantité reçue','Fournisseur']);
+  csv+=cr(['Produit','Zone','Catégorie','Date','Quantité reçue','Détail tailles','Fournisseur']);
   allRows.forEach(({p,z})=>{
     let livs=p.history.filter(h=>h.type==='livraison'&&h.date);
     if(filterLivraisons){
@@ -4601,7 +4644,7 @@ function exportConsoCSV() {
       if(toDate) livs=livs.filter(h=>h.date.slice(0,10)<=toDate);
     }
     livs.sort((a,b)=>a.date.localeCompare(b.date));
-    livs.forEach(h=>csv+=cr([p.name,z.name,p.category||'',h.date.slice(0,10),h.qty,h.fournisseur||h.notes||'']));
+    livs.forEach(h=>csv+=cr([p.name,z.name,p.category||'',h.date.slice(0,10),h.qty,h.sizes?Object.entries(h.sizes).map(([sz,q])=>sz+':'+q).join(' '):(p.sized?'non détaillé':''),h.fournisseur||h.notes||'']));
   });
   csv+='\r\n';
 
@@ -4658,6 +4701,51 @@ function exportConsoCSV() {
       csv+='\r\n';
     }
   });
+
+  // --- SECTION 4: Consommation par taille ---
+  const sizedRows=allRows.filter(({p})=>p.sized);
+  if(sizedRows.length){
+    csv+=cr(['=== CONSOMMATION PAR TAILLE ===']);
+    csv+=cr(['Produit','Zone','Taille','Période inventaire','Stock début','Livraisons','Stock fin','Consommation','Nb jours','Moy./jour','Moy./mois','Stock actuel','Jours de stock restants']);
+    sizedRows.forEach(({p,z})=>{
+      let invs=[...p.history]
+        .filter(h=>(h.type==='inventaire'||h.type==='inventaire_base')&&h.sizes&&h.date&&/^\d{4}-\d{2}-\d{2}/.test(h.date))
+        .sort((a,b)=>new Date(a.date)-new Date(b.date));
+      if(filterLivraisons){
+        if(fromDate) invs=invs.filter(h=>h.date.slice(0,10)>=fromDate);
+        if(toDate) invs=invs.filter(h=>h.date.slice(0,10)<=toDate);
+      }
+      if(invs.length<2){
+        csv+=cr([p.name,z.name,'','Pas assez d\'inventaires par taille (2 minimum)']);
+        csv+='\r\n';
+        return;
+      }
+      getProductSizes(p).forEach(sz=>{
+        let totCons=0,totDays=0;
+        for(let i=1;i<invs.length;i++){
+          const prev=invs[i-1],cur=invs[i];
+          const livs=p.history.filter(h=>h.type==='livraison'&&new Date(h.date)>new Date(prev.date)&&new Date(h.date)<=new Date(cur.date));
+          const days=Math.max(1,Math.round((new Date(cur.date)-new Date(prev.date))/86400000));
+          const periode=prev.date.slice(0,10)+' → '+cur.date.slice(0,10);
+          const sIn=(prev.sizes||{})[sz]||0, sOut=(cur.sizes||{})[sz]||0;
+          if(livs.some(h=>!h.sizes)){
+            csv+=cr([p.name,z.name,sz,periode,sIn,'livraison sans détail taille',sOut,'','','','','','']);
+            continue;
+          }
+          const livSz=livs.reduce((a,h)=>a+((h.sizes||{})[sz]||0),0);
+          const cons=Math.max(0,sIn+livSz-sOut);
+          totCons+=cons; totDays+=days;
+          csv+=cr([p.name,z.name,sz,periode,sIn,livSz,sOut,cons,days,r2(cons/days),r2(cons/days*30.44),'','']);
+        }
+        const stockNow=(p.sizes||{})[sz]||0;
+        if(totDays>0){
+          const d=r2(totCons/totDays);
+          csv+=cr([p.name,z.name,sz,'MOYENNE GLOBALE','','','',totCons,totDays,d,r2(d*30.44),stockNow,d>0?Math.round(stockNow/d):'']);
+        }
+      });
+      csv+='\r\n';
+    });
+  }
 
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a');
