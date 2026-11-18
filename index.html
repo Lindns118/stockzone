@@ -5087,7 +5087,7 @@ function exportConsoXLSX() {
   const sized=items.filter(it=>it.p.sized);
   if(sized.length){
     const rows=top('Consommation par taille');
-    rows.push(H(['Produit','Taille','Stock actuel','Total consommé','Nb jours analysés','Moy. / jour','Moy. / mois','Jours de stock restants','Remarque']));
+    rows.push(H(['Produit','Taille','Stock actuel','Total consommé','Nb jours analysés','Moy. / jour','Moy. / mois','Jours de stock restants','À commander pour 30 j','Remarque']));
     sized.forEach(it=>{
       const p=it.p,sInvs=it.intervals.filter(r=>r.prev.sizes&&r.cur.sizes);
       getProductSizes(p).forEach(sz=>{
@@ -5099,10 +5099,10 @@ function exportConsoXLSX() {
         });
         const st=(p.sizes||{})[sz]||0,pd=td?tc/td:0;
         const note=!sInvs.length?'Pas d\'inventaire par taille':skipped?`${skipped} période(s) ignorée(s) : livraison sans détail de taille`:'';
-        rows.push([p.name,sz,{v:st,s:'int'},{v:td?r2x(tc):'',s:'int'},{v:td||'',s:'int'},{v:td?r2x(pd):'',s:'dec'},{v:td?r2x(pd*30.44,1):'',s:'dec1'},{v:pd>0?Math.round(st/pd):'',s:'int'},note?{v:note,s:'warn'}:'']);
+        rows.push([p.name,sz,{v:st,s:'int'},{v:td?r2x(tc):'',s:'int'},{v:td||'',s:'int'},{v:td?r2x(pd):'',s:'dec'},{v:td?r2x(pd*30.44,1):'',s:'dec1'},{v:pd>0?Math.round(st/pd):'',s:'int'},{v:td?Math.max(0,Math.ceil(pd*30-st)):'',s:'int'},note?{v:note,s:'warn'}:'']);
       });
     });
-    sheets.push({name:'Par taille',rows,cols:[28,8,12,14,14,12,12,15,44],freeze:4});
+    sheets.push({name:'Par taille',rows,cols:[28,8,12,14,14,12,12,15,17,44],freeze:4});
   }
   downloadBlob(buildXlsx(sheets),'conso_stockzone_'+new Date().toISOString().slice(0,10)+'.xlsx');
 }
