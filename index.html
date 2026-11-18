@@ -4186,15 +4186,24 @@ function printPersonFiche() {
 // ===== STATS =====
 
 // Calcule la conso par mois pour un produit {ym:'2026-04', cons:N}
-function calcConso(product, period='month') {
-  const invs=[...product.history]
+function calcConso(product, period='month', opts={}) {
+  const {fromDate, toDate, filterLivraisons} = opts;
+  let invs=[...product.history]
     .filter(h=>(h.type==='inventaire'||h.type==='inventaire_base') && h.date && /^\d{4}-\d{2}-\d{2}/.test(h.date))
     .sort((a,b)=>new Date(a.date)-new Date(b.date));
+  if(filterLivraisons&&(fromDate||toDate)){
+    invs=invs.filter(h=>{
+      if(fromDate&&h.date<fromDate)return false;
+      if(toDate&&h.date>toDate)return false;
+      return true;
+    });
+  }
   const r={};
   for(let i=1;i<invs.length;i++){
     const prev=invs[i-1],cur=invs[i];
     const livs=product.history
-      .filter(h=>h.type==='livraison'&&new Date(h.date)>new Date(prev.date)&&new Date(h.date)<=new Date(cur.date))
+      .filter(h=>h.type==='livraison'&&new Date(h.date)>new Date(prev.date)&&new Date(h.date)<=new Date(cur.date)
+        &&(!filterLivraisons||(!fromDate||h.date>=fromDate))&&(!filterLivraisons||(!toDate||h.date<=toDate)))
       .reduce((s,h)=>s+h.qty,0);
     const pretAdj=product.history
       .filter(h=>['pret','emprunt','retour_pret','retour_emprunt','vente'].includes(h.type)&&new Date(h.date)>new Date(prev.date)&&new Date(h.date)<=new Date(cur.date))
@@ -4398,6 +4407,9 @@ function renderConsoTable(){
 
   const fromDate=document.getElementById('tbl-from')?.value;
   const toDate=document.getElementById('tbl-to')?.value;
+  const filterRow=document.getElementById('tbl-date-filter-row');
+  if(filterRow) filterRow.style.display=(fromDate||toDate)?'flex':'none';
+  const filterLivraisons=document.getElementById('tbl-filter-livraisons')?.checked&&(fromDate||toDate);
 
   let rows=[];
   Object.entries(S.zones).forEach(([k,z])=>{
@@ -4409,7 +4421,7 @@ function renderConsoTable(){
       }
       if(_prodFilterNoneMode&&selectedProds.size===0)return;
       if(selectedProds.size>0&&!selectedProds.has(p.name))return;
-      const raw=calcConso(p,period);
+      const raw=calcConso(p,period,{fromDate,toDate,filterLivraisons});
       const grouped={};
       Object.entries(raw).forEach(([ym,v])=>{
         if(!/^\d{4}-\d{2}$/.test(ym)&&!/^\d{4}-W\d{2}$/.test(ym)) return;
@@ -4538,23 +4550,122 @@ function renderConsoTable(){
 }
 
 function exportConsoCSV() {
-  const tbl = document.getElementById('conso-main-tbl');
-  if(!tbl) { toast('Aucun tableau à exporter', 'error'); return; }
-  const rows = [];
-  tbl.querySelectorAll('tr').forEach(tr => {
-    const cells = [...tr.querySelectorAll('th,td')].map(td => {
-      const text = td.textContent.trim().replace(/\s+/g,' ');
-      return '"' + text.replace(/"/g,'""') + '"';
+  const zk=document.getElementById('tbl-zone')?.value||'all';
+  const cat=document.getElementById('tbl-cat')?.value||'all';
+  const period=document.getElementById('tbl-period')?.value||'month';
+  const fromDate=document.getElementById('tbl-from')?.value||'';
+  const toDate=document.getElementById('tbl-to')?.value||'';
+  const filterLivraisons=document.getElementById('tbl-filter-livraisons')?.checked&&(fromDate||toDate);
+  const SEP=';';
+  function cv(v){const s=String(v===null||v===undefined?'':v);return s.includes(SEP)||s.includes('"')||s.includes('\n')?'"'+s.replace(/"/g,'""')+'"':s;}
+  function cr(cells){return cells.map(cv).join(SEP)+'\r\n';}
+  let csv='﻿';
+  const dateLabel=(fromDate||toDate)?(` (${fromDate||'…'} → ${toDate||'…'})`):' ';
+  csv+=cr(['StockZone — Export consommation'+dateLabel, new Date().toLocaleDateString('fr-FR')]);
+  csv+='\r\n';
+
+  // --- Collect products ---
+  const allRows=[];
+  Object.entries(S.zones).forEach(([k,z])=>{
+    if(zk!=='all'&&k!==zk)return;
+    z.products.forEach(p=>{
+      if(cat!=='all'){
+        if(cat.startsWith('groupe:')){if(p.groupe!==cat.slice(7))return;}
+        else{if(p.category!==cat)return;}
+      }
+      if(_prodFilterNoneMode&&selectedProds.size===0)return;
+      if(selectedProds.size>0&&!selectedProds.has(p.name))return;
+      allRows.push({p,z,zk:k});
     });
-    rows.push(cells.join(';'));
   });
-  const bom = '﻿';
-  const blob = new Blob([bom + rows.join('\n')], {type:'text/csv;charset=utf-8'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'conso_stockzone_' + new Date().toISOString().slice(0,10) + '.csv';
+
+  // --- SECTION 1: Résumé par période ---
+  csv+=cr(['=== CONSOMMATION PAR PÉRIODE ===']);
+  const tbl=document.getElementById('conso-main-tbl');
+  if(tbl){
+    tbl.querySelectorAll('tr').forEach(tr=>{
+      const cells=[...tr.querySelectorAll('th,td')].map(td=>td.textContent.trim().replace(/\s+/g,' '));
+      csv+=cr(cells);
+    });
+  }
+  csv+='\r\n';
+
+  // --- SECTION 2: Détail des livraisons ---
+  csv+=cr(['=== DÉTAIL DES LIVRAISONS ===']);
+  csv+=cr(['Produit','Zone','Catégorie','Date','Quantité reçue','Notes']);
+  allRows.forEach(({p,z})=>{
+    let livs=p.history.filter(h=>h.type==='livraison'&&h.date);
+    if(filterLivraisons){
+      if(fromDate) livs=livs.filter(h=>h.date>=fromDate);
+      if(toDate) livs=livs.filter(h=>h.date<=toDate);
+    }
+    livs.sort((a,b)=>a.date.localeCompare(b.date));
+    livs.forEach(h=>csv+=cr([p.name,z.name,p.category||'',h.date.slice(0,10),h.qty,h.notes||'']));
+  });
+  csv+='\r\n';
+
+  // --- SECTION 3: Moyennes de consommation ---
+  csv+=cr(['=== MOYENNES DE CONSOMMATION ===']);
+  csv+=cr(['Produit','Zone','Catégorie','Période inventaire','Stock début','Livraisons','Stock fin','Consommation','Nb jours','Moy./jour','Moy./mois','Jours de stock restants']);
+  allRows.forEach(({p,z})=>{
+    let invs=[...p.history]
+      .filter(h=>(h.type==='inventaire'||h.type==='inventaire_base')&&h.date&&/^\d{4}-\d{2}-\d{2}/.test(h.date))
+      .sort((a,b)=>new Date(a.date)-new Date(b.date));
+    if(filterLivraisons){
+      if(fromDate) invs=invs.filter(h=>h.date>=fromDate);
+      if(toDate) invs=invs.filter(h=>h.date<=toDate);
+    }
+    if(invs.length<2){
+      // No pairs: show overall average from dons if available
+      const dons=p.history.filter(h=>h.type==='don'&&h.qty>0&&h.date);
+      if(dons.length){
+        const totalDon=dons.reduce((s,h)=>s+h.qty,0);
+        const dates=dons.map(h=>new Date(h.date)).sort((a,b)=>a-b);
+        const days=Math.max(1,Math.round((dates[dates.length-1]-dates[0])/86400000)||1);
+        const avgDay=r2(totalDon/days);
+        const avgMonth=r2(avgDay*30.44);
+        const daysLeft=avgDay>0?Math.round(p.qty/avgDay):'';
+        csv+=cr([p.name,z.name,p.category||'','(dons)','','',p.qty,totalDon,days,avgDay,avgMonth,daysLeft]);
+      }
+      return;
+    }
+    // One row per inventory interval
+    let totalCons=0,totalDays=0;
+    for(let i=1;i<invs.length;i++){
+      const prev=invs[i-1],cur=invs[i];
+      let livs=p.history.filter(h=>h.type==='livraison'&&new Date(h.date)>new Date(prev.date)&&new Date(h.date)<=new Date(cur.date));
+      if(filterLivraisons){
+        if(fromDate) livs=livs.filter(h=>h.date>=fromDate);
+        if(toDate) livs=livs.filter(h=>h.date<=toDate);
+      }
+      const livsTotal=livs.reduce((s,h)=>s+h.qty,0);
+      const pretAdj=p.history.filter(h=>['pret','emprunt','retour_pret','retour_emprunt','vente'].includes(h.type)&&new Date(h.date)>new Date(prev.date)&&new Date(h.date)<=new Date(cur.date)).reduce((s,h)=>s+h.qty,0);
+      const cons=Math.max(0,r2(prev.qty+livsTotal+pretAdj-cur.qty));
+      const days=Math.max(1,Math.round((new Date(cur.date)-new Date(prev.date))/86400000));
+      const avgDay=r2(cons/days);
+      const avgMonth=r2(avgDay*30.44);
+      totalCons+=cons; totalDays+=days;
+      const periode=prev.date.slice(0,10)+' → '+cur.date.slice(0,10);
+      csv+=cr([p.name,z.name,p.category||'',periode,prev.qty,livsTotal,cur.qty,cons,days,avgDay,avgMonth,'']);
+    }
+    // Global average row
+    if(invs.length>=2){
+      const avgDayGlobal=totalDays>0?r2(totalCons/totalDays):0;
+      const avgMonthGlobal=r2(avgDayGlobal*30.44);
+      const daysLeft=avgDayGlobal>0?Math.round(p.qty/avgDayGlobal):'';
+      csv+=cr([p.name,z.name,p.category||'','MOYENNE GLOBALE','','','',totalCons,totalDays,avgDayGlobal,avgMonthGlobal,daysLeft]);
+      csv+='\r\n';
+    }
+  });
+
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='conso_stockzone_'+new Date().toISOString().slice(0,10)+'.csv';
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(a.href);
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(a.href),3000);
 }
 
 function exportConsoPrint() {
@@ -4759,6 +4870,10 @@ function renderStats() {
           <label>au</label>
           <input type="date" id="tbl-to" onchange="renderConsoTable()">
           <button onclick="document.getElementById('tbl-from').value='';document.getElementById('tbl-to').value='';renderConsoTable()" style="padding:5px 10px;border-radius:8px;border:1.5px solid var(--gray2);background:var(--gray);color:var(--text2);font-size:12px;cursor:pointer">✕ Effacer</button>
+        </div>
+        <div id="tbl-date-filter-row" style="display:none;align-items:center;gap:8px;margin-top:4px;font-size:12px;color:var(--text2)">
+          <input type="checkbox" id="tbl-filter-livraisons" style="width:16px;height:16px;cursor:pointer" onchange="renderConsoTable()">
+          <label for="tbl-filter-livraisons" style="cursor:pointer">Inclure uniquement les livraisons/inventaires dans cette période</label>
         </div>
         <details class="prod-filter-details" id="prod-filter-details">
           <summary class="prod-filter-summary" id="prod-filter-summary">📦 Tous les produits ▾</summary>
