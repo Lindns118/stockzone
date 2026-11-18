@@ -4645,17 +4645,17 @@ function exportConsoCSV() {
   const period=document.getElementById('tbl-period')?.value||'month';
   const fromDate=document.getElementById('tbl-from')?.value||'';
   const toDate=document.getElementById('tbl-to')?.value||'';
-  const filterLivraisons=document.getElementById('tbl-filter-livraisons')?.checked&&(fromDate||toDate);
+  const filterLivraisons=!!(document.getElementById('tbl-filter-livraisons')?.checked&&(fromDate||toDate));
   const SEP=';';
-  function cv(v){const s=String(v===null||v===undefined?'':v);return s.includes(SEP)||s.includes('"')||s.includes('\n')?'"'+s.replace(/"/g,'""')+'"':s;}
-  function cr(cells){return cells.map(cv).join(SEP)+'\r\n';}
-  let csv='﻿';
-  const dateLabel=(fromDate||toDate)?(` (${fromDate||'…'} → ${toDate||'…'})`):' ';
-  csv+=cr(['StockZone — Export consommation'+dateLabel, new Date().toLocaleDateString('fr-FR')]);
-  csv+='\r\n';
+  const cv=v=>{const t=String(v===null||v===undefined?'':v);return /[;"\n]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t;};
+  const cr=cells=>cells.map(cv).join(SEP)+'\r\n';
+  const num=(v,d=2)=>v===''||v===null||v===undefined||!isFinite(v)?'':String(Math.round(v*10**d)/10**d).replace('.',',');
+  const fd=d=>{const t=(d||'').slice(0,10);return /^\d{4}-\d{2}-\d{2}$/.test(t)?t.slice(8,10)+'/'+t.slice(5,7)+'/'+t.slice(0,4):t;};
+  const inRange=d=>{const t=(d||'').slice(0,10);return (!fromDate||t>=fromDate)&&(!toDate||t<=toDate);};
+  const day=d=>new Date(d);
 
-  // --- Collect products ---
-  const allRows=[];
+  // --- Produits sélectionnés ---
+  const items=[];
   Object.entries(S.zones).forEach(([k,z])=>{
     if(zk!=='all'&&k!==zk)return;
     z.products.forEach(p=>{
@@ -4665,132 +4665,129 @@ function exportConsoCSV() {
       }
       if(_prodFilterNoneMode&&selectedProds.size===0)return;
       if(selectedProds.size>0&&!selectedProds.has(p.name))return;
-      allRows.push({p,z,zk:k});
+      items.push({p,z});
     });
   });
+  if(!items.length){toast('Aucun produit à exporter','error');return;}
+  items.sort((x,y)=>x.p.name.localeCompare(y.p.name,'fr'));
 
-  // --- SECTION 1: Résumé par période ---
-  csv+=cr(['=== CONSOMMATION PAR PÉRIODE ===']);
-  const tbl=document.getElementById('conso-main-tbl');
-  if(tbl){
-    tbl.querySelectorAll('tr').forEach(tr=>{
-      const cells=[...tr.querySelectorAll('th,td')].map(td=>td.textContent.trim().replace(/\s+/g,' '));
-      csv+=cr(cells);
-    });
-  }
-  csv+='\r\n';
-
-  // --- SECTION 2: Détail des livraisons ---
-  csv+=cr(['=== DÉTAIL DES LIVRAISONS ===']);
-  csv+=cr(['Produit','Zone','Catégorie','Date','Quantité reçue','Détail tailles','Fournisseur']);
-  allRows.forEach(({p,z})=>{
-    let livs=p.history.filter(h=>h.type==='livraison'&&h.date);
-    if(filterLivraisons){
-      if(fromDate) livs=livs.filter(h=>h.date.slice(0,10)>=fromDate);
-      if(toDate) livs=livs.filter(h=>h.date.slice(0,10)<=toDate);
-    }
-    livs.sort((a,b)=>a.date.localeCompare(b.date));
-    livs.forEach(h=>csv+=cr([p.name,z.name,p.category||'',h.date.slice(0,10),h.qty,h.sizes?Object.entries(h.sizes).map(([sz,q])=>sz+':'+q).join(' '):(p.sized?'non détaillé':''),h.fournisseur||h.notes||'']));
-  });
-  csv+='\r\n';
-
-  // --- SECTION 3: Moyennes de consommation ---
-  csv+=cr(['=== MOYENNES DE CONSOMMATION ===']);
-  csv+=cr(['Produit','Zone','Catégorie','Période inventaire','Stock début','Livraisons','Stock fin','Consommation','Nb jours','Moy./jour','Moy./mois','Jours de stock restants']);
-  allRows.forEach(({p,z})=>{
-    let invs=[...p.history]
-      .filter(h=>(h.type==='inventaire'||h.type==='inventaire_base')&&h.date&&/^\d{4}-\d{2}-\d{2}/.test(h.date))
-      .sort((a,b)=>new Date(a.date)-new Date(b.date));
-    if(filterLivraisons){
-      if(fromDate) invs=invs.filter(h=>h.date.slice(0,10)>=fromDate);
-      if(toDate) invs=invs.filter(h=>h.date.slice(0,10)<=toDate);
-    }
-    if(invs.length<2){
-      // No pairs: show overall average from dons if available
-      const dons=p.history.filter(h=>h.type==='don'&&h.qty>0&&h.date);
-      if(dons.length){
-        const totalDon=dons.reduce((s,h)=>s+h.qty,0);
-        const dates=dons.map(h=>new Date(h.date)).sort((a,b)=>a-b);
-        const days=Math.max(1,Math.round((dates[dates.length-1]-dates[0])/86400000)||1);
-        const avgDay=r2(totalDon/days);
-        const avgMonth=r2(avgDay*30.44);
-        const daysLeft=avgDay>0?Math.round(p.qty/avgDay):'';
-        csv+=cr([p.name,z.name,p.category||'','(dons)','','',p.qty,totalDon,days,avgDay,avgMonth,daysLeft]);
-      }
-      return;
-    }
-    // One row per inventory interval
-    let totalCons=0,totalDays=0;
+  // --- Calculs par produit ---
+  items.forEach(it=>{
+    const p=it.p;
+    let invs=p.history.filter(h=>(h.type==='inventaire'||h.type==='inventaire_base')&&h.date&&/^\d{4}-\d{2}-\d{2}/.test(h.date)).sort((x,y)=>day(x.date)-day(y.date));
+    if(filterLivraisons) invs=invs.filter(h=>inRange(h.date));
+    let livs=p.history.filter(h=>h.type==='livraison'&&h.date).sort((x,y)=>x.date.localeCompare(y.date));
+    if(filterLivraisons) livs=livs.filter(h=>inRange(h.date));
+    it.livs=livs;
+    it.intervals=[];
     for(let i=1;i<invs.length;i++){
       const prev=invs[i-1],cur=invs[i];
-      let livs=p.history.filter(h=>h.type==='livraison'&&new Date(h.date)>new Date(prev.date)&&new Date(h.date)<=new Date(cur.date));
-      if(filterLivraisons){
-        if(fromDate) livs=livs.filter(h=>h.date.slice(0,10)>=fromDate);
-        if(toDate) livs=livs.filter(h=>h.date.slice(0,10)<=toDate);
+      const lv=livs.filter(h=>day(h.date)>day(prev.date)&&day(h.date)<=day(cur.date));
+      const livTot=lv.reduce((t,h)=>t+h.qty,0);
+      const adj=p.history.filter(h=>['pret','emprunt','retour_pret','retour_emprunt','vente'].includes(h.type)&&day(h.date)>day(prev.date)&&day(h.date)<=day(cur.date)).reduce((t,h)=>t+h.qty,0);
+      const cons=Math.max(0,prev.qty+livTot+adj-cur.qty);
+      const days=Math.max(1,Math.round((day(cur.date)-day(prev.date))/86400000));
+      it.intervals.push({prev,cur,lv,livTot,cons,days});
+    }
+    it.totCons=it.intervals.reduce((t,r)=>t+r.cons,0);
+    it.totDays=it.intervals.reduce((t,r)=>t+r.days,0);
+    it.totLiv=livs.reduce((t,h)=>t+h.qty,0);
+    if(!it.intervals.length){
+      const dons=p.history.filter(h=>h.type==='don'&&h.qty>0&&h.date&&(!filterLivraisons||inRange(h.date)));
+      if(dons.length){
+        const ds=dons.map(h=>day(h.date)).sort((x,y)=>x-y);
+        it.totCons=dons.reduce((t,h)=>t+h.qty,0);
+        it.totDays=Math.max(1,Math.round((ds[ds.length-1]-ds[0])/86400000));
+        it.fromDons=true;
       }
-      const livsTotal=livs.reduce((s,h)=>s+h.qty,0);
-      const pretAdj=p.history.filter(h=>['pret','emprunt','retour_pret','retour_emprunt','vente'].includes(h.type)&&new Date(h.date)>new Date(prev.date)&&new Date(h.date)<=new Date(cur.date)).reduce((s,h)=>s+h.qty,0);
-      const cons=Math.max(0,r2(prev.qty+livsTotal+pretAdj-cur.qty));
-      const days=Math.max(1,Math.round((new Date(cur.date)-new Date(prev.date))/86400000));
-      const avgDay=r2(cons/days);
-      const avgMonth=r2(avgDay*30.44);
-      totalCons+=cons; totalDays+=days;
-      const periode=prev.date.slice(0,10)+' → '+cur.date.slice(0,10);
-      csv+=cr([p.name,z.name,p.category||'',periode,prev.qty,livsTotal,cur.qty,cons,days,avgDay,avgMonth,'']);
     }
-    // Global average row
-    if(invs.length>=2){
-      const avgDayGlobal=totalDays>0?r2(totalCons/totalDays):0;
-      const avgMonthGlobal=r2(avgDayGlobal*30.44);
-      const daysLeft=avgDayGlobal>0?Math.round(p.qty/avgDayGlobal):'';
-      csv+=cr([p.name,z.name,p.category||'','MOYENNE GLOBALE','','','',totalCons,totalDays,avgDayGlobal,avgMonthGlobal,daysLeft]);
-      csv+='\r\n';
-    }
+    it.perDay=it.totDays?it.totCons/it.totDays:0;
+    it.left=it.perDay>0?Math.round(p.qty/it.perDay):'';
+    // Conso par période (même calcul que le tableau à l'écran)
+    const raw=calcConso(p,period,{fromDate,toDate,filterLivraisons});
+    it.grouped={};
+    Object.entries(raw).forEach(([ym,v])=>{
+      if(!/^\d{4}-\d{2}$/.test(ym)&&!/^\d{4}-W\d{2}$/.test(ym))return;
+      const pk=period==='week'?ym:ymPeriod(ym,period);
+      it.grouped[pk]=(it.grouped[pk]||0)+v;
+    });
   });
 
-  // --- SECTION 4: Consommation par taille ---
-  const sizedRows=allRows.filter(({p})=>p.sized);
-  if(sizedRows.length){
-    csv+=cr(['=== CONSOMMATION PAR TAILLE ===']);
-    csv+=cr(['Produit','Zone','Taille','Période inventaire','Stock début','Livraisons','Stock fin','Consommation','Nb jours','Moy./jour','Moy./mois','Stock actuel','Jours de stock restants']);
-    sizedRows.forEach(({p,z})=>{
-      let invs=[...p.history]
-        .filter(h=>(h.type==='inventaire'||h.type==='inventaire_base')&&h.sizes&&h.date&&/^\d{4}-\d{2}-\d{2}/.test(h.date))
-        .sort((a,b)=>new Date(a.date)-new Date(b.date));
-      if(filterLivraisons){
-        if(fromDate) invs=invs.filter(h=>h.date.slice(0,10)>=fromDate);
-        if(toDate) invs=invs.filter(h=>h.date.slice(0,10)<=toDate);
-      }
-      if(invs.length<2){
-        csv+=cr([p.name,z.name,'','Pas assez d\'inventaires par taille (2 minimum)']);
-        csv+='\r\n';
-        return;
-      }
-      getProductSizes(p).forEach(sz=>{
-        let totCons=0,totDays=0;
-        for(let i=1;i<invs.length;i++){
-          const prev=invs[i-1],cur=invs[i];
-          const livs=p.history.filter(h=>h.type==='livraison'&&new Date(h.date)>new Date(prev.date)&&new Date(h.date)<=new Date(cur.date));
-          const days=Math.max(1,Math.round((new Date(cur.date)-new Date(prev.date))/86400000));
-          const periode=prev.date.slice(0,10)+' → '+cur.date.slice(0,10);
-          const sIn=(prev.sizes||{})[sz]||0, sOut=(cur.sizes||{})[sz]||0;
-          if(livs.some(h=>!h.sizes)){
-            csv+=cr([p.name,z.name,sz,periode,sIn,'livraison sans détail taille',sOut,'','','','','','']);
-            continue;
-          }
-          const livSz=livs.reduce((a,h)=>a+((h.sizes||{})[sz]||0),0);
-          const cons=Math.max(0,sIn+livSz-sOut);
-          totCons+=cons; totDays+=days;
-          csv+=cr([p.name,z.name,sz,periode,sIn,livSz,sOut,cons,days,r2(cons/days),r2(cons/days*30.44),'','']);
-        }
-        const stockNow=(p.sizes||{})[sz]||0;
-        if(totDays>0){
-          const d=r2(totCons/totDays);
-          csv+=cr([p.name,z.name,sz,'MOYENNE GLOBALE','','','',totCons,totDays,d,r2(d*30.44),stockNow,d>0?Math.round(stockNow/d):'']);
-        }
-      });
-      csv+='\r\n';
+  const periods=[...new Set(items.flatMap(it=>Object.keys(it.grouped)))].sort().filter(pk=>{
+    if(!fromDate&&!toDate)return true;
+    const d=periodToDate(pk,period);
+    if(fromDate&&d<new Date(fromDate))return false;
+    if(toDate&&d>new Date(toDate+'T23:59:59'))return false;
+    return true;
+  });
+
+  let csv='﻿';
+  csv+=cr(['StockZone — Export consommation']);
+  csv+=cr(['Exporté le',new Date().toLocaleDateString('fr-FR')]);
+  csv+=cr(['Période',(fromDate||toDate)?`${fromDate?fd(fromDate):'début'} → ${toDate?fd(toDate):"aujourd'hui"}`:'Tout l\'historique']);
+  if(filterLivraisons) csv+=cr(['Filtre','Seuls les inventaires et livraisons de cette période sont pris en compte']);
+  csv+=cr(['Produits',items.length]);
+  csv+='\r\n';
+
+  // 1. Résumé
+  csv+=cr(['1. RÉSUMÉ PAR PRODUIT']);
+  csv+=cr(['Produit','Catégorie','Zone','Unité','Stock actuel','Total livré','Total consommé','Nb jours analysés','Moy. / jour','Moy. / mois','Jours de stock restants']);
+  items.forEach(it=>csv+=cr([it.p.name,it.p.category||'',it.z.name,it.p.unit||'',num(it.p.qty),num(it.totLiv),num(it.totCons),it.totDays||'',num(it.perDay),num(it.perDay*30.44,1),it.left]));
+  csv+='\r\n';
+
+  // 2. Conso par période
+  if(periods.length){
+    const lbl={month:'MOIS',week:'SEMAINE',quarter:'TRIMESTRE',year:'ANNÉE'}[period]||'PÉRIODE';
+    csv+=cr([`2. CONSOMMATION PAR ${lbl}`]);
+    csv+=cr(['Produit','Unité',...periods.map(pk=>ymLabel(pk,period)),'Total']);
+    items.forEach(it=>{
+      const vals=periods.map(pk=>it.grouped[pk]||0);
+      csv+=cr([it.p.name,it.p.unit||'',...vals.map(v=>num(v)),num(vals.reduce((t,v)=>t+v,0))]);
     });
+    const tots=periods.map(pk=>items.reduce((t,it)=>t+(it.grouped[pk]||0),0));
+    csv+=cr(['TOTAL','',...tots.map(v=>num(v)),num(tots.reduce((t,v)=>t+v,0))]);
+    csv+='\r\n';
+  }
+
+  // 3. Livraisons
+  csv+=cr(['3. DÉTAIL DES LIVRAISONS']);
+  csv+=cr(['Produit','Date','Quantité','Unité','Détail tailles','Fournisseur']);
+  let nLiv=0;
+  items.forEach(it=>it.livs.forEach(h=>{nLiv++;csv+=cr([it.p.name,fd(h.date),num(h.qty),it.p.unit||'',h.sizes?Object.entries(h.sizes).map(([sz,q])=>sz+' : '+q).join(' / '):(it.p.sized?'non détaillé':''),h.fournisseur||h.notes||'']);}));
+  if(!nLiv) csv+=cr(['Aucune livraison sur la période']);
+  csv+='\r\n';
+
+  // 4. Détail entre inventaires
+  csv+=cr(['4. DÉTAIL ENTRE INVENTAIRES']);
+  csv+=cr(['Produit','Du','Au','Nb jours','Stock début','+ Livré','Stock fin','= Consommé','Moy. / jour','Moy. / mois']);
+  items.forEach(it=>{
+    if(!it.intervals.length){csv+=cr([it.p.name,it.fromDons?'(calculé sur les distributions)':'Pas assez d\'inventaires (2 minimum)']);return;}
+    it.intervals.forEach(r=>csv+=cr([it.p.name,fd(r.prev.date),fd(r.cur.date),r.days,num(r.prev.qty),num(r.livTot),num(r.cur.qty),num(r.cons),num(r.cons/r.days),num(r.cons/r.days*30.44,1)]));
+  });
+  csv+='\r\n';
+
+  // 5. Par taille
+  const sized=items.filter(it=>it.p.sized);
+  if(sized.length){
+    csv+=cr(['5. CONSOMMATION PAR TAILLE']);
+    csv+=cr(['Produit','Taille','Stock actuel','Total consommé','Nb jours analysés','Moy. / jour','Moy. / mois','Jours de stock restants','Remarque']);
+    sized.forEach(it=>{
+      const p=it.p;
+      const sInvs=it.intervals.filter(r=>r.prev.sizes&&r.cur.sizes);
+      getProductSizes(p).forEach(sz=>{
+        let tc=0,td=0,skipped=0;
+        sInvs.forEach(r=>{
+          if(r.lv.some(h=>!h.sizes)){skipped++;return;}
+          const lvs=r.lv.reduce((t,h)=>t+((h.sizes||{})[sz]||0),0);
+          tc+=Math.max(0,((r.prev.sizes||{})[sz]||0)+lvs-((r.cur.sizes||{})[sz]||0));td+=r.days;
+        });
+        const st=(p.sizes||{})[sz]||0;
+        const pd=td?tc/td:0;
+        const note=!sInvs.length?'Pas d\'inventaire par taille':skipped?`${skipped} période(s) ignorée(s) : livraison sans détail de taille`:'';
+        csv+=cr([p.name,sz,num(st),td?num(tc):'',td||'',td?num(pd):'',td?num(pd*30.44,1):'',pd>0?Math.round(st/pd):'',note]);
+      });
+    });
+    csv+='\r\n';
   }
 
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
